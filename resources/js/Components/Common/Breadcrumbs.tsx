@@ -2,10 +2,52 @@ import { Link } from '@inertiajs/react';
 import { ChevronRight, Home } from 'lucide-react';
 import { usePage } from '@inertiajs/react';
 
-export default function Breadcrumbs() {
+export interface BreadcrumbItem {
+    label: string;
+    href?: string;
+}
+
+interface Props {
+    items?: BreadcrumbItem[];
+}
+
+export default function Breadcrumbs({ items }: Props) {
     const { url } = usePage();
 
-    // Remove query params and leading slash, then split
+    // If custom items are provided, use them
+    if (items && items.length > 0) {
+        return (
+            <nav className="flex items-center text-sm text-muted-foreground">
+                <Link
+                    href="/dashboard"
+                    className="flex items-center hover:text-foreground transition-colors"
+                    title="Dashboard"
+                >
+                    <Home className="h-4 w-4" />
+                </Link>
+
+                {items.map((item, index) => (
+                    <div key={index} className="flex items-center">
+                        <ChevronRight className="h-4 w-4 mx-1 text-muted-foreground/50" />
+                        {item.href ? (
+                            <Link
+                                href={item.href}
+                                className="hover:text-foreground transition-colors capitalize"
+                            >
+                                {item.label}
+                            </Link>
+                        ) : (
+                            <span className="font-semibold text-foreground capitalize">
+                                {item.label}
+                            </span>
+                        )}
+                    </div>
+                ))}
+            </nav>
+        );
+    }
+
+    // Default URL-based generation
     const pathSegments = url.split('?')[0].split('/').filter(Boolean);
 
     // Don't show on dashboard/home if empty or just dashboard
@@ -38,22 +80,24 @@ export default function Breadcrumbs() {
                     .replace(/[-_]/g, ' ')
                     .replace(/^\w/, (c) => c.toUpperCase());
 
+                // If segment is numeric, it's likely an ID. 
+                // In URL-mode, we can't know the name, so we just show the number or "Details"
+                // Ideally, pages with IDs should stick to passing custom items.
+                const displayLabel = /^\d+$/.test(label) ? `#${label}` : label;
+
                 return (
                     <div key={path} className="flex items-center">
                         <ChevronRight className="h-4 w-4 mx-1 text-muted-foreground/50" />
                         {isLast ? (
                             <span className="font-semibold text-foreground capitalize">
-                                {label}
+                                {displayLabel}
                             </span>
                         ) : (
-                            // Don't link if it's a numeric ID in the middle of a path (often not indexable directly without context)
-                            // or create logic to handle it. For now, we link everything except numeric IDs to be safe? 
-                            // actually, Laravel resource routes usually handle index.
                             <Link
                                 href={path}
                                 className="hover:text-foreground transition-colors capitalize"
                             >
-                                {label}
+                                {displayLabel}
                             </Link>
                         )}
                     </div>

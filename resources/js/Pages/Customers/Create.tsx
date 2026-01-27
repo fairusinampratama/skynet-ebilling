@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea'; // Assuming you have this
-import { ArrowLeft, Save, User, Network, MapPin, Shield } from 'lucide-react';
+import { ChevronLeft, Save, User, Network, MapPin, Shield } from 'lucide-react';
+import MapPicker from '@/Components/MapPicker';
 import { FormEventHandler } from 'react';
 
 // Interfaces
@@ -59,11 +60,15 @@ export default function Create({ packages }: Props) {
 
     return (
         <AuthenticatedLayout
+            breadcrumbs={[
+                { label: 'Customers', href: route('customers.index') },
+                { label: 'Create' }
+            ]}
             header={
                 <div className="flex items-center gap-4">
                     <Link href={route('customers.index')}>
                         <Button variant="ghost" size="icon" className="rounded-full">
-                            <ArrowLeft className="h-5 w-5" />
+                            <ChevronLeft className="h-5 w-5" />
                         </Button>
                     </Link>
                     <h2 className="text-xl font-semibold leading-tight text-foreground">
@@ -75,6 +80,16 @@ export default function Create({ packages }: Props) {
             <Head title="Create Customer" />
 
             <form onSubmit={submit} className="space-y-8 py-6">
+                {Object.keys(errors).length > 0 && (
+                    <div className="bg-destructive/15 text-destructive p-4 rounded-md border border-destructive/20">
+                        <p className="font-semibold">Please fix the following errors:</p>
+                        <ul className="list-disc list-inside text-sm mt-1">
+                            {Object.entries(errors).map(([field, msg]) => (
+                                <li key={field}>{msg}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
                 <div className="grid gap-8 lg:grid-cols-2">
                     {/* Left Column: Personal Information */}
                     <div className="space-y-6">
@@ -91,17 +106,29 @@ export default function Create({ packages }: Props) {
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        id="name"
-                                        value={data.name}
-                                        onChange={handleNameChange}
-                                        placeholder="e.g. John Doe"
-                                        className={errors.name ? 'border-destructive' : ''}
-                                        required
-                                    />
-                                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="internal_id">Internal ID</Label>
+                                        <Input
+                                            id="internal_id"
+                                            value={data.internal_id}
+                                            onChange={(e) => setData('internal_id', e.target.value)}
+                                            placeholder="e.g. 1001"
+                                        />
+                                        {errors.internal_id && <p className="text-sm text-destructive">{errors.internal_id}</p>}
+                                    </div>
+                                    <div className="col-span-2 grid gap-2">
+                                        <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
+                                        <Input
+                                            id="name"
+                                            value={data.name}
+                                            onChange={handleNameChange}
+                                            placeholder="e.g. John Doe"
+                                            className={errors.name ? 'border-destructive' : ''}
+                                            required
+                                        />
+                                        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -154,24 +181,39 @@ export default function Create({ packages }: Props) {
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="lat">Latitude</Label>
-                                    <Input
-                                        id="lat"
-                                        value={data.geo_lat}
-                                        onChange={(e) => setData('geo_lat', e.target.value)}
-                                        placeholder="-6.200000"
+                            <CardContent className="space-y-4">
+                                <div className="rounded-md overflow-hidden border border-border">
+                                    <MapPicker
+                                        initialLat={Number(data.geo_lat) || -6.200000}
+                                        initialLong={Number(data.geo_long) || 106.816666}
+                                        onLocationSelect={(lat: number, lng: number) => {
+                                            setData((prev) => ({
+                                                ...prev,
+                                                geo_lat: lat.toFixed(6),
+                                                geo_long: lng.toFixed(6)
+                                            }));
+                                        }}
                                     />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="long">Longitude</Label>
-                                    <Input
-                                        id="long"
-                                        value={data.geo_long}
-                                        onChange={(e) => setData('geo_long', e.target.value)}
-                                        placeholder="106.816666"
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="lat">Latitude</Label>
+                                        <Input
+                                            id="lat"
+                                            value={data.geo_lat}
+                                            onChange={(e) => setData('geo_lat', e.target.value)}
+                                            placeholder="-6.200000"
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="long">Longitude</Label>
+                                        <Input
+                                            id="long"
+                                            value={data.geo_long}
+                                            onChange={(e) => setData('geo_long', e.target.value)}
+                                            placeholder="106.816666"
+                                        />
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

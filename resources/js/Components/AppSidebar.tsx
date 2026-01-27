@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { LayoutDashboard, Users, FileText, Package } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Package, Server } from 'lucide-react';
 
 export function AppSidebar() {
     const { url } = usePage(); // Use usePage hook to get current URL
@@ -10,6 +10,7 @@ export function AppSidebar() {
         { name: 'Customers', route: 'customers.index', icon: Users },
         { name: 'Invoices', route: 'invoices.index', icon: FileText },
         { name: 'Packages', route: 'packages.index', icon: Package },
+        { name: 'Routers', route: 'routers.index', icon: Server },
     ];
 
     return (

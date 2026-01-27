@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+
 use Illuminate\Support\Facades\DB;
 
 class GenerateInvoices extends Command

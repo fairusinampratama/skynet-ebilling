@@ -15,11 +15,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
+        // Create Admin User
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'name' => 'Admin Skynet',
+            'email' => 'admin@skynet.id',
+            'password' => bcrypt('skynet123'),
         ]);
+
+        // Seed in proper order
+        $this->call([
+            RouterSeeder::class,      // First: Routers
+            CustomerSeeder::class,    // Second: Customers (needs packages auto-created)
+        ]);
+
+        // Auto-scan network to map customers
+        $this->command->info('Running initial network scan...');
+        \Illuminate\Support\Facades\Artisan::call('network:monitor'); // Get stats first
+        \Illuminate\Support\Facades\Artisan::call('network:scan');    // Then map customers
+        $this->command->info('Network scan completed.');
     }
 }

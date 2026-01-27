@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Customer;
-use Illuminate\Http\Request;
+
 use Inertia\Inertia;
 
 class InvoiceController extends Controller
@@ -14,35 +15,32 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Invoice::with(['customer.package']);
+        $query = Invoice::query()
+            ->with(['customer:id,name,code,internal_id'])
+            ->when($request->search, function ($q, $search) {
+                $q->whereHas('customer', function ($c) use ($search) {
+                    $c->where('name', 'like', "%{$search}%")
+                      ->orWhere('code', 'like', "%{$search}%")
+                      ->orWhere('internal_id', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->status, function ($q, $status) {
+                if ($status !== 'all') {
+                    $q->where('status', $status);
+                }
+            })
+            // Default sort: Unpaid first, then newest
+            ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
+            ->latest('period');
 
-        // Filter by status
-        if ($request->has('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by overdue
-        if ($request->has('overdue') && $request->overdue === 'true') {
-            $query->where('status', 'unpaid')
-                  ->where('due_date', '<', now());
-        }
-
-        // Search
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->whereHas('customer', function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
-
-        $invoices = $query->orderBy('due_date', 'desc')
-                          ->paginate(50)
-                          ->withQueryString();
+        $invoices = $query->paginate(50)->withQueryString();
 
         return Inertia::render('Invoices/Index', [
             'invoices' => $invoices,
-            'filters' => $request->only(['status', 'overdue', 'search']),
+            'filters' => [
+                'search' => $request->search,
+                'status' => $request->status ?? 'all',
+            ],
         ]);
     }
 

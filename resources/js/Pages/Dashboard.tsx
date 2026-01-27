@@ -3,11 +3,11 @@ import { Head } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Activity, CreditCard, DollarSign, AlertCircle } from 'lucide-react';
+import { Activity, CreditCard, DollarSign, AlertCircle, Wifi, Server } from 'lucide-react';
 
 interface Transaction {
     id: number;
-    amount_paid: number;
+    amount: number;
     method: string;
     paid_at: string;
     invoice: {
@@ -31,12 +31,20 @@ interface DashboardStats {
     overdue_count: number;
 }
 
+interface NetworkStats {
+    total_routers: number;
+    active_routers: number;
+    isolated_customers: number;
+    mapping_percentage: number;
+}
+
 interface Props {
     stats: DashboardStats;
+    network_stats: NetworkStats;
     recent_payments: Transaction[];
 }
 
-export default function Dashboard({ stats, recent_payments }: Props) {
+export default function Dashboard({ stats, network_stats, recent_payments }: Props) {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -159,6 +167,73 @@ export default function Dashboard({ stats, recent_payments }: Props) {
                     </Card>
                 </div>
 
+                {/* Network Health Card */}
+                <Card className="border-border bg-card">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Wifi className="h-5 w-5 text-primary" />
+                            Network Health
+                        </CardTitle>
+                        <CardDescription>
+                            Router status and customer mapping overview
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-6 md:grid-cols-4">
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Server className="h-4 w-4" />
+                                    <span>Active Routers</span>
+                                </div>
+                                <div className="text-2xl font-bold">
+                                    {network_stats.active_routers}/{network_stats.total_routers}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {network_stats.total_routers > 0
+                                        ? Math.round((network_stats.active_routers / network_stats.total_routers) * 100)
+                                        : 0}% online
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <span>Isolated Customers</span>
+                                </div>
+                                <div className="text-2xl font-bold text-red-500">
+                                    {network_stats.isolated_customers}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Blocked for non-payment
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Activity className="h-4 w-4" />
+                                    <span>Router Mapping</span>
+                                </div>
+                                <div className="text-2xl font-bold">
+                                    {network_stats.mapping_percentage}%
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Customers linked to routers
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Wifi className="h-4 w-4" />
+                                    <span>System Status</span>
+                                </div>
+                                <Badge variant={network_stats.active_routers === network_stats.total_routers ? 'default' : 'secondary'}>
+                                    {network_stats.active_routers === network_stats.total_routers ? 'All Systems Operational' : 'Some Routers Offline'}
+                                </Badge>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Recent Payments Table */}
                 <Card className="border-border bg-card/50 backdrop-blur-sm shadow-none">
                     <CardHeader>
@@ -226,7 +301,7 @@ export default function Dashboard({ stats, recent_payments }: Props) {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right font-bold font-mono tracking-tight text-foreground">
-                                                {formatCurrency(payment.amount_paid)}
+                                                {formatCurrency(payment.amount)}
                                             </TableCell>
                                         </TableRow>
                                     ))

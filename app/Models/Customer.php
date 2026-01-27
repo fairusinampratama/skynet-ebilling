@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
+
 class Customer extends Model
 {
     use LogsActivity;
@@ -27,6 +28,7 @@ class Customer extends Model
         'pppoe_user',
         'pppoe_pass',
         'package_id',
+        'router_id',
         'status',
         'join_date',
         'ktp_photo_url',
@@ -49,6 +51,11 @@ class Customer extends Model
     public function package(): BelongsTo
     {
         return $this->belongsTo(Package::class);
+    }
+
+    public function router(): BelongsTo
+    {
+        return $this->belongsTo(Router::class);
     }
 
     public function invoices(): HasMany

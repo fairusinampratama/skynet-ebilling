@@ -54,6 +54,7 @@ class CustomerController extends Controller
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
             'filters' => $request->only(['search', 'status', 'package_id', 'sort', 'direction']),
+            'packages' => Package::all(), // For filter dropdown
         ]);
     }
 
@@ -67,7 +68,51 @@ class CustomerController extends Controller
         ]);
     }
 
-    // ...
+    /**
+     * Store a newly created customer in storage.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'internal_id' => 'nullable|string|max:255',
+            'address' => 'required|string',
+            'phone' => 'nullable|string|max:20',
+            'nik' => 'nullable|string|max:20',
+            'pppoe_user' => 'required|string|unique:customers,pppoe_user',
+            'pppoe_pass' => 'required|string',
+            'package_id' => 'required|exists:packages,id',
+            'status' => 'required|in:active,suspended,isolated,offboarding',
+            'geo_lat' => 'nullable|numeric|between:-90,90',
+            'geo_long' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        // Auto-generate join date if not provided
+        $validated['join_date'] = now();
+
+        Customer::create($validated);
+
+        return redirect()->route('customers.index')
+            ->with('success', 'Customer created successfully.');
+    }
+
+    /**
+     * Display the specified customer.
+     */
+    public function show(Customer $customer)
+    {
+        $customer->load([
+            'package', 
+            'invoices' => function($q) {
+                $q->latest('period'); 
+            },
+            'invoices.transactions'
+        ]);
+
+        return Inertia::render('Customers/Show', [
+            'customer' => $customer,
+        ]);
+    }
 
     /**
      * Show the form for editing the customer
@@ -87,11 +132,25 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'internal_id' => 'nullable|string|max:255',
             'package_id' => 'required|exists:packages,id',
             'address' => 'required|string',
             'phone' => 'nullable|string',
+            'nik' => 'nullable|string',
+            'pppoe_user' => 'required|string|unique:customers,pppoe_user,' . $customer->id,
+            'pppoe_pass' => 'nullable|string', // Optional password update
             'status' => 'required|in:active,suspended,isolated,offboarding',
+            'geo_lat' => 'nullable|numeric|between:-90,90',
+            'geo_long' => 'nullable|numeric|between:-180,180',
         ]);
+
+        // Only update password if a new one is provided
+        if ($request->filled('pppoe_pass')) {
+            // The model cast will automatically encrypt this
+            $validated['pppoe_pass'] = $request->pppoe_pass;
+        } else {
+            unset($validated['pppoe_pass']);
+        }
 
         $customer->update($validated);
 

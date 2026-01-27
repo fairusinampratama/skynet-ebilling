@@ -12,12 +12,12 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class IsolateCustomerJob implements ShouldQueue
+class ReconnectCustomerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
-    public $backoff = [60, 180, 600]; // 1min, 3min, 10min
+    public $backoff = [60, 180, 600];
 
     /**
      * Create a new job instance.
@@ -34,29 +34,24 @@ class IsolateCustomerJob implements ShouldQueue
     {
         // Check if customer has a router assigned
         if (!$this->customer->router_id || !$this->customer->router) {
-            Log::warning("Customer {$this->customer->name} has no router assigned. Skipping isolation.");
-            activity()
-                ->causedBy(auth()->user() ?? null)
-                ->performedOn($this->customer)
-                ->withProperties(['reason' => 'no_router_assigned'])
-                ->log('isolation_skipped');
+            Log::warning("Customer {$this->customer->name} has no router assigned. Skipping reconnection.");
             return;
         }
 
         $router = $this->customer->router;
 
         try {
-            Log::info("Attempting to isolate: {$this->customer->name} ({$this->customer->pppoe_user}) on {$router->name}");
+            Log::info("Attempting to reconnect: {$this->customer->name} ({$this->customer->pppoe_user}) on {$router->name}");
 
             // Connect to the customer's router
             $mikrotik->connect($router);
 
-            // Isolate the user
-            $success = $mikrotik->isolateUser($this->customer->pppoe_user);
+            // Reconnect the user (restore to 'default' profile)
+            $success = $mikrotik->reconnectUser($this->customer->pppoe_user, 'default');
 
             if ($success) {
-                // Update customer status
-                $this->customer->update(['status' => 'isolated']);
+                // Update customer status back to active
+                $this->customer->update(['status' => 'active']);
 
                 // Log the action
                 activity()
@@ -66,17 +61,17 @@ class IsolateCustomerJob implements ShouldQueue
                         'router' => $router->name,
                         'pppoe_user' => $this->customer->pppoe_user,
                     ])
-                    ->log('customer_isolated');
+                    ->log('customer_reconnected');
 
-                Log::info("Successfully isolated: {$this->customer->name}");
+                Log::info("Successfully reconnected: {$this->customer->name}");
             } else {
-                Log::warning("Failed to isolate {$this->customer->name}: User not found on router");
+                Log::warning("Failed to reconnect {$this->customer->name}: User not found on router");
             }
 
             $mikrotik->disconnect();
 
         } catch (Exception $e) {
-            Log::error("Failed to isolate customer {$this->customer->name}: " . $e->getMessage());
+            Log::error("Failed to reconnect customer {$this->customer->name}: " . $e->getMessage());
             
             // Log the failure
             activity()
@@ -86,7 +81,7 @@ class IsolateCustomerJob implements ShouldQueue
                     'error' => $e->getMessage(),
                     'router' => $router->name,
                 ])
-                ->log('isolation_failed');
+                ->log('reconnection_failed');
 
             // Retry logic
             if ($this->attempts() < $this->tries) {

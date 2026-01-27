@@ -1,5 +1,6 @@
-import { PropsWithChildren, ReactNode, useState } from 'react';
+import { PropsWithChildren, ReactNode, useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
+import { PageProps } from '@/types';
 import {
     Menu,
     Search,
@@ -22,17 +23,33 @@ import { Link } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { ThemeToggle } from '@/Components/ThemeToggle';
 import { AppSidebar } from '@/Components/AppSidebar';
-import Breadcrumbs from '@/Components/Common/Breadcrumbs';
+import Breadcrumbs, { BreadcrumbItem } from '@/Components/Common/Breadcrumbs';
+
+import { Toaster } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 
 export default function Authenticated({
     header,
     children,
-}: PropsWithChildren<{ header?: ReactNode }>) {
+    breadcrumbs,
+}: PropsWithChildren<{ header?: ReactNode; breadcrumbs?: BreadcrumbItem[] }>) {
     const user = usePage().props.auth.user;
+    const { flash } = usePage<PageProps>().props; // Clean typescript inference
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
+
+    // Watch for flash messages
+    useEffect(() => {
+        if (flash.success) {
+            toast.success(flash.success);
+        }
+        if (flash.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
     return (
         <div className="flex h-screen bg-background font-sans overflow-hidden">
+            <Toaster />
             {/* Background Pattern - Subtle Texture */}
             <div className="fixed inset-0 z-0 pointer-events-none opacity-50">
                 <div className="absolute inset-0"
@@ -88,10 +105,9 @@ export default function Authenticated({
                         <span className="sr-only">Toggle navigation menu</span>
                     </Button>
 
-                    {/* Header Left: Breadcrumbs & Search */}
                     <div className="flex flex-1 items-center gap-4">
                         <div className="hidden md:block">
-                            <Breadcrumbs />
+                            <Breadcrumbs items={breadcrumbs} />
                         </div>
 
                         {/* Divider */}

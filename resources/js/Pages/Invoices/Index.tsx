@@ -1,18 +1,17 @@
+import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState } from 'react';
-import { router } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
+import { Eye, CreditCard, Calendar, AlertCircle, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 
 interface Customer {
     id: number;
     name: string;
     code: string | null;
+    internal_id: string | null;
 }
 
 interface Invoice {
@@ -25,33 +24,16 @@ interface Invoice {
 }
 
 interface Props {
-    invoices: {
-        data: Invoice[];
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-    };
+    invoices: PaginatedData<Invoice>;
     filters: {
         search?: string;
         status?: string;
+        sort?: string;
+        direction?: 'asc' | 'desc';
     };
 }
 
-export default function Index({ invoices, filters }: Props) {
-    const [search, setSearch] = useState(filters.search || '');
-    const [status, setStatus] = useState(filters.status || 'all');
-
-    const handleFilter = () => {
-        router.get('/invoices', {
-            search: search || undefined,
-            status: status !== 'all' ? status : undefined,
-        }, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
+export default function Index({ invoices, filters = {} }: Props) {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -69,172 +51,171 @@ export default function Index({ invoices, filters }: Props) {
     };
 
     const getStatusBadge = (status: string) => {
-        const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-            paid: 'default',
-            unpaid: 'destructive',
-            void: 'secondary',
+        const variants: Record<string, string> = {
+            paid: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
+            unpaid: 'text-red-500 border-red-500/20 bg-red-500/10',
+            void: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
         };
-        return variants[status] || 'outline';
+        const className = variants[status] || 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10';
+
+        return (
+            <Badge variant="outline" className={`${className} capitalize border`}>
+                {status}
+            </Badge>
+        );
     };
 
     const isOverdue = (invoice: Invoice) => {
         return invoice.status === 'unpaid' && new Date(invoice.due_date) < new Date();
     };
 
+    const columns: Column<Invoice>[] = [
+        {
+            header: "ID",
+            className: "w-[80px]",
+            cell: (invoice) => (
+                <span className="font-mono text-xs text-muted-foreground font-medium">
+                    #{invoice.id}
+                </span>
+            )
+        },
+        {
+            header: "Customer",
+            accessorKey: "customer", // Sorting might need specific handling backend side if we want to sort by customer name
+            sortable: false,
+            cell: (invoice) => (
+                <div className="flex flex-col">
+                    <Link
+                        href={route('customers.show', invoice.customer.id)}
+                        className="font-medium text-foreground hover:underline"
+                    >
+                        {invoice.customer.name}
+                    </Link>
+                    {invoice.customer.code && (
+                        <span className="text-xs text-muted-foreground">
+                            {invoice.customer.code}
+                        </span>
+                    )}
+                </div>
+            )
+        },
+        {
+            header: "Period",
+            accessorKey: "period",
+            sortable: true,
+            cell: (invoice) => (
+                <span className="font-medium">
+                    {new Date(invoice.period).toLocaleDateString('id-ID', {
+                        month: 'long',
+                        year: 'numeric'
+                    })}
+                </span>
+            )
+        },
+        {
+            header: "Amount",
+            accessorKey: "amount",
+            cell: (invoice) => (
+                <span className="font-mono">
+                    {formatCurrency(invoice.amount)}
+                </span>
+            )
+        },
+        {
+            header: "Status",
+            accessorKey: "status",
+            sortable: true,
+            cell: (invoice) => getStatusBadge(invoice.status)
+        },
+        {
+            header: "Due Date",
+            accessorKey: "due_date",
+            cell: (invoice) => (
+                <div className="flex flex-col gap-1">
+                    <div className={`flex items-center gap-2 text-sm ${isOverdue(invoice) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-muted-foreground'}`}>
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{formatDate(invoice.due_date)}</span>
+                    </div>
+                    {isOverdue(invoice) && (
+                        <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400 animate-pulse mt-0.5">
+                            <AlertCircle className="h-3 w-3" />
+                            <span className="text-[10px] font-bold uppercase tracking-wide">Overdue</span>
+                        </div>
+                    )}
+                </div>
+            )
+        },
+        {
+            header: "Actions",
+            className: "text-right",
+            cell: (invoice) => (
+                <div className="flex justify-end gap-2">
+                    {invoice.status === 'unpaid' && (
+                        <Link href={route('invoices.show', invoice.id)}>
+                            <Button size="sm" className="h-8">
+                                <CreditCard className="mr-2 h-3 w-3" />
+                                Pay
+                            </Button>
+                        </Link>
+                    )}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.visit(route('invoices.show', invoice.id))}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => window.open(route('invoices.download', invoice.id), '_blank')}>
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Download PDF
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            )
+        }
+    ];
+
+    const filterConfigs: FilterConfig[] = [
+        {
+            key: 'status',
+            placeholder: 'All Status',
+            options: [
+                { label: 'Paid', value: 'paid' },
+                { label: 'Unpaid', value: 'unpaid' },
+                { label: 'Void', value: 'void' },
+            ]
+        }
+    ];
+
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                    Invoices
-                </h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold leading-tight text-foreground">
+                        Invoices
+                    </h2>
+                </div>
             }
         >
             <Head title="Invoices" />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Invoice Management</CardTitle>
-                            <CardDescription>
-                                Showing {invoices.data.length} of {invoices.total} invoices
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {/* Search and Filters */}
-                            <div className="mb-6 flex flex-col gap-4 sm:flex-row">
-                                <div className="flex-1">
-                                    <Input
-                                        placeholder="Search by customer name or code..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleFilter()}
-                                    />
-                                </div>
-                                <Select value={status} onValueChange={setStatus}>
-                                    <SelectTrigger className="w-full sm:w-[180px]">
-                                        <SelectValue placeholder="All Statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Statuses</SelectItem>
-                                        <SelectItem value="paid">Paid</SelectItem>
-                                        <SelectItem value="unpaid">Unpaid</SelectItem>
-                                        <SelectItem value="void">Void</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Button onClick={handleFilter}>Filter</Button>
-                            </div>
-
-                            {/* Table */}
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>ID</TableHead>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead>Period</TableHead>
-                                        <TableHead>Amount</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {invoices.data.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center text-muted-foreground">
-                                                No invoices found
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        invoices.data.map((invoice) => (
-                                            <TableRow key={invoice.id}>
-                                                <TableCell className="font-medium">
-                                                    #{invoice.id}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-col">
-                                                        <Link
-                                                            href={`/customers/${invoice.customer.id}`}
-                                                            className="font-medium hover:underline"
-                                                        >
-                                                            {invoice.customer.name}
-                                                        </Link>
-                                                        {invoice.customer.code && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                {invoice.customer.code}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {new Date(invoice.period).toLocaleDateString('id-ID', {
-                                                        year: 'numeric',
-                                                        month: 'long',
-                                                    })}
-                                                </TableCell>
-                                                <TableCell className="font-medium">
-                                                    {formatCurrency(invoice.amount)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant={getStatusBadge(invoice.status)}>
-                                                        {invoice.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className={isOverdue(invoice) ? 'text-red-600 font-medium' : ''}>
-                                                        {formatDate(invoice.due_date)}
-                                                        {isOverdue(invoice) && ' (Overdue)'}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Link href={`/invoices/${invoice.id}`}>
-                                                        <Button variant="ghost" size="sm">
-                                                            View
-                                                        </Button>
-                                                    </Link>
-                                                    {invoice.status === 'unpaid' && (
-                                                        <Link href={`/invoices/${invoice.id}/pay`}>
-                                                            <Button variant="default" size="sm" className="ml-2">
-                                                                Pay
-                                                            </Button>
-                                                        </Link>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-
-                            {/* Pagination */}
-                            {invoices.last_page > 1 && (
-                                <div className="mt-4 flex items-center justify-between">
-                                    <div className="text-sm text-muted-foreground">
-                                        Page {invoices.current_page} of {invoices.last_page}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={invoices.current_page === 1}
-                                            onClick={() => router.get(`/invoices?page=${invoices.current_page - 1}`)}
-                                        >
-                                            Previous
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={invoices.current_page === invoices.last_page}
-                                            onClick={() => router.get(`/invoices?page=${invoices.current_page + 1}`)}
-                                        >
-                                            Next
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="py-8">
+                <DataTable
+                    data={invoices}
+                    columns={columns}
+                    filters={filters}
+                    title="Invoices"
+                    description={`Showing ${invoices.data.length} of ${invoices.total} invoices`}
+                    searchPlaceholder="Search Customer, Code..."
+                    filterConfigs={filterConfigs}
+                    routeName="invoices.index"
+                />
             </div>
         </AuthenticatedLayout>
     );

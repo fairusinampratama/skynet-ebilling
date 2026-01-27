@@ -1,10 +1,35 @@
+import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    User, MapPin, Phone, Hash, Calendar, DollarSign,
+    CreditCard, FileText, CheckCircle2, Clock, AlertCircle,
+    Download, ExternalLink, Plus, ChevronLeft
+} from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Customer {
     id: number;
@@ -41,6 +66,18 @@ interface Props {
 }
 
 export default function Show({ invoice }: Props) {
+    const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+
+    const totalPaid = invoice.transactions.reduce((sum, t) => sum + t.amount, 0);
+    const balance = invoice.amount - totalPaid;
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        amount: balance,
+        method: 'cash',
+        paid_at: new Date().toISOString().slice(0, 16), // datetime-local format
+        proof_url: '',
+    });
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -67,181 +104,321 @@ export default function Show({ invoice }: Props) {
         });
     };
 
-    const totalPaid = invoice.transactions.reduce((sum, t) => sum + t.amount, 0);
-    const balance = invoice.amount - totalPaid;
-
     const getStatusBadge = (status: string) => {
-        const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-            paid: 'default',
-            unpaid: 'destructive',
-            void: 'secondary',
+        const variants: Record<string, string> = {
+            paid: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/25 border-emerald-200 dark:border-emerald-800',
+            unpaid: 'bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-500/25 border-red-200 dark:border-red-800',
+            void: 'bg-gray-500/15 text-gray-700 dark:text-gray-400 hover:bg-gray-500/25 border-gray-200 dark:border-gray-800',
         };
-        return variants[status] || 'outline';
+        return variants[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+    };
+
+    const handlePaymentSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post(route('payments.store', invoice.id), {
+            onSuccess: () => {
+                setIsPaymentOpen(false);
+                reset();
+                toast.success('Payment recorded successfully');
+            },
+        });
     };
 
     return (
         <AuthenticatedLayout
+            breadcrumbs={[
+                { label: 'Invoices', href: route('invoices.index') },
+                { label: `Invoice #${invoice.id}` }
+            ]}
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                    Invoice #{invoice.id}
-                </h2>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link href={route('invoices.index')}>
+                            <Button variant="ghost" size="icon" className="rounded-full">
+                                <ChevronLeft className="h-5 w-5" />
+                            </Button>
+                        </Link>
+                        <div>
+                            <h2 className="text-xl font-semibold leading-tight text-foreground">
+                                Invoice #{invoice.id}
+                            </h2>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                                {invoice.customer.name} • {formatDate(invoice.generated_at)}
+                            </p>
+                        </div>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-2">
+                        <Download className="w-4 h-4" />
+                        Download PDF
+                    </Button>
+                </div>
             }
         >
-            <Head title={`Invoice #${invoice.id}`} />
+            <Head title={`Invoice: #${invoice.id}`} />
 
-            <div className="py-12">
-                <div className="mx-auto max-w-7xl sm:px-6 lg:px-8 space-y-6">
-                    {/* Invoice Header */}
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle>Invoice #{invoice.id}</CardTitle>
-                                    <CardDescription>
-                                        Generated on {formatDate(invoice.generated_at)}
-                                    </CardDescription>
-                                </div>
-                                <Badge variant={getStatusBadge(invoice.status)} className="text-lg px-4 py-2">
-                                    {invoice.status.toUpperCase()}
-                                </Badge>
+            <div className="py-8">
+                <div className="mx-auto max-w-5xl space-y-6">
+                    {/* Status Banner */}
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-6 rounded-xl border border-border bg-card shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-full ${invoice.status === 'paid' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-red-100 dark:bg-red-900/30 text-red-600'}`}>
+                                {invoice.status === 'paid' ? <CheckCircle2 className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
                             </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-6 md:grid-cols-2">
-                                {/* Customer Info */}
-                                <div>
-                                    <h3 className="font-semibold mb-2">Customer Information</h3>
-                                    <div className="space-y-1 text-sm">
-                                        <p>
-                                            <Link
-                                                href={`/customers/${invoice.customer.id}`}
-                                                className="font-medium hover:underline"
-                                            >
-                                                {invoice.customer.name}
-                                            </Link>
-                                        </p>
-                                        {invoice.customer.code && (
-                                            <p className="text-muted-foreground">Code: {invoice.customer.code}</p>
-                                        )}
-                                        {invoice.customer.phone && (
-                                            <p className="text-muted-foreground">Phone: {invoice.customer.phone}</p>
-                                        )}
-                                        <p className="text-muted-foreground">{invoice.customer.address}</p>
-                                    </div>
-                                </div>
-
-                                {/* Invoice Details */}
-                                <div>
-                                    <h3 className="font-semibold mb-2">Invoice Details</h3>
-                                    <div className="space-y-1 text-sm">
-                                        <p>
-                                            <span className="text-muted-foreground">Period:</span>{' '}
-                                            <span className="font-medium">
-                                                {new Date(invoice.period).toLocaleDateString('id-ID', {
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                })}
-                                            </span>
-                                        </p>
-                                        <p>
-                                            <span className="text-muted-foreground">Due Date:</span>{' '}
-                                            <span className="font-medium">{formatDate(invoice.due_date)}</span>
-                                        </p>
-                                        <p>
-                                            <span className="text-muted-foreground">Amount:</span>{' '}
-                                            <span className="font-bold text-lg">{formatCurrency(invoice.amount)}</span>
-                                        </p>
-                                        {totalPaid > 0 && (
-                                            <>
-                                                <p>
-                                                    <span className="text-muted-foreground">Paid:</span>{' '}
-                                                    <span className="font-medium text-green-600">
-                                                        {formatCurrency(totalPaid)}
-                                                    </span>
-                                                </p>
-                                                <p>
-                                                    <span className="text-muted-foreground">Balance:</span>{' '}
-                                                    <span className="font-medium text-red-600">
-                                                        {formatCurrency(balance)}
-                                                    </span>
-                                                </p>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+                            <div>
+                                <h3 className="font-semibold text-lg">
+                                    {invoice.status === 'paid' ? 'Invoice Paid' : 'Payment Pending'}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {invoice.status === 'paid'
+                                        ? 'This invoice has been fully settled.'
+                                        : `Due on ${formatDate(invoice.due_date)}`
+                                    }
+                                </p>
                             </div>
+                        </div>
 
+                        <div className="flex items-center gap-3">
+                            {/* Payment Dialog */}
                             {invoice.status === 'unpaid' && (
-                                <>
-                                    <Separator className="my-6" />
-                                    <div className="flex justify-end">
-                                        <Link href={`/invoices/${invoice.id}/pay`}>
-                                            <Button size="lg">Record Payment</Button>
-                                        </Link>
-                                    </div>
-                                </>
+                                <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                                            <CreditCard className="w-4 h-4" />
+                                            Record Payment
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[425px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Record Payment</DialogTitle>
+                                            <DialogDescription>
+                                                Enter the payment details for Invoice #{invoice.id}.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={handlePaymentSubmit} className="space-y-4 pt-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="amount">Amount (IDR)</Label>
+                                                <Input
+                                                    id="amount"
+                                                    type="number"
+                                                    value={data.amount}
+                                                    onChange={(e) => setData('amount', Number(e.target.value))}
+                                                    max={balance}
+                                                    required
+                                                />
+                                                <p className="text-xs text-muted-foreground">
+                                                    Max payable: {formatCurrency(balance)}
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="date">Payment Date</Label>
+                                                <Input
+                                                    id="date"
+                                                    type="datetime-local"
+                                                    value={data.paid_at}
+                                                    onChange={(e) => setData('paid_at', e.target.value)}
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="method">Payment Method</Label>
+                                                <Select
+                                                    value={data.method}
+                                                    onValueChange={(val) => setData('method', val)}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select method" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="cash">Cash</SelectItem>
+                                                        <SelectItem value="transfer">Bank Transfer</SelectItem>
+                                                        <SelectItem value="payment_gateway">Payment Gateway</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="proof">Proof URL (Optional)</Label>
+                                                <Input
+                                                    id="proof"
+                                                    placeholder="https://..."
+                                                    value={data.proof_url}
+                                                    onChange={(e) => setData('proof_url', e.target.value)}
+                                                />
+                                            </div>
+
+                                            <DialogFooter className="pt-4">
+                                                <Button type="button" variant="outline" onClick={() => setIsPaymentOpen(false)}>
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={processing}>
+                                                    {processing ? 'Recording...' : 'Save Payment'}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
                             )}
-                        </CardContent>
-                    </Card>
+
+                            {/* Download Button moved to Header */}
+                        </div>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Customer Info Card */}
+                        <Card className="shadow-sm border-border">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <User className="w-4 h-4 text-muted-foreground" />
+                                    Customer Details
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid gap-4">
+                                <div className="space-y-1">
+                                    <Link href={`/customers/${invoice.customer.id}`} className="font-semibold text-lg hover:underline text-foreground">
+                                        {invoice.customer.name}
+                                    </Link>
+                                    {invoice.customer.code && (
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Hash className="w-3.5 h-3.5" />
+                                            <span>{invoice.customer.code}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <Separator />
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex items-start gap-3">
+                                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                                        <span className="text-muted-foreground">{invoice.customer.address}</span>
+                                    </div>
+                                    {invoice.customer.phone && (
+                                        <div className="flex items-center gap-3">
+                                            <Phone className="w-4 h-4 text-muted-foreground" />
+                                            <span className="text-muted-foreground">{invoice.customer.phone}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Invoice Summary Card */}
+                        <Card className="shadow-sm border-border">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                    Invoice Summary
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div className="space-y-1">
+                                        <p className="text-muted-foreground">Billing Period</p>
+                                        <p className="font-medium flex items-center gap-2">
+                                            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                                            {new Date(invoice.period).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-muted-foreground">Generated On</p>
+                                        <p className="font-medium flex items-center gap-2">
+                                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                                            {formatDate(invoice.generated_at)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <Separator />
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-muted-foreground">Subtotal</span>
+                                        <span className="font-medium">{formatCurrency(invoice.amount)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-muted-foreground">Total Paid</span>
+                                        <span className="font-medium text-emerald-600">-{formatCurrency(totalPaid)}</span>
+                                    </div>
+                                    <Separator />
+                                    <div className="flex justify-between items-center pt-2">
+                                        <span className="font-semibold">Balance Due</span>
+                                        <span className="font-bold text-xl text-foreground">{formatCurrency(balance)}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     {/* Payment History */}
-                    {invoice.transactions.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Payment History</CardTitle>
+                    <Card className="shadow-sm border-border">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle className="text-lg">Payment History</CardTitle>
                                 <CardDescription>
-                                    {invoice.transactions.length} payment(s) recorded
+                                    Transactions recorded for this invoice
                                 </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
+                            </div>
+                            <Badge variant="outline" className="font-mono">
+                                {invoice.transactions.length} Transactions
+                            </Badge>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Method</TableHead>
+                                        <TableHead>Recorded By</TableHead>
+                                        <TableHead>Proof</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {invoice.transactions.length === 0 ? (
                                         <TableRow>
-                                            <TableHead>Date & Time</TableHead>
-                                            <TableHead>Method</TableHead>
-                                            <TableHead>Amount</TableHead>
-                                            <TableHead>Recorded By</TableHead>
-                                            <TableHead>Proof</TableHead>
+                                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                                No payments found
+                                            </TableCell>
                                         </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {invoice.transactions.map((transaction) => (
-                                            <TableRow key={transaction.id}>
+                                    ) : (
+                                        invoice.transactions.map((t) => (
+                                            <TableRow key={t.id}>
                                                 <TableCell className="font-medium">
-                                                    {formatDateTime(transaction.paid_at)}
+                                                    {formatDateTime(t.paid_at)}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline">
-                                                        {transaction.method}
+                                                    <Badge variant="secondary" className="capitalize">
+                                                        {t.method.replace('_', ' ')}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="font-medium">
-                                                    {formatCurrency(transaction.amount)}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {transaction.admin?.name || 'System'}
+                                                <TableCell className="text-muted-foreground text-sm">
+                                                    {t.admin?.name || 'System'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {transaction.proof_url ? (
+                                                    {t.proof_url ? (
                                                         <a
-                                                            href={transaction.proof_url}
+                                                            href={t.proof_url}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="text-primary hover:underline"
+                                                            className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
                                                         >
+                                                            <ExternalLink className="w-3 h-3" />
                                                             View
                                                         </a>
                                                     ) : (
-                                                        <span className="text-muted-foreground">-</span>
+                                                        <span className="text-muted-foreground text-sm">-</span>
                                                     )}
                                                 </TableCell>
+                                                <TableCell className="text-right font-medium">
+                                                    {formatCurrency(t.amount)}
+                                                </TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    )}
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </AuthenticatedLayout>

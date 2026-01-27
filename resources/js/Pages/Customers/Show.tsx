@@ -1,51 +1,62 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import ActivityFeed from '@/Components/ActivityFeed';
+import { ArrowLeft, Edit, Trash2, User, Network, MapPin, Search, ChevronLeft, MoreHorizontal, Eye } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import MapPicker from '@/Components/MapPicker';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 
-interface Package {
-    name: string;
-    bandwidth_label: string;
+// Types
+interface Transaction {
+    id: number;
+    amount: number;
+    method: string;
+    paid_at: string;
 }
 
 interface Invoice {
     id: number;
     period: string;
     amount: number;
-    status: string;
+    status: 'unpaid' | 'paid' | 'void';
     due_date: string;
+    transactions: Transaction[];
 }
 
-interface Transaction {
+interface Package {
     id: number;
-    amount: number;
-    method: string;
-    paid_at: string;
-    invoice: {
-        period: string;
-    };
+    name: string;
+    price: number;
+    bandwidth_label: string;
 }
 
 interface Customer {
     id: number;
-    internal_id: string | null;
-    code: string | null;
     name: string;
+    internal_id: string;
+    code: string;
     address: string;
-    phone: string | null;
-    nik: string | null;
+    phone: string;
+    nik: string;
     pppoe_user: string;
-    status: string;
+    status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    geo_lat: string;
+    geo_long: string;
     join_date: string;
     package: Package;
     invoices: Invoice[];
-    transactions: Transaction[];
-    activities: any[];
 }
 
 interface Props {
@@ -53,300 +64,330 @@ interface Props {
 }
 
 export default function Show({ customer }: Props) {
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
+    const { delete: destroy } = useForm();
+
+    const handleDelete = () => {
+        destroy(route('customers.destroy', customer.id));
+    };
+
+    const periodDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
     };
 
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('id-ID', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
+        return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    };
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
     };
 
     const getStatusBadge = (status: string) => {
         const variants: Record<string, string> = {
             active: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
+            params: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10', // Typo fallback
+            paid: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
             suspended: 'text-orange-500 border-orange-500/20 bg-orange-500/10',
             isolated: 'text-red-500 border-red-500/20 bg-red-500/10',
-            offboarding: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
-            paid: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
             unpaid: 'text-red-500 border-red-500/20 bg-red-500/10',
+            offboarding: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
             void: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
         };
         const className = variants[status] || 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10';
+
         return (
-            <Badge variant="outline" className={`${className} capitalize border px-3 py-1`}>
-                {status.toUpperCase()}
+            <Badge variant="outline" className={`${className} capitalize border`}>
+                {status}
             </Badge>
         );
     };
 
     return (
         <AuthenticatedLayout
+            breadcrumbs={[
+                { label: 'Customers', href: route('customers.index') },
+                { label: customer.name }
+            ]}
             header={
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold leading-tight text-foreground">
-                        Customer Details
-                    </h2>
-                    <Link href={`/customers/${customer.id}/edit`}>
-                        <Button variant="outline" className="border-zinc-700 hover:bg-zinc-800 text-foreground">
-                            Edit Profile
-                        </Button>
-                    </Link>
+                    <div className="flex items-center gap-4">
+                        <Link href={route('customers.index')}>
+                            <Button variant="ghost" size="icon" className="rounded-full">
+                                <ChevronLeft className="h-5 w-5" />
+                            </Button>
+                        </Link>
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl font-semibold leading-tight text-foreground">
+                                    {customer.name}
+                                </h2>
+                                {getStatusBadge(customer.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 font-mono">
+                                ID: {customer.code || customer.internal_id} | PPPoE: {customer.pppoe_user}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link href={route('customers.edit', customer.id)}>
+                            <Button variant="outline" size="sm">
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Customer
+                            </Button>
+                        </Link>
+
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="destructive" size="sm">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="border-destructive/50">
+                                <DialogHeader>
+                                    <DialogTitle>Delete Customer Account?</DialogTitle>
+                                    <DialogDescription>
+                                        This will permanently remove <strong>{customer.name}</strong> from the database.
+                                        This action cannot be undone.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => document.getElementById('close-dialog')?.click()}>Cancel</Button>
+                                    <Button variant="destructive" onClick={handleDelete}>Confirm Delete</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </div>
             }
         >
-            <Head title={customer.name} />
+            <Head title={`Customer: ${customer.name}`} />
 
             <div className="py-8">
-                <div className="mx-auto max-w-7xl">
-                    <Tabs defaultValue="details" className="space-y-6">
-                        <TabsList className="bg-zinc-900/50 border border-zinc-800 p-1">
-                            <TabsTrigger value="details" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-foreground text-zinc-400">
-                                Customer Details
-                            </TabsTrigger>
-                            <TabsTrigger value="invoices" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-foreground text-zinc-400">
-                                Invoices ({customer.invoices.length})
-                            </TabsTrigger>
-                            <TabsTrigger value="payments" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-foreground text-zinc-400">
-                                Payment History ({customer.transactions.length})
-                            </TabsTrigger>
-                            <TabsTrigger value="activity" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-foreground text-zinc-400">
-                                Activity Log
-                            </TabsTrigger>
+                <Tabs defaultValue="overview" className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <TabsList className="bg-card border border-border">
+                            <TabsTrigger value="overview">Overview</TabsTrigger>
+                            <TabsTrigger value="invoices">Invoices ({customer.invoices.length})</TabsTrigger>
+                            <TabsTrigger value="payments">Payment History</TabsTrigger>
                         </TabsList>
+                    </div>
 
-                        {/* Details Tab */}
-                        <TabsContent value="details">
-                            <Card className="border-zinc-800 bg-card/50 backdrop-blur-sm shadow-none">
-                                <CardHeader className="border-b border-zinc-800 bg-zinc-900/20">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-16 w-16 rounded-full bg-zinc-800 flex items-center justify-center text-xl font-bold text-zinc-500">
-                                                {customer.name.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <CardTitle className="text-2xl">{customer.name}</CardTitle>
-                                                <CardDescription className="font-mono text-zinc-500 mt-1">
-                                                    {customer.code || `ID: ${customer.id}`}
-                                                </CardDescription>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            {getStatusBadge(customer.status)}
-                                        </div>
-                                    </div>
+                    {/* OVERVIEW TAB */}
+                    <TabsContent value="overview" className="space-y-6">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            {/* Personal Info */}
+                            <Card className="bg-card/50 backdrop-blur border-border">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <User className="h-4 w-4 text-primary" />
+                                        Personal Information
+                                    </CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-8">
-                                    <div className="grid gap-8 md:grid-cols-2">
-                                        {/* Personal Information */}
-                                        <div className="space-y-6">
-                                            <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                                                <h3>Personal Information</h3>
-                                            </div>
-                                            <Separator className="bg-zinc-800" />
-                                            <div className="space-y-4 text-sm">
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <span className="text-muted-foreground">Address</span>
-                                                    <span className="col-span-2 font-medium text-foreground">{customer.address}</span>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <span className="text-muted-foreground">Phone</span>
-                                                    <span className="col-span-2 font-mono text-foreground">{customer.phone || '-'}</span>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <span className="text-muted-foreground">NIK</span>
-                                                    <span className="col-span-2 font-mono text-foreground">{customer.nik || '-'}</span>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <span className="text-muted-foreground">Join Date</span>
-                                                    <span className="col-span-2 font-medium text-foreground">{formatDate(customer.join_date)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Service Information */}
-                                        <div className="space-y-6">
-                                            <div className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                                                <h3>Service Configuration</h3>
-                                            </div>
-                                            <Separator className="bg-zinc-800" />
-                                            <div className="space-y-4 text-sm">
-                                                <div className="grid grid-cols-3 gap-4 items-center">
-                                                    <span className="text-muted-foreground">Package</span>
-                                                    <span className="col-span-2 font-medium text-foreground flex items-center gap-2">
-                                                        {customer.package.name}
-                                                    </span>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-4 items-center">
-                                                    <span className="text-muted-foreground">Bandwidth</span>
-                                                    <div className="col-span-2">
-                                                        <Badge variant="outline" className="text-zinc-400 border-zinc-700 bg-zinc-900">
-                                                            {customer.package.bandwidth_label}
-                                                        </Badge>
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-4 items-center">
-                                                    <span className="text-muted-foreground">PPPoE User</span>
-                                                    <div className="col-span-2">
-                                                        <code className="text-xs bg-zinc-900 border border-zinc-800 px-2 py-1 rounded text-emerald-500 font-mono">
-                                                            {customer.pppoe_user}
-                                                        </code>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                <CardContent className="space-y-4 text-sm">
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Full Name</span>
+                                        <span className="col-span-2 font-medium">{customer.name}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">NIK</span>
+                                        <span className="col-span-2 font-mono">{customer.nik || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Phone</span>
+                                        <span className="col-span-2 font-mono">{customer.phone || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Address</span>
+                                        <span className="col-span-2">{customer.address}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Joined</span>
+                                        <span className="col-span-2">{formatDate(customer.join_date)}</span>
                                     </div>
                                 </CardContent>
                             </Card>
-                        </TabsContent>
 
-                        {/* Invoices Tab */}
-                        <TabsContent value="invoices">
-                            <Card className="border-zinc-800 bg-card/50 backdrop-blur-sm shadow-none">
+                            {/* Service Info */}
+                            <Card className="bg-card/50 backdrop-blur border-border">
                                 <CardHeader>
-                                    <CardTitle>Invoice History</CardTitle>
-                                    <CardDescription>
-                                        Billing records and payment status
-                                    </CardDescription>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Network className="h-4 w-4 text-blue-500" />
+                                        Service Details
+                                    </CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="rounded-md border border-zinc-800 overflow-hidden">
-                                        <Table>
-                                            <TableHeader className="bg-zinc-900/50">
-                                                <TableRow className="border-zinc-800 hover:bg-transparent">
-                                                    <TableHead>Invoice ID</TableHead>
-                                                    <TableHead>Billing Period</TableHead>
-                                                    <TableHead>Amount</TableHead>
-                                                    <TableHead>Status</TableHead>
-                                                    <TableHead>Due Date</TableHead>
-                                                    <TableHead className="text-right">Actions</TableHead>
+                                <CardContent className="space-y-4 text-sm">
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Package</span>
+                                        <span className="col-span-2 font-medium">{customer.package.name}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Bandwidth</span>
+                                        <span className="col-span-2">
+                                            <Badge variant="secondary" className="font-normal">
+                                                {customer.package.bandwidth_label}
+                                            </Badge>
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Price</span>
+                                        <span className="col-span-2 font-medium">{formatCurrency(customer.package.price)} / mo</span>
+                                    </div>
+                                    <div className="border-t border-border/50 my-2 pt-2"></div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">PPPoE User</span>
+                                        <span className="col-span-2 font-mono text-xs bg-muted px-2 py-0.5 rounded w-fit">
+                                            {customer.pppoe_user}
+                                        </span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Geo Info */}
+                            <Card className="bg-card/50 backdrop-blur border-border">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-emerald-500" />
+                                        Location
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4 text-sm">
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Latitude</span>
+                                        <span className="col-span-2 font-mono">{customer.geo_lat || 'N/A'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Longitude</span>
+                                        <span className="col-span-2 font-mono">{customer.geo_long || 'N/A'}</span>
+                                    </div>
+                                    <div className="mt-4 space-y-4">
+                                        <div className="rounded-md overflow-hidden border border-border h-48">
+                                            {customer.geo_lat && customer.geo_long ? (
+                                                <MapPicker
+                                                    initialLat={Number(customer.geo_lat)}
+                                                    initialLong={Number(customer.geo_long)}
+                                                />
+                                            ) : (
+                                                <div className="h-full w-full flex items-center justify-center bg-muted text-muted-foreground text-sm">
+                                                    No coordinates available
+                                                </div>
+                                            )}
+                                        </div>
+                                        <Button variant="outline" size="sm" className="w-full" disabled={!customer.geo_lat} onClick={() => window.open(`https://www.google.com/maps?q=${customer.geo_lat},${customer.geo_long}`, '_blank')}>
+                                            Open in Google Maps
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    {/* INVOICES TAB */}
+                    <TabsContent value="invoices">
+                        <Card className="bg-card/50 backdrop-blur border-border">
+                            <CardHeader>
+                                <CardTitle>Invoice History</CardTitle>
+                                <CardDescription>All billing statements generated for this customer</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-border hover:bg-transparent">
+                                            <TableHead>Invoice #</TableHead>
+                                            <TableHead>Billing Period</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead>Due Date</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {customer.invoices.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                                    No invoices found.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            customer.invoices.map((inv) => (
+                                                <TableRow key={inv.id} className="border-border hover:bg-muted/50">
+                                                    <TableCell className="font-mono">#{String(inv.id).padStart(6, '0')}</TableCell>
+                                                    <TableCell>{periodDate(inv.period)}</TableCell>
+                                                    <TableCell>{formatCurrency(inv.amount)}</TableCell>
+                                                    <TableCell className={new Date(inv.due_date) < new Date() && inv.status === 'unpaid' ? 'text-destructive font-bold' : ''}>
+                                                        {formatDate(inv.due_date)}
+                                                    </TableCell>
+                                                    <TableCell>{getStatusBadge(inv.status)}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                    <span className="sr-only">Open menu</span>
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={() => router.visit(route('invoices.show', inv.id))}>
+                                                                    <Eye className="mr-2 h-4 w-4" />
+                                                                    View Invoice
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
                                                 </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {customer.invoices.length === 0 ? (
-                                                    <TableRow>
-                                                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                                            No invoices generated yet
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* PAYMENTS TAB (Derived from invoice transactions) */}
+                    <TabsContent value="payments">
+                        <Card className="bg-card/50 backdrop-blur border-border">
+                            <CardHeader>
+                                <CardTitle>Payment History</CardTitle>
+                                <CardDescription>Confimed transactions</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-border hover:bg-transparent">
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Invoice Ref</TableHead>
+                                            <TableHead>Method</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {customer.invoices.flatMap(inv => inv.transactions.map(t => ({ ...t, invoice_id: inv.id }))).length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                                    No payments recorded yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            customer.invoices.flatMap(inv => inv.transactions.map(t => ({ ...t, invoice_id: inv.id })))
+                                                .sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime())
+                                                .map((txn) => (
+                                                    <TableRow key={txn.id} className="border-border hover:bg-muted/50">
+                                                        <TableCell>{formatDate(txn.paid_at)}</TableCell>
+                                                        <TableCell className="font-mono">INV-{String(txn.invoice_id).padStart(6, '0')}</TableCell>
+                                                        <TableCell className="capitalize">{txn.method.replace('_', ' ')}</TableCell>
+                                                        <TableCell className="font-medium text-emerald-500">
+                                                            + {formatCurrency(txn.amount)}
                                                         </TableCell>
                                                     </TableRow>
-                                                ) : (
-                                                    customer.invoices.map((invoice) => (
-                                                        <TableRow key={invoice.id} className="border-zinc-800 hover:bg-zinc-800/30">
-                                                            <TableCell className="font-mono font-medium text-xs">#{invoice.id}</TableCell>
-                                                            <TableCell>
-                                                                {new Date(invoice.period).toLocaleDateString('id-ID', {
-                                                                    year: 'numeric',
-                                                                    month: 'long',
-                                                                })}
-                                                            </TableCell>
-                                                            <TableCell className="font-medium font-mono">
-                                                                {formatCurrency(invoice.amount)}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {getStatusBadge(invoice.status)}
-                                                            </TableCell>
-                                                            <TableCell className="text-muted-foreground text-xs">
-                                                                {formatDate(invoice.due_date)}
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                <Link href={`/invoices/${invoice.id}`}>
-                                                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                                        <span className="sr-only">Open</span>
-                                                                        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4"><path d="M3 7.5C3 7.22386 3.22386 7 3.5 7H11.5C11.7761 7 12 7.22386 12 7.5C12 7.77614 11.7761 8 11.5 8H3.5C3.22386 8 3 7.77614 3 7.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path></svg>
-                                                                    </Button>
-                                                                </Link>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Payments Tab */}
-                        <TabsContent value="payments">
-                            <Card className="border-zinc-800 bg-card/50 backdrop-blur-sm shadow-none">
-                                <CardHeader>
-                                    <CardTitle>Payment History</CardTitle>
-                                    <CardDescription>
-                                        Confirmed transactions
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="rounded-md border border-zinc-800 overflow-hidden">
-                                        <Table>
-                                            <TableHeader className="bg-zinc-900/50">
-                                                <TableRow className="border-zinc-800 hover:bg-transparent">
-                                                    <TableHead>Date Recorded</TableHead>
-                                                    <TableHead>For Period</TableHead>
-                                                    <TableHead>Method</TableHead>
-                                                    <TableHead>Amount Paid</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {customer.transactions.length === 0 ? (
-                                                    <TableRow>
-                                                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                                                            No payments recorded
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ) : (
-                                                    customer.transactions.map((transaction) => (
-                                                        <TableRow key={transaction.id} className="border-zinc-800 hover:bg-zinc-800/30">
-                                                            <TableCell className="font-mono text-xs text-muted-foreground">
-                                                                {formatDate(transaction.paid_at)}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {new Date(transaction.invoice.period).toLocaleDateString('id-ID', {
-                                                                    year: 'numeric',
-                                                                    month: 'short',
-                                                                })}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge variant="outline" className="border-zinc-700 text-zinc-400 capitalize">
-                                                                    {transaction.method}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="font-medium font-mono text-emerald-500">
-                                                                +{formatCurrency(transaction.amount)}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Activity Tab */}
-                        <TabsContent value="activity">
-                            <Card className="border-zinc-800 bg-card/50 backdrop-blur-sm shadow-none">
-                                <CardHeader>
-                                    <CardTitle>Audit Log</CardTitle>
-                                    <CardDescription>
-                                        History of changes and actions
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ActivityFeed activities={customer.activities} />
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    </Tabs>
-                </div>
+                                                ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
-        </AuthenticatedLayout >
+        </AuthenticatedLayout>
     );
 }

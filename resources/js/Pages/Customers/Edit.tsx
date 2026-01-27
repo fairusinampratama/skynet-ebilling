@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, User, Network, MapPin, Shield, Trash2 } from 'lucide-react';
+import { ChevronLeft, Save, User, Network, MapPin, Shield, Trash2 } from 'lucide-react';
+import MapPicker from '@/Components/MapPicker';
 import { FormEventHandler } from 'react';
 import {
     Dialog,
@@ -52,7 +53,8 @@ export default function Edit({ customer, packages }: Props) {
         address: customer.address || '',
         phone: customer.phone || '',
         nik: customer.nik || '',
-        pppoe_user: customer.pppoe_user || '', // Usually read-only or careful edit
+        pppoe_user: customer.pppoe_user || '',
+        pppoe_pass: '', // Default to empty for security (only send if changing)
         package_id: String(customer.package_id),
         status: customer.status,
         geo_lat: customer.geo_lat || '',
@@ -70,12 +72,17 @@ export default function Edit({ customer, packages }: Props) {
 
     return (
         <AuthenticatedLayout
+            breadcrumbs={[
+                { label: 'Customers', href: route('customers.index') },
+                { label: customer.name, href: route('customers.show', customer.id) },
+                { label: 'Edit' }
+            ]}
             header={
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href={route('customers.index')}>
                             <Button variant="ghost" size="icon" className="rounded-full">
-                                <ArrowLeft className="h-5 w-5" />
+                                <ChevronLeft className="h-5 w-5" />
                             </Button>
                         </Link>
                         <h2 className="text-xl font-semibold leading-tight text-foreground">
@@ -112,6 +119,16 @@ export default function Edit({ customer, packages }: Props) {
             <Head title={`Edit ${customer.name}`} />
 
             <form onSubmit={submit} className="space-y-8 py-6">
+                {Object.keys(errors).length > 0 && (
+                    <div className="bg-destructive/15 text-destructive p-4 rounded-md border border-destructive/20">
+                        <p className="font-semibold">Please fix the following errors:</p>
+                        <ul className="list-disc list-inside text-sm mt-1">
+                            {Object.entries(errors).map(([field, msg]) => (
+                                <li key={field}>{msg}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
                 <div className="grid gap-8 lg:grid-cols-2">
                     {/* Left Column: Personal Information */}
                     <div className="space-y-6">
@@ -128,16 +145,28 @@ export default function Edit({ customer, packages }: Props) {
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        id="name"
-                                        value={data.name}
-                                        onChange={(e) => setData('name', e.target.value)}
-                                        className={errors.name ? 'border-destructive' : ''}
-                                        required
-                                    />
-                                    {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="internal_id">Internal ID</Label>
+                                        <Input
+                                            id="internal_id"
+                                            value={data.internal_id}
+                                            onChange={(e) => setData('internal_id', e.target.value)}
+                                            placeholder="e.g. 1001"
+                                        />
+                                        {errors.internal_id && <p className="text-sm text-destructive">{errors.internal_id}</p>}
+                                    </div>
+                                    <div className="col-span-2 grid gap-2">
+                                        <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
+                                        <Input
+                                            id="name"
+                                            value={data.name}
+                                            onChange={(e) => setData('name', e.target.value)}
+                                            className={errors.name ? 'border-destructive' : ''}
+                                            required
+                                        />
+                                        {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -187,22 +216,37 @@ export default function Edit({ customer, packages }: Props) {
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="lat">Latitude</Label>
-                                    <Input
-                                        id="lat"
-                                        value={data.geo_lat}
-                                        onChange={(e) => setData('geo_lat', e.target.value)}
+                            <CardContent className="space-y-4">
+                                <div className="rounded-md overflow-hidden border border-border">
+                                    <MapPicker
+                                        initialLat={Number(data.geo_lat) || -6.200000}
+                                        initialLong={Number(data.geo_long) || 106.816666}
+                                        onLocationSelect={(lat: number, lng: number) => {
+                                            setData((prev) => ({
+                                                ...prev,
+                                                geo_lat: lat.toFixed(6),
+                                                geo_long: lng.toFixed(6)
+                                            }));
+                                        }}
                                     />
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="long">Longitude</Label>
-                                    <Input
-                                        id="long"
-                                        value={data.geo_long}
-                                        onChange={(e) => setData('geo_long', e.target.value)}
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="lat">Latitude</Label>
+                                        <Input
+                                            id="lat"
+                                            value={data.geo_lat}
+                                            onChange={(e) => setData('geo_lat', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="long">Longitude</Label>
+                                        <Input
+                                            id="long"
+                                            value={data.geo_long}
+                                            onChange={(e) => setData('geo_long', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -284,8 +328,21 @@ export default function Edit({ customer, packages }: Props) {
                                         {errors.pppoe_user && <p className="text-sm text-destructive">{errors.pppoe_user}</p>}
                                     </div>
 
-                                    <div className="p-4 bg-muted/50 rounded-lg text-xs text-muted-foreground border border-border">
-                                        <p>Note: Password is encrypted and not shown. To reset, use the 'Reset Password' action in the main view.</p>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="pppoe_pass">
+                                            New Password <span className="text-muted-foreground font-normal">(Optional)</span>
+                                        </Label>
+                                        <Input
+                                            id="pppoe_pass"
+                                            type="text"
+                                            value={data.pppoe_pass}
+                                            onChange={(e) => setData('pppoe_pass', e.target.value)}
+                                            placeholder="Leave blank to keep current password"
+                                            className="font-mono"
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Enter a new value only if you want to change the customer's PPPoE password.
+                                        </p>
                                     </div>
                                 </div>
                             </CardContent>

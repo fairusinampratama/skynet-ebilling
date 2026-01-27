@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { ChevronLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +21,21 @@ export default function Create() {
 
     return (
         <AuthenticatedLayout
+            breadcrumbs={[
+                { label: 'Packages', href: route('packages.index') },
+                { label: 'Create' }
+            ]}
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                    Create Package
-                </h2>
+                <div className="flex items-center gap-4">
+                    <Link href={route('packages.index')}>
+                        <Button variant="ghost" size="icon" className="rounded-full">
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                    </Link>
+                    <h2 className="text-xl font-semibold leading-tight text-foreground">
+                        Create Package
+                    </h2>
+                </div>
             }
         >
             <Head title="Create Package" />

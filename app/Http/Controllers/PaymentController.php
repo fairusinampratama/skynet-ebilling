@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
+use App\Jobs\ReconnectCustomerJob;
+
 class PaymentController extends Controller
 {
     /**
@@ -55,8 +57,11 @@ class PaymentController extends Controller
         if ($totalPaid >= $invoice->amount) {
             $invoice->update(['status' => 'paid']);
             
-            // TODO: Dispatch reconnection job
-            // dispatch(new ReconnectCustomerJob($invoice->customer));
+            // Trigger reconnection if customer was isolated
+            $customer = $invoice->customer;
+            if ($customer->status === 'isolated') {
+                ReconnectCustomerJob::dispatch($customer);
+            }
         }
 
         return redirect()->route('invoices.show', $invoice)
