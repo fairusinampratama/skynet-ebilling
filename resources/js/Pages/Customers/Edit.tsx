@@ -290,23 +290,7 @@ export default function Edit({ customer, packages }: Props) {
                                     {errors.package_id && <p className="text-sm text-destructive">{errors.package_id}</p>}
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="status">Account Status</Label>
-                                    <Select
-                                        value={data.status}
-                                        onValueChange={(val) => setData('status', val as any)}
-                                    >
-                                        <SelectTrigger className="bg-background/50">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="active">Active</SelectItem>
-                                            <SelectItem value="suspended">Suspended</SelectItem>
-                                            <SelectItem value="isolated">Isolated</SelectItem>
-                                            <SelectItem value="offboarding">Offboarding</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                {/* Status modification removed to enforce use of Toggle on Details page */}
 
                                 <div className="border-t border-border/50 my-6"></div>
 

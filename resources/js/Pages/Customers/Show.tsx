@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, Trash2, User, Network, MapPin, Search, ChevronLeft, MoreHorizontal, Eye } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, User, Network, MapPin, Search, ChevronLeft, MoreHorizontal, Eye, Loader2, CheckCircle2, AlertTriangle, Power } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import MapPicker from '@/Components/MapPicker';
 import {
@@ -65,6 +67,7 @@ interface Props {
 
 export default function Show({ customer }: Props) {
     const { delete: destroy } = useForm();
+    const [loading, setLoading] = useState(false);
 
     const handleDelete = () => {
         destroy(route('customers.destroy', customer.id));
@@ -121,14 +124,15 @@ export default function Show({ customer }: Props) {
                                 <h2 className="text-xl font-semibold leading-tight text-foreground">
                                     {customer.name}
                                 </h2>
-                                {getStatusBadge(customer.status)}
                             </div>
                             <p className="text-sm text-muted-foreground mt-1 font-mono">
                                 ID: {customer.code || customer.internal_id} | PPPoE: {customer.pppoe_user}
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+
+
                         <Link href={route('customers.edit', customer.id)}>
                             <Button variant="outline" size="sm">
                                 <Edit className="h-4 w-4 mr-2" />
@@ -217,6 +221,63 @@ export default function Show({ customer }: Props) {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4 text-sm">
+                                    <div className="grid grid-cols-3 gap-1 items-center">
+                                        <span className="text-muted-foreground">Connection</span>
+                                        <div className="col-span-2 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`h-2 w-2 rounded-full ${customer.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`} />
+                                                <span className={`font-medium ${customer.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                                    {customer.status === 'active' ? 'Active' : 'Isolated'}
+                                                </span>
+                                            </div>
+
+                                            {customer.status === 'active' ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={loading}
+                                                    onClick={() => {
+                                                        if (confirm('Block internet access for this customer?')) {
+                                                            const toastId = toast.loading('Blocking access...');
+                                                            router.post(route('customers.isolate', customer.id), {}, {
+                                                                onStart: () => setLoading(true),
+                                                                onFinish: () => {
+                                                                    setLoading(false);
+                                                                    toast.dismiss(toastId);
+                                                                },
+                                                            });
+                                                        }
+                                                    }}
+                                                    className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:border-red-900/30 dark:hover:bg-red-900/20 dark:text-red-400"
+                                                >
+                                                    {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Power className="h-3 w-3 mr-1.5" />}
+                                                    Block
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={loading}
+                                                    onClick={() => {
+                                                        if (confirm('Restore internet access?')) {
+                                                            const toastId = toast.loading('Restoring access...');
+                                                            router.post(route('customers.reconnect', customer.id), {}, {
+                                                                onStart: () => setLoading(true),
+                                                                onFinish: () => {
+                                                                    setLoading(false);
+                                                                    toast.dismiss(toastId);
+                                                                },
+                                                            });
+                                                        }
+                                                    }}
+                                                    className="h-7 text-xs border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:border-emerald-900/30 dark:hover:bg-emerald-900/20 dark:text-emerald-400"
+                                                >
+                                                    {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <CheckCircle2 className="h-3 w-3 mr-1.5" />}
+                                                    Restore
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
                                     <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Package</span>
                                         <span className="col-span-2 font-medium">{customer.package.name}</span>

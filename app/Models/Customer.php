@@ -32,6 +32,7 @@ class Customer extends Model
         'status',
         'join_date',
         'ktp_photo_url',
+        'previous_profile',
     ];
 
     public function getActivitylogOptions(): LogOptions

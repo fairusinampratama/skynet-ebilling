@@ -62,6 +62,50 @@ class MikrotikService
             throw $e;
         }
     }
+    
+    /**
+     * Get a specific PPPoE secret by username
+     */
+    public function getPPPSecret(string $username): ?array
+    {
+        if (!$this->client) {
+            throw new \Exception('Not connected to router. Call connect() first.');
+        }
+
+        try {
+            $query = (new Query('/ppp/secret/print'))
+                ->where('name', $username);
+            
+            $secrets = $this->client->query($query)->read();
+
+            return $secrets[0] ?? null;
+        } catch (\Exception $e) {
+            Log::error("Failed to get PPP secret for {$username}: {$e->getMessage()}");
+            throw $e;
+        }
+    }
+
+    /**
+     * Get all PPP profiles from router
+     */
+    public function getProfiles(): array
+    {
+        if (!$this->client) {
+            throw new \Exception('Not connected to router. Call connect() first.');
+        }
+
+        try {
+            $query = new Query('/ppp/profile/print');
+            $response = $this->client->query($query)->read();
+
+            Log::info("Retrieved " . count($response) . " PPP profiles from {$this->router->name}");
+
+            return $response;
+        } catch (\Exception $e) {
+            Log::error("Failed to get PPP profiles from {$this->router->name}: {$e->getMessage()}");
+            throw $e;
+        }
+    }
 
     /**
      * Get active PPPoE connections
@@ -87,12 +131,17 @@ class MikrotikService
 
     /**
      * Isolate a user (block internet access)
-     * Method: Change PPPoE profile to 'blocked'
+     * Method: Change PPPoE profile to configured isolation profile
      */
     public function isolateUser(string $username): bool
     {
         if (!$this->client) {
             throw new \Exception('Not connected to router. Call connect() first.');
+        }
+
+        if (empty($this->router->isolation_profile)) {
+            Log::warning("Isolation skipped: No isolation profile configured for router {$this->router->name}");
+            throw new \Exception("Router {$this->router->name} does not have an isolation profile configured.");
         }
 
         try {
@@ -108,18 +157,28 @@ class MikrotikService
             }
 
             $secret = $secrets[0];
+            $currentProfile = $secret['profile'] ?? 'default';
 
-            // Change profile to 'blocked' (you need to create this profile in MikroTik)
+            // Don't overwrite if likely already isolated
+            if ($currentProfile !== $this->router->isolation_profile) {
+                // Update customer record with previous profile
+                $customer = \App\Models\Customer::where('pppoe_user', $username)->first();
+                if ($customer) {
+                    $customer->update(['previous_profile' => $currentProfile]);
+                }
+            }
+
+            // Change profile to confirmed isolation profile
             $query = (new Query('/ppp/secret/set'))
                 ->equal('.id', $secret['.id'])
-                ->equal('profile', 'blocked');
+                ->equal('profile', $this->router->isolation_profile);
 
             $this->client->query($query)->read();
 
             // Kick active session if any
             $this->kickUser($username);
 
-            Log::info("Successfully isolated user: {$username} on {$this->router->name}");
+            Log::info("Successfully isolated user: {$username} on {$this->router->name} (Profile: {$this->router->isolation_profile})");
 
             return true;
         } catch (\Exception $e) {
@@ -130,7 +189,7 @@ class MikrotikService
 
     /**
      * Reconnect a user (restore internet access)
-     * Method: Change PPPoE profile back to default
+     * Method: Change PPPoE profile back to saved previous profile
      */
     public function reconnectUser(string $username, string $profile = 'default'): bool
     {
@@ -152,17 +211,30 @@ class MikrotikService
 
             $secret = $secrets[0];
 
-            // Restore profile to default (or specified profile)
+            // Determine target profile
+            $targetProfile = $profile; // Default fallback
+
+            // Check database for previous profile
+            $customer = \App\Models\Customer::where('pppoe_user', $username)->first();
+            if ($customer && !empty($customer->previous_profile)) {
+                $targetProfile = $customer->previous_profile;
+                Log::info("Restoring {$username} to previous profile: {$targetProfile}");
+                
+                // Clear the saved profile
+                $customer->update(['previous_profile' => null]);
+            }
+
+            // Restore profile
             $query = (new Query('/ppp/secret/set'))
                 ->equal('.id', $secret['.id'])
-                ->equal('profile', $profile);
+                ->equal('profile', $targetProfile);
 
             $this->client->query($query)->read();
 
             // Kick active session to force new profile
             $this->kickUser($username);
 
-            Log::info("Successfully reconnected user: {$username} on {$this->router->name}");
+            Log::info("Successfully reconnected user: {$username} on {$this->router->name} to {$targetProfile}");
 
             return true;
         } catch (\Exception $e) {

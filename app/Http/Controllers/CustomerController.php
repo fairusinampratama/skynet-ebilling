@@ -168,4 +168,44 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')
             ->with('success', 'Customer deleted successfully.');
     }
+    /**
+     * Isolate the customer (block internet)
+     */
+    public function isolate(Customer $customer)
+    {
+        if ($customer->status !== 'active') {
+            return back()->with('error', 'Only active customers can be isolated.');
+        }
+
+        try {
+            // Synchronous Execution: We wait for the router to confirm.
+            // This ensures the UI never lies.
+            \App\Jobs\IsolateCustomerJob::dispatchSync($customer);
+            
+            return back()->with('success', 'CONFIRMED: Customer is now ISOLATED on the router.');
+        } catch (\Exception $e) {
+            // If the job fails (e.g. Router offline), the UI will show the error
+            // and the status will REMAINS 'active'.
+            return back()->with('error', 'ISOLATION FAILED: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Reconnect the customer (restore internet)
+     */
+    public function reconnect(Customer $customer)
+    {
+        if ($customer->status !== 'isolated') {
+            return back()->with('error', 'Only isolated customers can be reconnected.');
+        }
+
+        try {
+            // Synchronous Execution: Wait for confirmation.
+            \App\Jobs\ReconnectCustomerJob::dispatchSync($customer);
+
+            return back()->with('success', 'CONFIRMED: Internet access RESTORED.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'RECONNECT FAILED: ' . $e->getMessage());
+        }
+    }
 }

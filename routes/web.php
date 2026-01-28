@@ -52,6 +52,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Customer Management
     // =====================================================
     Route::resource('customers', CustomerController::class);
+    Route::post('/customers/{customer}/isolate', [CustomerController::class, 'isolate'])->name('customers.isolate');
+    Route::post('/customers/{customer}/reconnect', [CustomerController::class, 'reconnect'])->name('customers.reconnect');
     
     // =====================================================
     // Package Management

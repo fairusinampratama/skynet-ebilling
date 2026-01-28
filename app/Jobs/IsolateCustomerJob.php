@@ -76,6 +76,8 @@ class IsolateCustomerJob implements ShouldQueue
             $mikrotik->disconnect();
 
         } catch (Exception $e) {
+            $isConfigError = str_contains($e->getMessage(), 'does not have an isolation profile configured');
+            
             Log::error("Failed to isolate customer {$this->customer->name}: " . $e->getMessage());
             
             // Log the failure
@@ -85,11 +87,12 @@ class IsolateCustomerJob implements ShouldQueue
                 ->withProperties([
                     'error' => $e->getMessage(),
                     'router' => $router->name,
+                    'is_config_error' => $isConfigError
                 ])
                 ->log('isolation_failed');
 
-            // Retry logic
-            if ($this->attempts() < $this->tries) {
+            // Retry logic (Skip retry if it's a configuration error)
+            if (!$isConfigError && $this->attempts() < $this->tries) {
                 $this->release($this->backoff[$this->attempts() - 1] ?? 600);
             } else {
                 $this->fail($e);
