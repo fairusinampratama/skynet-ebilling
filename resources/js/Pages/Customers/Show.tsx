@@ -54,6 +54,7 @@ interface Customer {
     nik: string;
     pppoe_user: string;
     status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    is_online: boolean;
     geo_lat: string;
     geo_long: string;
     join_date: string;
@@ -124,6 +125,17 @@ export default function Show({ customer }: Props) {
                                 <h2 className="text-xl font-semibold leading-tight text-foreground">
                                     {customer.name}
                                 </h2>
+                                {customer.is_online ? (
+                                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-2 h-5 gap-1.5 flex items-center">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        Online
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="outline" className="bg-zinc-500/10 text-zinc-500 border-zinc-500/20 text-[10px] px-2 h-5 gap-1.5 flex items-center">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                                        Offline
+                                    </Badge>
+                                )}
                             </div>
                             <p className="text-sm text-muted-foreground mt-1 font-mono">
                                 ID: {customer.code || customer.internal_id} | PPPoE: {customer.pppoe_user}

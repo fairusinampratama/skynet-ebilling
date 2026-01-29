@@ -40,6 +40,7 @@ interface Customer {
     address: string;
     pppoe_user: string;
     status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    is_online: boolean;
     package: Package;
     created_at: string;
     invoices?: Array<{
@@ -80,7 +81,14 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
             sortable: true,
             cell: (customer) => (
                 <div className="flex flex-col">
-                    <span className="font-medium text-foreground">{customer.name}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">{customer.name}</span>
+                        {customer.is_online ? (
+                            <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Online" />
+                        ) : (
+                            <span className="flex h-2 w-2 rounded-full bg-zinc-300" title="Offline" />
+                        )}
+                    </div>
                     <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                         {customer.address}
                     </span>

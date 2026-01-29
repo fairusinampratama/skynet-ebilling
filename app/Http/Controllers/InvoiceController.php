@@ -33,13 +33,15 @@ class InvoiceController extends Controller
             ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
             ->latest('period');
 
-        $invoices = $query->paginate(50)->withQueryString();
+        $limit = $request->input('limit', 25);
+        $invoices = $query->paginate($limit)->withQueryString();
 
         return Inertia::render('Invoices/Index', [
             'invoices' => $invoices,
             'filters' => [
                 'search' => $request->search,
                 'status' => $request->status ?? 'all',
+                'limit' => $limit,
             ],
         ]);
     }

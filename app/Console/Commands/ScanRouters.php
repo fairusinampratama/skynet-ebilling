@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Router;
 use App\Models\Customer;
+use App\Models\Package;
 use App\Services\MikrotikService;
 use Illuminate\Console\Command;
 
@@ -71,8 +72,41 @@ class ScanRouters extends Command
 
                     if ($customer) {
                         if (!$this->option('dry-run')) {
-                            // Update customer's router_id
-                            $customer->update(['router_id' => $router->id]);
+                            $updates = ['router_id' => $router->id];
+
+                            // Auto-Sync Package from Profile
+                            $profileName = $secret['profile'] ?? null;
+                            
+                            // Check if profile exists and IS NOT the isolation profile
+                            if ($profileName && $profileName !== $router->isolation_profile) {
+                                // Find package by name (Case-insensitive match could be safer, but exact for now)
+                                $package = Package::where('name', $profileName)->first();
+                                
+                                if ($package && $customer->package_id !== $package->id) {
+                                    $updates['package_id'] = $package->id;
+                                    $this->line("    ↻ Synced Package: {$package->name}");
+                                }
+                            }
+
+                            // Auto-Sync Status from Profile
+                            if ($router->isolation_profile) {
+                                if ($profileName === $router->isolation_profile) {
+                                    // Router says Isolated -> Force DB to Isolated
+                                    if ($customer->status !== 'isolated') {
+                                        $updates['status'] = 'isolated';
+                                        $this->line("    ↻ Synced Status: ISOLATED (Matched Router Profile)");
+                                    }
+                                } else {
+                                    // Router says NOT Isolated -> If DB thinks Isolated, Restore to Active
+                                    if ($customer->status === 'isolated') {
+                                        $updates['status'] = 'active';
+                                        $this->line("    ↻ Synced Status: ACTIVE (Differs from Isolation Profile)");
+                                    }
+                                }
+                            }
+
+                            // Update customer
+                            $customer->update($updates);
                         }
                         $matchedCount++;
                     }

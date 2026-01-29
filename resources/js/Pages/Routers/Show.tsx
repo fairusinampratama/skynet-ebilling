@@ -111,15 +111,22 @@ export default function Show({ router: routerData }: Props) {
 
 
 
+    const [isTestingConnection, setIsTestingConnection] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+
     const handleTestConnection = () => {
+        setIsTestingConnection(true);
         router.post(`/routers/${routerData.id}/test-connection`, {}, {
             preserveScroll: true,
+            onFinish: () => setIsTestingConnection(false),
         });
     };
 
     const handleScanRouter = () => {
+        setIsScanning(true);
         router.post(`/routers/${routerData.id}/scan`, {}, {
             preserveScroll: true,
+            onFinish: () => setIsScanning(false),
         });
     };
 
@@ -173,13 +180,17 @@ export default function Show({ router: routerData }: Props) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={handleTestConnection}>
-                            <TestTube className="mr-2 h-4 w-4" />
-                            Test Connection
+                        <Button variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
+                            {isTestingConnection ? (
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <TestTube className="mr-2 h-4 w-4" />
+                            )}
+                            {isTestingConnection ? 'Testing...' : 'Test Connection'}
                         </Button>
-                        <Button variant="outline" onClick={handleScanRouter}>
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Scan Customers
+                        <Button variant="outline" onClick={handleScanRouter} disabled={isScanning || !routerData.is_active}>
+                            <RefreshCw className={`mr-2 h-4 w-4 ${isScanning ? 'animate-spin' : ''}`} />
+                            {isScanning ? 'Starting Scan...' : 'Scan Customers'}
                         </Button>
                         <Link href={route('routers.edit', routerData.id)}>
                             <Button variant="outline">

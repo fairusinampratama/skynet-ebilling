@@ -15,8 +15,11 @@ class MikrotikService
 
     /**
      * Connect to a MikroTik router
+     * 
+     * @param Router $router
+     * @param array $options Optional override for connection settings (timeout, attempts)
      */
-    public function connect(Router $router): self
+    public function connect(Router $router, array $options = []): self
     {
         $this->router = $router;
 
@@ -26,8 +29,8 @@ class MikrotikService
                 'user' => $router->username,
                 'pass' => $router->password, // Auto-decrypted by Laravel's encrypted cast
                 'port' => $router->port,
-                'timeout' => 15,
-                'attempts' => 2,
+                'timeout' => $options['timeout'] ?? 10,
+                'attempts' => $options['attempts'] ?? 2,
             ]);
 
             $this->client = new Client($config);
@@ -316,10 +319,9 @@ class MikrotikService
             $active = $this->client->query($activeQuery)->read();
             $onlineCount = count($active);
 
-            // Get Total PPPoE Secrets Count
-            $secretQuery = new Query('/ppp/secret/print');
-            $secrets = $this->client->query($secretQuery)->read();
-            $totalPppoeCount = count($secrets);
+            // Get Total PPPoE Secrets Count - REMOVED to prevent DoS (Update via network:monitor is too frequent)
+            // This is now handled by network:scan hourly
+            $totalPppoeCount = null;
 
             return [
                 'cpu_load' => isset($system['cpu-load']) ? (int)$system['cpu-load'] : null,
@@ -333,6 +335,44 @@ class MikrotikService
             Log::error("Failed to get health stats for {$this->router->name}: {$e->getMessage()}");
             throw $e;
         }
+    }
+
+    /**
+     * Sync Customer 'is_online' status based on active connections
+     */
+    public function syncCustomerOnlineStatus(array $activeConnections): void
+    {
+        if (!$this->router) {
+            return;
+        }
+
+        $activeUsernames = array_column($activeConnections, 'name');
+
+        if (!empty($activeUsernames)) {
+            // 1. Set is_online = true for active users
+            \App\Models\Customer::where('router_id', $this->router->id)
+                ->whereIn('pppoe_user', $activeUsernames)
+                ->update(['is_online' => true]);
+
+            // 2. Set is_online = false for inactive users
+            \App\Models\Customer::where('router_id', $this->router->id)
+                ->whereNotIn('pppoe_user', $activeUsernames)
+                ->update(['is_online' => false]);
+        } else {
+            // No active users -> Set all on this router to offline
+            \App\Models\Customer::where('router_id', $this->router->id)
+                ->update(['is_online' => false]);
+        }
+        
+        Log::info("Synced online status for Router: {$this->router->name} (" . count($activeUsernames) . " active)");
+    }
+
+    /**
+     * Get the RouterOS client instance
+     */
+    public function getClient(): ?Client
+    {
+        return $this->client;
     }
 
     /**

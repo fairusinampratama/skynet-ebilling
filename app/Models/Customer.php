@@ -33,6 +33,7 @@ class Customer extends Model
         'join_date',
         'ktp_photo_url',
         'previous_profile',
+        'is_online',
     ];
 
     public function getActivitylogOptions(): LogOptions
@@ -47,6 +48,7 @@ class Customer extends Model
         'geo_long' => 'decimal:8',
         'join_date' => 'date',
         'pppoe_pass' => 'encrypted', // Security: Encrypted storage
+        'is_online' => 'boolean',
     ];
 
     public function package(): BelongsTo

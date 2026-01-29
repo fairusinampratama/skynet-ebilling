@@ -43,6 +43,7 @@ export interface FilterConfig {
 
 export interface PaginatedData<T> {
     data: T[];
+    path: string;
     links: {
         url: string | null;
         label: string;
@@ -291,34 +292,70 @@ export default function DataTable<T extends { id: number | string }>({
                         <div className="text-sm text-muted-foreground">
                             Showing <span className="font-medium text-foreground">{data.from || 0}</span> to <span className="font-medium text-foreground">{data.to || 0}</span> of <span className="font-medium text-foreground">{data.total}</span> records
                         </div>
-                        <div className="flex gap-1.5">
-                            {data.links.map((link, index) => {
-                                const isPrevious = link.label.includes('Previous') || link.label.includes('&laquo;');
-                                const isNext = link.label.includes('Next') || link.label.includes('&raquo;');
-                                const isDots = link.label.includes('...');
+                        <div className="flex gap-1.5 items-center">
+                            <span className="text-sm text-muted-foreground mr-2">Rows per page:</span>
+                            <Select
+                                value={String(data.per_page)}
+                                onValueChange={(val) => {
+                                    router.get(data.path, { ...filters, limit: val }, {
+                                        preserveState: true,
+                                        preserveScroll: true
+                                    });
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-[70px]">
+                                    <SelectValue placeholder={String(data.per_page)} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {[10, 25, 50, 100].map((size) => (
+                                        <SelectItem key={size} value={String(size)}>
+                                            {size}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                                return (
-                                    <Button
-                                        key={index}
-                                        variant={link.active ? 'default' : 'outline'}
-                                        size="sm"
-                                        className={`
-                                            ${!link.active ? 'border-border bg-transparent hover:bg-muted font-normal' : ''}
-                                            ${(isPrevious || isNext) ? 'px-2' : 'px-3'}
-                                            ${isDots ? 'cursor-default border-none hover:bg-transparent text-muted-foreground' : ''}
-                                        `}
-                                        disabled={!link.url || isDots}
-                                        onClick={() => link.url && router.get(link.url, {}, {
-                                            preserveScroll: true,
-                                            preserveState: true,
-                                        })}
-                                    >
-                                        {isPrevious ? <ChevronLeft className="h-4 w-4" /> :
-                                            isNext ? <ChevronRight className="h-4 w-4" /> :
-                                                <span dangerouslySetInnerHTML={{ __html: link.label }} />}
-                                    </Button>
-                                );
-                            })}
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        const prevUrl = data.links[0]?.url;
+                                        if (prevUrl) {
+                                            router.get(prevUrl, { limit: data.per_page }, {
+                                                preserveScroll: true,
+                                                preserveState: true,
+                                            });
+                                        }
+                                    }}
+                                    disabled={data.current_page === 1}
+                                    className="px-2"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+
+                                <span className="text-sm font-medium text-muted-foreground min-w-[100px] text-center">
+                                    Page {data.current_page} of {data.last_page}
+                                </span>
+
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        const nextUrl = data.links[data.links.length - 1]?.url;
+                                        if (nextUrl) {
+                                            router.get(nextUrl, { limit: data.per_page }, {
+                                                preserveScroll: true,
+                                                preserveState: true,
+                                            });
+                                        }
+                                    }}
+                                    disabled={data.current_page === data.last_page}
+                                    className="px-2"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </CardContent>

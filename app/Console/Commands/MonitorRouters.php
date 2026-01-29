@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Router;
+use App\Models\Customer;
 use App\Services\MikrotikService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -47,22 +48,29 @@ class MonitorRouters extends Command
                 // Attempt connection
                 $this->mikrotik->connect($router);
 
-                // Fetch Stats
+                // Fetch Stats (CPU, Uptime, etc.)
                 $stats = $this->mikrotik->getHealthStats();
 
-                // Update Router
+                // Fetch Active Connections (Real-time List)
+                $activeConnections = $this->mikrotik->getActiveConnections();
+                $activeUsernames = array_column($activeConnections, 'name');
+
+                // Update Router Stats
                 $router->update([
                     'is_active' => true,
-                    'current_online_count' => $stats['online_count'],
+                    'current_online_count' => count($activeConnections), // Use accurate count from list
                     'cpu_load' => $stats['cpu_load'],
                     'uptime' => $stats['uptime'],
                     'version' => $stats['version'],
                     'board_name' => $stats['board_name'],
-                    'total_pppoe_count' => $stats['total_pppoe_count'],
+                    // 'total_pppoe_count' => $stats['total_pppoe_count'], // Removed to prevent overrides with null
                     'last_health_check_at' => now(),
                 ]);
 
-                $this->info("ONLINE ({$stats['online_count']} users)");
+                // Bulk Sync 'is_online' Status for Customers on this Router
+                $this->mikrotik->syncCustomerOnlineStatus($activeConnections);
+
+                $this->info("ONLINE ({$stats['online_count']} users) - Sync Configured");
                 
                 // Disconnect to clean up
                 $this->mikrotik->disconnect();

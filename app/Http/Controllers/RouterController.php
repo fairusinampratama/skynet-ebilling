@@ -37,11 +37,12 @@ class RouterController extends Controller
         $query->orderBy($sortField, $sortDirection);
 
         // Paginate
-        $routers = $query->paginate(15)->withQueryString();
+        $limit = $request->input('limit', 25);
+        $routers = $query->paginate($limit)->withQueryString();
 
         return Inertia::render('Routers/Index', [
             'routers' => $routers,
-            'filters' => $request->only(['search', 'status', 'sort', 'direction']),
+            'filters' => $request->only(['search', 'status', 'sort', 'direction', 'limit']),
         ]);
     }
 
@@ -174,16 +175,42 @@ class RouterController extends Controller
         $mikrotik = app(\App\Services\MikrotikService::class);
 
         try {
-            $mikrotik->connect($router);
-            $result = $mikrotik->testConnection();
+            // Strict timeout for UI responsiveness: 5 seconds, 1 attempt
+            $mikrotik->connect($router, ['timeout' => 5, 'attempts' => 1]);
+            
+            // 1. Fetch System Resources (Fast)
+            $resourceQuery = new \RouterOS\Query('/system/resource/print');
+            $resource = $mikrotik->getClient()->query($resourceQuery)->read();
+            $system = $resource[0] ?? [];
+
+            // 2. Fetch Active Connections (Heavy - do only once)
+            $activeConnections = $mikrotik->getActiveConnections();
+            $onlineCount = count($activeConnections);
+
+            // 3. Sync Customer Status
+            $mikrotik->syncCustomerOnlineStatus($activeConnections);
+
+            // 4. Update Router Stats in DB
+            $router->update([
+                'is_active' => true,
+                'current_online_count' => $onlineCount,
+                'cpu_load' => isset($system['cpu-load']) ? (int)$system['cpu-load'] : null,
+                'uptime' => $system['uptime'] ?? null,
+                'version' => $system['version'] ?? null,
+                'board_name' => $system['board-name'] ?? null,
+                'last_health_check_at' => now(),
+            ]);
+
             $mikrotik->disconnect();
 
-            if ($result['success']) {
-                return back()->with('success', "Successfully connected to {$router->name}!");
-            } else {
-                return back()->with('error', "Connection failed: {$result['error']}");
-            }
+            return back()->with('success', "Connected! Synced {$onlineCount} active users.");
         } catch (\Exception $e) {
+            // Update offline status
+            $router->update([
+                 'is_active' => false,
+                 'last_health_check_at' => now(),
+            ]);
+            
             return back()->with('error', "Connection error: {$e->getMessage()}");
         }
     }
@@ -193,20 +220,34 @@ class RouterController extends Controller
      */
     public function scanRouter(Router $router)
     {
+        if (!$router->is_active) {
+            return back()->with('error', "Cannot scan inactive router. Please enable it first or 'Test Connection'.");
+        }
+
         try {
-            \Log::info("Initiating scan for router: {$router->name} (ID: {$router->id})");
+            \Log::info("Initiating synchronous scan for router: {$router->name} (ID: {$router->id})");
             
             \Artisan::call('network:scan', [
                 '--router' => $router->id
             ]);
             
             $output = \Artisan::output();
+            
+            // Aggressive UTF-8 sanitization
+            // 1. Try iconv to strip invalid sequences
+            $output = iconv('UTF-8', 'UTF-8//IGNORE', $output);
+            
+            // 2. Fallback: If iconv fails or returns empty unexpectedly, ensure it's at least ASCII safe if needed, 
+            // but usually iconv is sufficient. 
+            // Let's also ensure we don't have control characters that break JSON
+            $output = preg_replace('/[\x00-\x1F\x7F]/u', '', $output);
+            
             \Log::info("Scan output for {$router->name}: " . $output);
             
-            return back()->with('success', "Scan initiated for {$router->name}. Check logs for details.");
+            return back()->with('success', "Scan completed successfully.");
         } catch (\Exception $e) {
-            \Log::error("Scan failed for {$router->name}: {$e->getMessage()}");
-            return back()->with('error', "Scan failed: {$e->getMessage()}");
+            \Log::error("Scan dispatch failed for {$router->name}: {$e->getMessage()}");
+            return back()->with('error', "Failed to start scan: {$e->getMessage()}");
         }
     }
 }

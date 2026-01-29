@@ -37,6 +37,7 @@ interface Customer {
     pppoe_user: string;
     package_id: number;
     status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    is_online: boolean;
     geo_lat?: string;
     geo_long?: string;
 }
@@ -85,9 +86,16 @@ export default function Edit({ customer, packages }: Props) {
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
                         </Link>
-                        <h2 className="text-xl font-semibold leading-tight text-foreground">
-                            Edit Customer: {customer.name}
-                        </h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-semibold leading-tight text-foreground">
+                                Edit Customer: {customer.name}
+                            </h2>
+                            {customer.is_online ? (
+                                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" title="Online" />
+                            ) : (
+                                <span className="flex h-2.5 w-2.5 rounded-full bg-zinc-300" title="Offline" />
+                            )}
+                        </div>
                     </div>
                     {/* Delete Action - using Dialog as fallback */}
                     <Dialog>
@@ -272,8 +280,9 @@ export default function Edit({ customer, packages }: Props) {
                                     <Select
                                         value={data.package_id}
                                         onValueChange={(val) => setData('package_id', val)}
+                                        disabled
                                     >
-                                        <SelectTrigger className="bg-background/50">
+                                        <SelectTrigger className="bg-background/50 disabled:opacity-50 disabled:cursor-not-allowed">
                                             <SelectValue placeholder="Select a package" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -287,6 +296,9 @@ export default function Edit({ customer, packages }: Props) {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <p className="text-[10px] text-muted-foreground mt-1">
+                                        Package is determined by the Router Profile.
+                                    </p>
                                     {errors.package_id && <p className="text-sm text-destructive">{errors.package_id}</p>}
                                 </div>
 
@@ -305,27 +317,27 @@ export default function Edit({ customer, packages }: Props) {
                                         <Input
                                             id="pppoe_user"
                                             value={data.pppoe_user}
-                                            // PPPoE User is usually less editable to track history, but allowing edit here
-                                            onChange={(e) => setData('pppoe_user', e.target.value)}
-                                            className="font-mono bg-muted/30"
+                                            disabled
+                                            className="font-mono bg-muted text-muted-foreground cursor-not-allowed"
                                         />
-                                        {errors.pppoe_user && <p className="text-sm text-destructive">{errors.pppoe_user}</p>}
+                                        <p className="text-[10px] text-muted-foreground">
+                                            PPPoE Username cannot be changed. Create a new customer if needed.
+                                        </p>
                                     </div>
 
                                     <div className="grid gap-2">
                                         <Label htmlFor="pppoe_pass">
-                                            New Password <span className="text-muted-foreground font-normal">(Optional)</span>
+                                            Password
                                         </Label>
                                         <Input
                                             id="pppoe_pass"
-                                            type="text"
-                                            value={data.pppoe_pass}
-                                            onChange={(e) => setData('pppoe_pass', e.target.value)}
-                                            placeholder="Leave blank to keep current password"
-                                            className="font-mono"
+                                            type="password"
+                                            value="********"
+                                            disabled
+                                            className="font-mono bg-muted text-muted-foreground cursor-not-allowed"
                                         />
                                         <p className="text-[10px] text-muted-foreground">
-                                            Enter a new value only if you want to change the customer's PPPoE password.
+                                            Password management is handled directly via Mikrotik Winbox.
                                         </p>
                                     </div>
                                 </div>
@@ -344,6 +356,6 @@ export default function Edit({ customer, packages }: Props) {
                     </Button>
                 </div>
             </form>
-        </AuthenticatedLayout>
+        </AuthenticatedLayout >
     );
 }

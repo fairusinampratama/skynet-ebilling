@@ -19,7 +19,7 @@ Schedule::command('queue:work --queue=network-enforcement --max-time=3600 --stop
     ->description('Process network enforcement queue');
 
 Schedule::command('network:monitor')
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping()
     ->description('Monitor router connection and health stats');
 

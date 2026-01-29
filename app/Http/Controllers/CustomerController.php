@@ -49,11 +49,12 @@ class CustomerController extends Controller
         $query->orderBy($sortField, $sortDirection);
 
         // Pagination
-        $customers = $query->paginate(50)->withQueryString();
+        $limit = $request->input('limit', 25);
+        $customers = $query->paginate($limit)->withQueryString();
 
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
-            'filters' => $request->only(['search', 'status', 'package_id', 'sort', 'direction']),
+            'filters' => $request->only(['search', 'status', 'package_id', 'sort', 'direction', 'limit']),
             'packages' => Package::all(), // For filter dropdown
         ]);
     }
@@ -133,24 +134,24 @@ class CustomerController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'internal_id' => 'nullable|string|max:255',
-            'package_id' => 'required|exists:packages,id',
+            // 'package_id' => 'required|exists:packages,id', // Disabled
             'address' => 'required|string',
             'phone' => 'nullable|string',
             'nik' => 'nullable|string',
-            'pppoe_user' => 'required|string|unique:customers,pppoe_user,' . $customer->id,
-            'pppoe_pass' => 'nullable|string', // Optional password update
+            // 'pppoe_user' => 'required|string|unique:customers,pppoe_user,' . $customer->id, // Disabled
+            // 'pppoe_pass' => 'nullable|string', // Disabled
             'status' => 'required|in:active,suspended,isolated,offboarding',
             'geo_lat' => 'nullable|numeric|between:-90,90',
             'geo_long' => 'nullable|numeric|between:-180,180',
         ]);
 
         // Only update password if a new one is provided
-        if ($request->filled('pppoe_pass')) {
-            // The model cast will automatically encrypt this
-            $validated['pppoe_pass'] = $request->pppoe_pass;
-        } else {
-            unset($validated['pppoe_pass']);
-        }
+        // if ($request->filled('pppoe_pass')) {
+        //     // The model cast will automatically encrypt this
+        //     $validated['pppoe_pass'] = $request->pppoe_pass;
+        // } else {
+        //     unset($validated['pppoe_pass']);
+        // }
 
         $customer->update($validated);
 
