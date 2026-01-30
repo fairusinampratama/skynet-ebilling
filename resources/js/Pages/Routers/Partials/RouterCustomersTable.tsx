@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Search, RotateCw, MoreHorizontal, Eye, Edit } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
+import { Badge } from '@/Components/ui/badge';
+import { Skeleton } from '@/Components/ui/skeleton';
+import { router } from '@inertiajs/react';
+import { MoreHorizontal, Eye, Edit } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
+import { Button } from '@/Components/ui/button';
 import { PaginatedData } from '@/Components/DataTable';
+import { DataTableToolbar } from '@/Components/DataTableToolbar';
+import { DataTablePagination } from '@/Components/DataTablePagination';
 
 interface Customer {
     id: number;
@@ -39,6 +39,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function RouterCustomersTable({ routerId, activeConnections }: RouterCustomersTableProps) {
     const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(10);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -46,13 +47,31 @@ export default function RouterCustomersTable({ routerId, activeConnections }: Ro
     // Debounce search input
     const handleSearchChange = (value: string) => {
         setSearch(value);
-        const timer = setTimeout(() => setDebouncedSearch(value), 500);
+        const timer = setTimeout(() => {
+            setDebouncedSearch(value);
+            setPage(1); // Reset to page 1 on search
+        }, 500);
         return () => clearTimeout(timer);
+    };
+
+    const handleFilterChange = (key: string, value: string) => {
+        if (key === 'status') {
+            setStatusFilter(value);
+            setPage(1);
+        }
+    };
+
+    const handleReset = () => {
+        setSearch('');
+        setDebouncedSearch('');
+        setStatusFilter('all');
+        setPage(1);
     };
 
     // Construct URL for SWR
     const queryParams = new URLSearchParams({
         page: page.toString(),
+        limit: perPage.toString(),
         search: debouncedSearch,
         status: statusFilter,
     });
@@ -77,37 +96,38 @@ export default function RouterCustomersTable({ routerId, activeConnections }: Ro
         }
     };
 
+    const filterConfigs = [
+        {
+            key: 'status',
+            placeholder: 'Filter Status',
+            options: [
+                { label: 'Active', value: 'active' },
+                { label: 'Isolated', value: 'isolated' },
+            ]
+        }
+    ];
+
+    const activeFilters = {
+        status: statusFilter
+    };
+
     return (
         <div className="space-y-4">
-            {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/30 p-4 rounded-lg border border-border">
-                <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by name, PPPoE..."
-                        value={search}
-                        onChange={(e) => handleSearchChange(e.target.value)}
-                        className="pl-9 bg-background"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val); setPage(1); }}>
-                        <SelectTrigger className="w-[180px] bg-background">
-                            <SelectValue placeholder="Filter Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="isolated">Isolated</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    <Button variant="outline" size="icon" onClick={() => mutate()} title="Refresh Data">
-                        <RotateCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {/* Modular Toolbar */}
+            <DataTableToolbar
+                search={search}
+                onSearchChange={handleSearchChange}
+                searchPlaceholder="Search by name, PPPoE..."
+                activeFilters={activeFilters}
+                filterConfigs={filterConfigs}
+                onFilterChange={handleFilterChange}
+                onReset={handleReset}
+                actions={
+                    <Button variant="outline" size="sm" onClick={() => mutate()} title="Refresh Data">
+                        Refresh
                     </Button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Table */}
             <div className="rounded-md border border-border overflow-hidden bg-card">
@@ -195,31 +215,13 @@ export default function RouterCustomersTable({ routerId, activeConnections }: Ro
                 </Table>
             </div>
 
-            {/* Pagination Controls */}
-            {customersData && customersData.last_page > 1 && (
-                <div className="flex items-center justify-between border-t border-border pt-4">
-                    <p className="text-sm text-muted-foreground">
-                        Showing <span className="font-medium">{customersData.from}</span> to <span className="font-medium">{customersData.to}</span> of <span className="font-medium">{customersData.total}</span> customers
-                    </p>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
-                            disabled={page === 1 || isLoading}
-                        >
-                            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPage(p => Math.min(customersData.last_page, p + 1))}
-                            disabled={page === customersData.last_page || isLoading}
-                        >
-                            Next <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                    </div>
-                </div>
+            {/* Modular Pagination */}
+            {customersData && (
+                <DataTablePagination
+                    data={customersData}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPerPage}
+                />
             )}
         </div>
     );

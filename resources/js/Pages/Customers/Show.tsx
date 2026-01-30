@@ -1,14 +1,15 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import { ArrowLeft, Edit, Trash2, User, Network, MapPin, Search, ChevronLeft, MoreHorizontal, Eye, Loader2, CheckCircle2, AlertTriangle, Power } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from '@/Components/ConfirmDialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import MapPicker from '@/Components/MapPicker';
 import {
     Dialog,
@@ -18,7 +19,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/Components/ui/dialog";
 
 // Types
 interface Transaction {
@@ -72,6 +73,27 @@ export default function Show({ customer }: Props) {
 
     const handleDelete = () => {
         destroy(route('customers.destroy', customer.id));
+    };
+
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<'block' | 'unblock' | null>(null);
+
+    const handleToggleBlock = () => {
+        const isActive = customer.status === 'active';
+        setConfirmAction(isActive ? 'block' : 'unblock');
+        setConfirmOpen(true);
+    };
+
+    const confirmToggle = () => {
+        if (confirmAction === 'block') {
+            router.post(route('customers.isolate', customer.id), {}, {
+                onFinish: () => setConfirmOpen(false)
+            });
+        } else {
+            router.post(route('customers.reconnect', customer.id), {}, {
+                onFinish: () => setConfirmOpen(false)
+            });
+        }
     };
 
     const periodDate = (dateString: string) => {
@@ -243,52 +265,22 @@ export default function Show({ customer }: Props) {
                                                 </span>
                                             </div>
 
-                                            {customer.status === 'active' ? (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={loading}
-                                                    onClick={() => {
-                                                        if (confirm('Block internet access for this customer?')) {
-                                                            const toastId = toast.loading('Blocking access...');
-                                                            router.post(route('customers.isolate', customer.id), {}, {
-                                                                onStart: () => setLoading(true),
-                                                                onFinish: () => {
-                                                                    setLoading(false);
-                                                                    toast.dismiss(toastId);
-                                                                },
-                                                            });
-                                                        }
-                                                    }}
-                                                    className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:border-red-900/30 dark:hover:bg-red-900/20 dark:text-red-400"
-                                                >
-                                                    {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Power className="h-3 w-3 mr-1.5" />}
-                                                    Block
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={loading}
-                                                    onClick={() => {
-                                                        if (confirm('Restore internet access?')) {
-                                                            const toastId = toast.loading('Restoring access...');
-                                                            router.post(route('customers.reconnect', customer.id), {}, {
-                                                                onStart: () => setLoading(true),
-                                                                onFinish: () => {
-                                                                    setLoading(false);
-                                                                    toast.dismiss(toastId);
-                                                                },
-                                                            });
-                                                        }
-                                                    }}
-                                                    className="h-7 text-xs border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 dark:border-emerald-900/30 dark:hover:bg-emerald-900/20 dark:text-emerald-400"
-                                                >
-                                                    {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <CheckCircle2 className="h-3 w-3 mr-1.5" />}
-                                                    Restore
-                                                </Button>
-                                            )}
                                         </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50 mt-4">
+                                        <div>
+                                            <h4 className="font-medium">Internet Access</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                {customer.status === 'active' ? 'Customer has internet access' : 'Internet access is blocked'}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            variant={customer.status === 'active' ? "destructive" : "default"}
+                                            onClick={handleToggleBlock}
+                                        >
+                                            {customer.status === 'active' ? 'Block Access' : 'Restore Access'}
+                                        </Button>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Package</span>
@@ -461,6 +453,18 @@ export default function Show({ customer }: Props) {
                     </TabsContent>
                 </Tabs>
             </div>
+
+            <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={setConfirmOpen}
+                title={confirmAction === 'block' ? "Block Internet Access" : "Restore Internet Access"}
+                description={confirmAction === 'block'
+                    ? "Are you sure you want to block internet access for this customer? They will not be able to connect."
+                    : "Are you sure you want to restore internet access for this customer?"}
+                confirmText={confirmAction === 'block' ? "Block Access" : "Restore Access"}
+                variant={confirmAction === 'block' ? "destructive" : "default"}
+                onConfirm={confirmToggle}
+            />
         </AuthenticatedLayout>
     );
 }

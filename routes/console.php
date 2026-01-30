@@ -24,9 +24,9 @@ Schedule::command('network:monitor')
     ->description('Monitor router connection and health stats');
 
 Schedule::command('network:scan')
-    ->hourly()
+    ->everyTenMinutes()
     ->withoutOverlapping()
-    ->description('Sync customer mapping from routers');
+    ->description('Sync customer mapping and health from routers');
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

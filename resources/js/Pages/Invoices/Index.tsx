@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
 import { Eye, CreditCard, Calendar, AlertCircle, MoreHorizontal } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 
 interface Customer {
@@ -147,35 +147,35 @@ export default function Index({ invoices, filters = {} }: Props) {
         },
         {
             header: "Actions",
-            className: "text-right",
+            className: "text-right w-[120px]",
             cell: (invoice) => (
-                <div className="flex justify-end gap-2">
+                <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                     {invoice.status === 'unpaid' && (
                         <Link href={route('invoices.show', invoice.id)}>
-                            <Button size="sm" className="h-8">
-                                <CreditCard className="mr-2 h-3 w-3" />
+                            <Button size="sm" className="h-8 px-2 text-xs">
+                                <CreditCard className="mr-1.5 h-3 w-3" />
                                 Pay
                             </Button>
                         </Link>
                     )}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => router.visit(route('invoices.show', invoice.id))}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => window.open(route('invoices.download', invoice.id), '_blank')}>
-                                <CreditCard className="mr-2 h-4 w-4" />
-                                Download PDF
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                        title="View Details"
+                        onClick={() => router.visit(route('invoices.show', invoice.id))}
+                    >
+                        <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800/50"
+                        title="Download PDF"
+                        onClick={() => window.open(route('invoices.download', invoice.id), '_blank')}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                    </Button>
                 </div>
             )
         }
@@ -215,6 +215,7 @@ export default function Index({ invoices, filters = {} }: Props) {
                     searchPlaceholder="Search Customer, Code..."
                     filterConfigs={filterConfigs}
                     routeName="invoices.index"
+                    onRowClick={(item: Invoice) => router.visit(route('invoices.show', item.id))}
                 />
             </div>
         </AuthenticatedLayout>

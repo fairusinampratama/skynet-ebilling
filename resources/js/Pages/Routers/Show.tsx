@@ -1,14 +1,14 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Server, Wifi, Activity, Users, TestTube, RefreshCw, Edit, Trash2, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Skeleton } from '../../components/ui/skeleton';
+import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
+import { Input } from '@/Components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
+import { ArrowLeft, Server, Wifi, Activity, Users, RefreshCw, Edit, Trash2, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Skeleton } from '@/Components/ui/skeleton';
 import {
     Dialog,
     DialogContent,
@@ -17,7 +17,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@/Components/ui/dialog";
 import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { formatDistanceToNow } from 'date-fns';
@@ -99,7 +99,7 @@ export default function Show({ router: routerData }: Props) {
     const [activeTab, setActiveTab] = useState('overview');
 
     // Use SWR for live stats with smart caching
-    const { data: liveStats, error: statsError, isLoading: isLoadingStats } = useSWR<LiveStats>(
+    const { data: liveStats, error: statsError, isLoading: isLoadingStats, mutate } = useSWR<LiveStats>(
         `/api/routers/${routerData.id}/live-stats`,
         fetcher,
         {
@@ -109,24 +109,17 @@ export default function Show({ router: routerData }: Props) {
         }
     );
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-
-    const [isTestingConnection, setIsTestingConnection] = useState(false);
-    const [isScanning, setIsScanning] = useState(false);
-
-    const handleTestConnection = () => {
-        setIsTestingConnection(true);
-        router.post(`/routers/${routerData.id}/test-connection`, {}, {
+    // Manual Refresh (Overrides Scheduled Sync)
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        router.post(`/routers/${routerData.id}/sync`, {}, {
             preserveScroll: true,
-            onFinish: () => setIsTestingConnection(false),
-        });
-    };
-
-    const handleScanRouter = () => {
-        setIsScanning(true);
-        router.post(`/routers/${routerData.id}/scan`, {}, {
-            preserveScroll: true,
-            onFinish: () => setIsScanning(false),
+            onSuccess: () => {
+                mutate(); // Trigger refresh but don't wait for it
+            },
+            onFinish: () => setIsRefreshing(false),
         });
     };
 
@@ -180,18 +173,6 @@ export default function Show({ router: routerData }: Props) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={handleTestConnection} disabled={isTestingConnection}>
-                            {isTestingConnection ? (
-                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <TestTube className="mr-2 h-4 w-4" />
-                            )}
-                            {isTestingConnection ? 'Testing...' : 'Test Connection'}
-                        </Button>
-                        <Button variant="outline" onClick={handleScanRouter} disabled={isScanning || !routerData.is_active}>
-                            <RefreshCw className={`mr-2 h-4 w-4 ${isScanning ? 'animate-spin' : ''}`} />
-                            {isScanning ? 'Starting Scan...' : 'Scan Customers'}
-                        </Button>
                         <Link href={route('routers.edit', routerData.id)}>
                             <Button variant="outline">
                                 <Edit className="mr-2 h-4 w-4" />
@@ -236,6 +217,7 @@ export default function Show({ router: routerData }: Props) {
             <div className="py-12">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        {/* ... TabsList unchanged ... */}
                         <TabsList>
                             <TabsTrigger value="overview">
                                 <Server className="h-4 w-4 mr-2" />
@@ -251,12 +233,12 @@ export default function Show({ router: routerData }: Props) {
                         <TabsContent value="overview" className="space-y-6">
                             {/* Stats Grid */}
                             <div className="grid gap-6 md:grid-cols-3">
+                                {/* ... Status Card unchanged ... */}
                                 <Card className="border-border bg-card">
                                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                         <CardTitle className="text-sm font-medium text-muted-foreground">
                                             Status
                                         </CardTitle>
-                                        <Wifi className="h-4 w-4 text-muted-foreground" />
                                     </CardHeader>
                                     <CardContent>
                                         <Badge variant={routerData.is_active ? 'default' : 'secondary'}>
@@ -265,6 +247,7 @@ export default function Show({ router: routerData }: Props) {
                                     </CardContent>
                                 </Card>
 
+                                {/* ... Online/Total Card unchanged ... */}
                                 <Card className="border-border bg-card">
                                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -292,6 +275,7 @@ export default function Show({ router: routerData }: Props) {
                                     </CardContent>
                                 </Card>
 
+                                {/* ... API Port Card unchanged ... */}
                                 <Card className="border-border bg-card">
                                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -308,28 +292,35 @@ export default function Show({ router: routerData }: Props) {
                                 </Card>
                             </div>
 
-                            {/* Last Scan Info */}
-                            {routerData.last_scanned_at && (
-                                <Card className="border-border bg-card">
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <Activity className="h-5 w-5 text-muted-foreground" />
-                                                <div>
-                                                    <p className="text-sm font-medium">Last Network Scan</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {formatDistanceToNow(new Date(routerData.last_scanned_at))} ago • Found {routerData.last_scan_customers_count} customers
-                                                    </p>
-                                                </div>
+                            {/* Last Scan Info - Always Visible */}
+                            <Card className="border-border bg-card">
+                                <CardContent className="pt-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Activity className="h-5 w-5 text-muted-foreground" />
+                                            <div>
+                                                <p className="text-sm font-medium">Last Full Sync</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {routerData.last_scanned_at
+                                                        ? `${formatDistanceToNow(new Date(routerData.last_scanned_at))} ago • Found ${routerData.last_scan_customers_count} customers`
+                                                        : 'Never synced'
+                                                    }
+                                                </p>
                                             </div>
-                                            <Button variant="outline" size="sm" onClick={handleScanRouter}>
-                                                <RefreshCw className="h-4 w-4 mr-2" />
-                                                Refresh
-                                            </Button>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            )}
+                                        {/* Subtle Refresh Button */}
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleRefresh}
+                                            disabled={isRefreshing}
+                                            title={routerData.is_active ? "Force Manual Sync" : "Sync to Reactivate Router"}
+                                        >
+                                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
 
                             {/* Active Connections */}
                             {liveStats?.data?.active_connections && Array.isArray(liveStats.data.active_connections) && liveStats.data.active_connections.length > 0 && (

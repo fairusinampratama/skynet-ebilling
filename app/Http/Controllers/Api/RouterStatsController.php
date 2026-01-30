@@ -31,8 +31,22 @@ class RouterStatsController extends Controller
                 return response()->json($cached);
             }
 
-            // Fetch fresh data
-            $this->mikrotikService->connect($router);
+            // Optimization: If router is marked inactive, don't try to connect (fail fast)
+            // Unless we are forcing a check (which is handled by sync endpoint, not here)
+            if (!$router->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'data' => [
+                        'total_online' => 0,
+                        'active_connections' => [],
+                    ],
+                    'error' => 'Router is marked inactive',
+                    'last_updated' => now()->toIso8601String(),
+                ]);
+            }
+
+            // Fetch fresh data with short timeout
+            $this->mikrotikService->connect($router, ['timeout' => 2, 'attempts' => 1]);
 
             // Get active connections
             $activeConnections = $this->mikrotikService->getActiveConnections();

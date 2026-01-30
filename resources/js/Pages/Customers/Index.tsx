@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { EditAction, DeleteAction } from '@/Components/TableActions';
 import { Head, Link, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 
@@ -146,40 +147,27 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
         },
         {
             header: "Actions",
-            className: "text-right",
+            className: "text-right w-[100px]",
             cell: (customer) => (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.visit(route('customers.show', customer.id))}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.visit(route('customers.edit', customer.id))}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Customer
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600"
-                            onClick={() => {
-                                if (confirm('Are you sure you want to delete this customer?')) {
-                                    router.delete(route('customers.destroy', customer.id));
-                                }
-                            }}
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    <EditAction
+                        onClick={() => router.visit(route('customers.edit', customer.id))}
+                        title="Edit Customer"
+                    />
+                    <DeleteAction
+                        onClick={() => handleDelete(customer.id)}
+                        title="Delete Customer"
+                    />
+                </div>
             )
-        }
+        },
     ];
+
+    const handleDelete = (id: number) => {
+        if (confirm('Are you sure you want to delete this customer?')) {
+            router.delete(route('customers.destroy', id));
+        }
+    };
 
     const filterConfigs: FilterConfig[] = [
         {
@@ -206,6 +194,11 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
                     <h2 className="text-xl font-semibold leading-tight text-foreground">
                         Customers
                     </h2>
+                    <Link href={route('customers.create')}>
+                        <Button className="bg-foreground text-background hover:bg-foreground/90">
+                            Add Customer
+                        </Button>
+                    </Link>
                 </div>
             }
         >
@@ -217,17 +210,11 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
                     columns={columns}
                     filters={filters}
                     title="Customers Directory"
-                    description={`Managing ${customers.total} registered subscribers`}
-                    searchPlaceholder="Search Name, ID, Address..."
+                    description={`Showing ${customers.data.length} of ${customers.total} customers`}
+                    searchPlaceholder="Search Name, Phone, Address..."
                     filterConfigs={filterConfigs}
                     routeName="customers.index"
-                    actions={
-                        <Link href={route('customers.create')}>
-                            <Button className="bg-foreground text-background hover:bg-foreground/90">
-                                Add Customer
-                            </Button>
-                        </Link>
-                    }
+                    onRowClick={(item) => router.visit(route('customers.show', item.id))}
                 />
             </div>
         </AuthenticatedLayout>

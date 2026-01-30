@@ -24,12 +24,17 @@ class MikrotikService
         $this->router = $router;
 
         try {
+            $timeout = $options['timeout'] ?? 3;
+            // Force PHP socket timeout to respect our setting (fix for hanging connections)
+            ini_set('default_socket_timeout', $timeout);
+
             $config = new Config([
                 'host' => $router->ip_address,
                 'user' => $router->username,
                 'pass' => $router->password, // Auto-decrypted by Laravel's encrypted cast
                 'port' => $router->port,
-                'timeout' => $options['timeout'] ?? 10,
+                'timeout' => $timeout, // Connection timeout
+                'socket_timeout' => $timeout, // Read/write timeout (THIS WAS THE MISSING PIECE!)
                 'attempts' => $options['attempts'] ?? 2,
             ]);
 

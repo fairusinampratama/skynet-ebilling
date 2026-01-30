@@ -6,6 +6,7 @@ use App\Models\Router;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Services\MikrotikService;
+use App\Services\RouterSyncService;
 use Illuminate\Console\Command;
 
 class ScanRouters extends Command
@@ -16,11 +17,13 @@ class ScanRouters extends Command
 
     protected $description = 'Scan all MikroTik routers and map customers to their routers';
 
-    protected MikrotikService $mikrotik;
+    protected RouterSyncService $syncService;
+    protected MikrotikService $mikrotik; // Kept for constructor compatibility if needed, but primary logic moves to syncService
 
-    public function __construct(MikrotikService $mikrotik)
+    public function __construct(RouterSyncService $syncService, MikrotikService $mikrotik)
     {
         parent::__construct();
+        $this->syncService = $syncService;
         $this->mikrotik = $mikrotik;
     }
 
@@ -32,7 +35,7 @@ class ScanRouters extends Command
         // Determine which routers to scan
         $routers = $this->option('router')
             ? Router::where('id', $this->option('router'))->get()
-            : Router::where('is_active', true)->get();
+            : Router::all(); // Scan ALL routers (including inactive to detect when they come back online)
 
         if ($routers->isEmpty()) {
             $this->error('No routers found to scan.');
@@ -48,93 +51,25 @@ class ScanRouters extends Command
 
         foreach ($routers as $router) {
             try {
+                // Use the Service!
+                // Note: The service doesn't return text output, so we lose the per-customer log lines in CLI
+                // unless we enhance the service or just accept the summary.
+                // For a robust cleaner app, summary is usually better.
+                
+                $stats = $this->syncService->syncCustomers($router, $this->option('dry-run'));
+
                 $this->info("\nScanning: {$router->name} ({$router->ip_address})");
-
-                // Connect to router
-                $this->mikrotik->connect($router);
-
-                // Get PPP secrets
-                $secrets = $this->mikrotik->getPPPSecrets();
-                $this->info("  → Found " . count($secrets) . " PPP secrets");
-
-                $matchedCount = 0;
-
-                // Match with customers
-                foreach ($secrets as $secret) {
-                    $pppoeUsername = $secret['name'] ?? null;
-
-                    if (!$pppoeUsername) {
-                        continue;
-                    }
-
-                    // Find customer by PPPoE username
-                    $customer = Customer::where('pppoe_user', $pppoeUsername)->first();
-
-                    if ($customer) {
-                        if (!$this->option('dry-run')) {
-                            $updates = ['router_id' => $router->id];
-
-                            // Auto-Sync Package from Profile
-                            $profileName = $secret['profile'] ?? null;
-                            
-                            // Check if profile exists and IS NOT the isolation profile
-                            if ($profileName && $profileName !== $router->isolation_profile) {
-                                // Find package by name (Case-insensitive match could be safer, but exact for now)
-                                $package = Package::where('name', $profileName)->first();
-                                
-                                if ($package && $customer->package_id !== $package->id) {
-                                    $updates['package_id'] = $package->id;
-                                    $this->line("    ↻ Synced Package: {$package->name}");
-                                }
-                            }
-
-                            // Auto-Sync Status from Profile
-                            if ($router->isolation_profile) {
-                                if ($profileName === $router->isolation_profile) {
-                                    // Router says Isolated -> Force DB to Isolated
-                                    if ($customer->status !== 'isolated') {
-                                        $updates['status'] = 'isolated';
-                                        $this->line("    ↻ Synced Status: ISOLATED (Matched Router Profile)");
-                                    }
-                                } else {
-                                    // Router says NOT Isolated -> If DB thinks Isolated, Restore to Active
-                                    if ($customer->status === 'isolated') {
-                                        $updates['status'] = 'active';
-                                        $this->line("    ↻ Synced Status: ACTIVE (Differs from Isolation Profile)");
-                                    }
-                                }
-                            }
-
-                            // Update customer
-                            $customer->update($updates);
-                        }
-                        $matchedCount++;
-                    }
-                }
-
-                $this->info("  ✓ Matched {$matchedCount} customers");
-                $totalCustomersFound += $matchedCount;
+                $this->info("  ✓ Found {$stats['total_secrets']} secrets");
+                $this->info("  ✓ Mapped {$stats['mapped']} customers");
+                if ($stats['synced_package'] > 0) $this->info("  ✓ Updated {$stats['synced_package']} packages");
+                if ($stats['synced_status'] > 0) $this->info("  ✓ Updated {$stats['synced_status']} statuses");
+                
+                $totalCustomersFound += $stats['mapped'];
                 $routersScanned++;
-
-                // Update scan timestamp and stats
-                if (!$this->option('dry-run')) {
-                    $router->update([
-                        'last_scanned_at' => now(),
-                        'last_scan_customers_count' => $matchedCount,
-                        'is_active' => true, // Mark as active on successful scan
-                    ]);
-                }
-
-                $this->mikrotik->disconnect();
 
             } catch (\Exception $e) {
                 $this->error("\n  ✗ Failed to scan {$router->name}: {$e->getMessage()}");
                 $routersFailed++;
-
-                // Mark router as inactive if connection failed
-                if (!$this->option('dry-run')) {
-                    $router->update(['is_active' => false]);
-                }
             }
 
             $progressBar->advance();

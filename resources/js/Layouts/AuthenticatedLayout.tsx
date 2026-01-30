@@ -16,16 +16,16 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from '@/Components/ui/dropdown-menu';
+import { Button } from '@/Components/ui/button';
+import { Input } from '@/Components/ui/input';
 import { Link } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { ThemeToggle } from '@/Components/ThemeToggle';
 import { AppSidebar } from '@/Components/AppSidebar';
 import Breadcrumbs, { BreadcrumbItem } from '@/Components/Common/Breadcrumbs';
 
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from '@/Components/ui/sonner';
 import { toast } from 'sonner';
 
 export default function Authenticated({

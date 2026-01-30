@@ -1,11 +1,11 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { router } from '@inertiajs/react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpDown, ArrowUp, ArrowDown, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
+import { Button } from '@/Components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
+import { ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
+import { DataTableToolbar } from '@/Components/DataTableToolbar';
+import { DataTablePagination } from '@/Components/DataTablePagination';
 
 // Helper for debounce
 function useDebounce<T>(value: T, delay: number): T {
@@ -33,6 +33,7 @@ export interface Column<T> {
 export interface FilterOption {
     label: string;
     value: string;
+    icon?: React.ComponentType<{ className?: string }>; // Enhanced to support icons
 }
 
 export interface FilterConfig {
@@ -67,6 +68,8 @@ interface DataTableProps<T> {
     searchPlaceholder?: string;
     filterConfigs?: FilterConfig[]; // Dropdown filters configuration
     actions?: ReactNode; // Slot for "Add Button" etc.
+    loading?: boolean;
+    onRowClick?: (item: T) => void;
     routeName: string; // Base route name for router.get() e.g. "customers.index"
 }
 
@@ -79,6 +82,7 @@ export default function DataTable<T extends { id: number | string }>({
     searchPlaceholder = "Search...",
     filterConfigs = [],
     actions,
+    onRowClick,
     routeName
 }: DataTableProps<T>) {
     const safeFilters = Array.isArray(filters) ? {} : (filters || {});
@@ -164,59 +168,18 @@ export default function DataTable<T extends { id: number | string }>({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {/* Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-border bg-card shadow-sm transition-all">
-                <div className="flex-1 relative">
-                    <Input
-                        placeholder={searchPlaceholder}
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-background border-input focus-visible:ring-ring pl-10"
-                    />
-                    <div className="absolute left-3 top-2.5 text-muted-foreground pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-search"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-                    </div>
-                    {search && (
-                        <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground">
-                            <X className="h-4 w-4" />
-                        </button>
-                    )}
-                </div>
-
-                {filterConfigs.map(config => (
-                    <Select
-                        key={config.key}
-                        value={activeFilters[config.key]}
-                        onValueChange={(val) => handleFilterChange(config.key, val)}
-                    >
-                        <SelectTrigger className="w-[160px] bg-background border-input text-foreground">
-                            <SelectValue placeholder={config.placeholder} />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border-border">
-                            <SelectItem value="all" className="text-foreground focus:bg-accent focus:text-accent-foreground">{config.placeholder}</SelectItem>
-                            {config.options.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value} className="text-foreground focus:bg-accent focus:text-accent-foreground">{opt.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                ))}
-
-                <Button
-                    variant="ghost"
-                    onClick={handleReset}
-                    className="px-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    title="Reset Filters"
-                >
-                    Reset
-                </Button>
-
-                {actions && (
-                    <div className="sm:ml-auto pl-2 border-l border-border/50">
-                        {actions}
-                    </div>
-                )}
-            </div>
+            <DataTableToolbar
+                search={search}
+                onSearchChange={setSearch}
+                activeFilters={activeFilters}
+                filterConfigs={filterConfigs}
+                onFilterChange={handleFilterChange}
+                onReset={handleReset}
+                searchPlaceholder={searchPlaceholder}
+                actions={actions}
+            />
 
             {/* Table Card */}
             <Card className="border-border bg-card shadow-sm">
@@ -271,7 +234,11 @@ export default function DataTable<T extends { id: number | string }>({
                                     </TableRow>
                                 ) : (
                                     data.data.map((item) => (
-                                        <TableRow key={item.id} className="group hover:bg-muted/50 border-border transition-colors">
+                                        <TableRow
+                                            key={item.id}
+                                            className={`group border-border transition-colors hover:bg-muted/50 ${onRowClick ? 'cursor-pointer' : ''}`}
+                                            onClick={() => onRowClick && onRowClick(item)}
+                                        >
                                             {columns.map((col, idx) => (
                                                 <TableCell key={idx} className={col.className}>
                                                     {col.cell
@@ -288,76 +255,7 @@ export default function DataTable<T extends { id: number | string }>({
                     </div>
 
                     {/* Pagination */}
-                    <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-                        <div className="text-sm text-muted-foreground">
-                            Showing <span className="font-medium text-foreground">{data.from || 0}</span> to <span className="font-medium text-foreground">{data.to || 0}</span> of <span className="font-medium text-foreground">{data.total}</span> records
-                        </div>
-                        <div className="flex gap-1.5 items-center">
-                            <span className="text-sm text-muted-foreground mr-2">Rows per page:</span>
-                            <Select
-                                value={String(data.per_page)}
-                                onValueChange={(val) => {
-                                    router.get(data.path, { ...filters, limit: val }, {
-                                        preserveState: true,
-                                        preserveScroll: true
-                                    });
-                                }}
-                            >
-                                <SelectTrigger className="h-8 w-[70px]">
-                                    <SelectValue placeholder={String(data.per_page)} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {[10, 25, 50, 100].map((size) => (
-                                        <SelectItem key={size} value={String(size)}>
-                                            {size}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                        const prevUrl = data.links[0]?.url;
-                                        if (prevUrl) {
-                                            router.get(prevUrl, { limit: data.per_page }, {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            });
-                                        }
-                                    }}
-                                    disabled={data.current_page === 1}
-                                    className="px-2"
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-
-                                <span className="text-sm font-medium text-muted-foreground min-w-[100px] text-center">
-                                    Page {data.current_page} of {data.last_page}
-                                </span>
-
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                        const nextUrl = data.links[data.links.length - 1]?.url;
-                                        if (nextUrl) {
-                                            router.get(nextUrl, { limit: data.per_page }, {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            });
-                                        }
-                                    }}
-                                    disabled={data.current_page === data.last_page}
-                                    className="px-2"
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
+                    <DataTablePagination data={data} filters={filters} />
                 </CardContent>
             </Card>
         </div>

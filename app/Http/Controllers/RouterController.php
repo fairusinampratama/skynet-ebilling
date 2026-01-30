@@ -172,46 +172,13 @@ class RouterController extends Controller
      */
     public function testConnection(Router $router)
     {
-        $mikrotik = app(\App\Services\MikrotikService::class);
+        $syncService = app(\App\Services\RouterSyncService::class);
+        $result = $syncService->syncHealthStatus($router);
 
-        try {
-            // Strict timeout for UI responsiveness: 5 seconds, 1 attempt
-            $mikrotik->connect($router, ['timeout' => 5, 'attempts' => 1]);
-            
-            // 1. Fetch System Resources (Fast)
-            $resourceQuery = new \RouterOS\Query('/system/resource/print');
-            $resource = $mikrotik->getClient()->query($resourceQuery)->read();
-            $system = $resource[0] ?? [];
-
-            // 2. Fetch Active Connections (Heavy - do only once)
-            $activeConnections = $mikrotik->getActiveConnections();
-            $onlineCount = count($activeConnections);
-
-            // 3. Sync Customer Status
-            $mikrotik->syncCustomerOnlineStatus($activeConnections);
-
-            // 4. Update Router Stats in DB
-            $router->update([
-                'is_active' => true,
-                'current_online_count' => $onlineCount,
-                'cpu_load' => isset($system['cpu-load']) ? (int)$system['cpu-load'] : null,
-                'uptime' => $system['uptime'] ?? null,
-                'version' => $system['version'] ?? null,
-                'board_name' => $system['board-name'] ?? null,
-                'last_health_check_at' => now(),
-            ]);
-
-            $mikrotik->disconnect();
-
-            return back()->with('success', "Connected! Synced {$onlineCount} active users.");
-        } catch (\Exception $e) {
-            // Update offline status
-            $router->update([
-                 'is_active' => false,
-                 'last_health_check_at' => now(),
-            ]);
-            
-            return back()->with('error', "Connection error: {$e->getMessage()}");
+        if ($result['success']) {
+            return back()->with('success', $result['message']);
+        } else {
+            return back()->with('error', $result['message']);
         }
     }
 
@@ -227,27 +194,67 @@ class RouterController extends Controller
         try {
             \Log::info("Initiating synchronous scan for router: {$router->name} (ID: {$router->id})");
             
-            \Artisan::call('network:scan', [
-                '--router' => $router->id
-            ]);
+            $syncService = app(\App\Services\RouterSyncService::class);
+            $stats = $syncService->syncCustomers($router);
             
-            $output = \Artisan::output();
+            $message = "Scan completed. Mapped: {$stats['mapped']}, Orphans: {$stats['orphaned']}";
+            if ($stats['synced_package'] > 0) $message .= ", Packages Updated: {$stats['synced_package']}";
             
-            // Aggressive UTF-8 sanitization
-            // 1. Try iconv to strip invalid sequences
-            $output = iconv('UTF-8', 'UTF-8//IGNORE', $output);
-            
-            // 2. Fallback: If iconv fails or returns empty unexpectedly, ensure it's at least ASCII safe if needed, 
-            // but usually iconv is sufficient. 
-            // Let's also ensure we don't have control characters that break JSON
-            $output = preg_replace('/[\x00-\x1F\x7F]/u', '', $output);
-            
-            \Log::info("Scan output for {$router->name}: " . $output);
-            
-            return back()->with('success', "Scan completed successfully.");
+            return back()->with('success', $message);
         } catch (\Exception $e) {
-            \Log::error("Scan dispatch failed for {$router->name}: {$e->getMessage()}");
-            return back()->with('error', "Failed to start scan: {$e->getMessage()}");
+            \Log::error("Scan failed for {$router->name}: {$e->getMessage()}");
+            return back()->with('error', "Failed to scan: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Unified Sync (Test + Scan)
+     */
+    public function sync(Router $router)
+    {
+        $syncService = app(\App\Services\RouterSyncService::class);
+        $result = $syncService->fullSync($router);
+
+        if ($result['success']) {
+            $scan = $result['scan'];
+            // Simplify message for toast
+            $msg = "{$router->name}: Synced! Online: {$router->current_online_count}. Scan: {$scan['mapped']} mapped, {$scan['orphaned']} orphans.";
+            return back()->with('success', $msg);
+        } else {
+            return back()->with('error', "{$router->name}: Sync Failed - " . $result['error']);
+        }
+    }
+
+    /**
+     * Sync All Active Routers
+     */
+    public function syncAll()
+    {
+        $routers = Router::where('is_active', true)->get();
+        $results = [
+            'total' => $routers->count(),
+            'synced' => 0,
+            'failed' => 0,
+            'errors' => []
+        ];
+
+        $syncService = app(\App\Services\RouterSyncService::class);
+
+        foreach ($routers as $router) {
+            try {
+                $syncService->fullSync($router);
+                $results['synced']++;
+            } catch (\Exception $e) {
+                $results['failed']++;
+                $results['errors'][] = "{$router->name}: {$e->getMessage()}";
+            }
+        }
+
+        $message = "Synced {$results['synced']}/{$results['total']} routers";
+        if ($results['failed'] > 0) {
+            $message .= ". {$results['failed']} failed.";
+        }
+
+        return back()->with('success', $message);
     }
 }
