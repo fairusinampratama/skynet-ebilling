@@ -139,7 +139,7 @@ class MikrotikService
 
     /**
      * Isolate a user (block internet access)
-     * Method: Change PPPoE profile to configured isolation profile
+     * Method: Change PPPoE profile to 'isolirebilling' (case-insensitive)
      */
     public function isolateUser(string $username): bool
     {
@@ -147,12 +147,25 @@ class MikrotikService
             throw new \Exception('Not connected to router. Call connect() first.');
         }
 
-        if (empty($this->router->isolation_profile)) {
-            Log::warning("Isolation skipped: No isolation profile configured for router {$this->router->name}");
-            throw new \Exception("Router {$this->router->name} does not have an isolation profile configured.");
-        }
+        // Hardcoded isolation profile (case-insensitive)
+        $isolationProfile = 'isolirebilling';
 
         try {
+            // Get all available profiles to find case-insensitive match
+            $allProfiles = $this->getProfiles();
+            $matchedProfile = null;
+            
+            foreach ($allProfiles as $profile) {
+                if (strcasecmp($profile['name'], $isolationProfile) === 0) {
+                    $matchedProfile = $profile['name'];
+                    break;
+                }
+            }
+            
+            if (!$matchedProfile) {
+                throw new \Exception("Isolation profile 'isolirebilling' not found on router {$this->router->name}");
+            }
+
             // Find the PPP secret
             $query = (new Query('/ppp/secret/print'))
                 ->where('name', $username);
@@ -167,26 +180,25 @@ class MikrotikService
             $secret = $secrets[0];
             $currentProfile = $secret['profile'] ?? 'default';
 
-            // Don't overwrite if likely already isolated
-            if ($currentProfile !== $this->router->isolation_profile) {
-                // Update customer record with previous profile
+            // Save previous profile if not already isolated
+            if (strcasecmp($currentProfile, $isolationProfile) !== 0) {
                 $customer = \App\Models\Customer::where('pppoe_user', $username)->first();
                 if ($customer) {
                     $customer->update(['previous_profile' => $currentProfile]);
                 }
             }
 
-            // Change profile to confirmed isolation profile
+            // Change profile to isolation profile (using the exact case from router)
             $query = (new Query('/ppp/secret/set'))
                 ->equal('.id', $secret['.id'])
-                ->equal('profile', $this->router->isolation_profile);
+                ->equal('profile', $matchedProfile);
 
             $this->client->query($query)->read();
 
             // Kick active session if any
             $this->kickUser($username);
 
-            Log::info("Successfully isolated user: {$username} on {$this->router->name} (Profile: {$this->router->isolation_profile})");
+            Log::info("Successfully isolated user: {$username} on {$this->router->name} (Profile: {$matchedProfile})");
 
             return true;
         } catch (\Exception $e) {

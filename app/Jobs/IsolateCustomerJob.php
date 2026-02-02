@@ -70,7 +70,22 @@ class IsolateCustomerJob implements ShouldQueue
 
                 Log::info("Successfully isolated: {$this->customer->name}");
             } else {
-                Log::warning("Failed to isolate {$this->customer->name}: User not found on router");
+                // PPPoE secret not found on router - this is a critical error
+                $errorMsg = "PPPoE user '{$this->customer->pppoe_user}' not found on router '{$router->name}'";
+                
+                Log::error($errorMsg);
+                
+                activity()
+                    ->causedBy(auth()->user() ?? null)
+                    ->performedOn($this->customer)
+                    ->withProperties([
+                        'error' => $errorMsg,
+                        'router' => $router->name,
+                        'pppoe_user' => $this->customer->pppoe_user,
+                    ])
+                    ->log('isolation_failed');
+                
+                throw new Exception($errorMsg);
             }
 
             $mikrotik->disconnect();

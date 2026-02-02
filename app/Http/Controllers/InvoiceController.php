@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Customer;
+use App\Models\Setting;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 use Inertia\Inertia;
 
@@ -72,5 +74,26 @@ class InvoiceController extends Controller
             'customer' => $customer,
             'invoices' => $invoices,
         ]);
+    }
+
+    /**
+     * Download invoice as PDF
+     */
+    public function download(Invoice $invoice)
+    {
+        $invoice->load(['customer.package', 'transactions']);
+        
+        $company = [
+            'name' => Setting::get('company_name', 'PT. SKYNET LINTAS NUSANTARA'),
+            'address' => Setting::get('company_address', 'Randuagung Gg VIII RT3, RW7, No.01 Singosari - Malang 65153'),
+            'email' => 'cs@sky.net.id',
+            'phone' => '081252095394',
+        ];
+        
+        $manual_accounts = Setting::get('payment_channels', []);
+        
+        $pdf = Pdf::loadView('invoices.pdf', compact('invoice', 'company', 'manual_accounts'));
+        
+        return $pdf->download("Invoice-{$invoice->code}.pdf");
     }
 }

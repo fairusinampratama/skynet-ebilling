@@ -9,6 +9,8 @@ import { EditAction, DeleteAction } from '@/Components/TableActions';
 import { ConfirmDialog } from '@/Components/ConfirmDialog';
 import { RouterStatusBadge, SyncStatus } from '@/Components/RouterStatusBadge';
 
+import { PageProps } from '@/types';
+
 interface Router {
     id: number;
     name: string;
@@ -22,14 +24,9 @@ interface Router {
     cpu_load: number | null;
 }
 
-interface CommonProps {
-    auth: any;
-    flash: {
-        success?: string;
-        error?: string;
-        [key: string]: any;
-    };
-    [key: string]: any; // Add index signature to satisfy PageProps
+interface CommonProps extends PageProps {
+    // Add existing CommonProps that were unique, if any
+    [key: string]: any;
 }
 
 interface Props {
@@ -43,7 +40,7 @@ interface Props {
 }
 
 export default function Index({ routers, filters = {} }: Props) {
-    const { flash } = usePage<CommonProps>().props;
+    const { flash } = usePage<PageProps>().props;
     const [isSyncingAll, setIsSyncingAll] = useState(false);
     const [currentSyncingId, setCurrentSyncingId] = useState<number | null>(null);
     const [syncedIds, setSyncedIds] = useState<Set<number>>(new Set());

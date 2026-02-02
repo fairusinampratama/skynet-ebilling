@@ -13,13 +13,24 @@ class Invoice extends Model
     use LogsActivity;
 
     protected $fillable = [
+        'uuid',
         'customer_id',
         'period',
         'amount',
         'status',
         'due_date',
         'generated_at',
+        'payment_link',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($invoice) {
+            if (empty($invoice->uuid)) {
+                $invoice->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -59,5 +70,10 @@ class Invoice extends Model
     public function totalPaid()
     {
         return $this->transactions()->sum('amount');
+    }
+
+    public function broadcasts(): HasMany
+    {
+        return $this->hasMany(InvoiceBroadcast::class);
     }
 }

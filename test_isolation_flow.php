@@ -49,10 +49,7 @@ try {
     echo "   ✅ Connected to router: {$customer->router->name}\n";
     
     // Check isolation profile config
-    if (!$customer->router->isolation_profile) {
-        throw new Exception("Router has no isolation_profile configured!");
-    }
-    echo "   ✅ Router Isolation Profile Config: {$customer->router->isolation_profile}\n";
+    echo "   ✅ Using hardcoded isolation profile: isolirebilling\n";
 
     // Get current secret
     $secret = $mikrotik->getPPPSecret($customer->pppoe_user);
@@ -62,7 +59,7 @@ try {
     $originalProfile = $secret['profile'];
     echo "   ✅ Current Router Profile: $originalProfile\n";
 
-    if ($originalProfile === $customer->router->isolation_profile) {
+    if (strcasecmp($originalProfile, 'isolirebilling') === 0) {
         throw new Exception("Customer is ALREADY isolated on the router! Cannot start test.");
     }
 
@@ -106,8 +103,8 @@ try {
     $secret = $mikrotik->getPPPSecret($customer->pppoe_user);
     $currentProfile = $secret['profile'];
     
-    if ($currentProfile !== $customer->router->isolation_profile) {
-        echo "   ❌ ROUTER PROFILE FAIL: Expected '{$customer->router->isolation_profile}', got '$currentProfile'\n";
+    if (strcasecmp($currentProfile, 'isolirebilling') !== 0) {
+        echo "   ❌ ROUTER PROFILE FAIL: Expected 'isolirebilling', got '$currentProfile'\n";
     } else {
         echo "   ✅ Router Profile: $currentProfile (Correctly Isolated)\n";
     }

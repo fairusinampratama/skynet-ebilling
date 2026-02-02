@@ -38,6 +38,9 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            'settings' => [
+                'payment_channels' => \App\Models\Setting::get('payment_channels', []),
+            ],
         ];
     }
 }

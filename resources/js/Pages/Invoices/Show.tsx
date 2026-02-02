@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import { Badge } from '@/Components/ui/badge';
@@ -65,7 +65,10 @@ interface Props {
     invoice: Invoice;
 }
 
+import { PageProps } from '@/types';
+
 export default function Show({ invoice }: Props) {
+    const { settings } = usePage<PageProps>().props;
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
     const totalPaid = invoice.transactions.reduce((sum, t) => sum + t.amount, 0);
@@ -147,9 +150,11 @@ export default function Show({ invoice }: Props) {
                             </p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2">
-                        <Download className="w-4 h-4" />
-                        Download PDF
+                    <Button variant="outline" size="sm" className="gap-2" asChild>
+                        <a href={route('invoices.download', invoice.id)} target="_blank">
+                            <Download className="w-4 h-4" />
+                            Download PDF
+                        </a>
                     </Button>
                 </div>
             }
@@ -237,6 +242,22 @@ export default function Show({ invoice }: Props) {
                                                     </SelectContent>
                                                 </Select>
                                             </div>
+
+                                            {data.method === 'transfer' && (
+                                                <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 text-sm text-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+                                                    <p className="font-semibold mb-1">Bank Account Details:</p>
+                                                    {settings.payment_channels && settings.payment_channels.length > 0 ? (
+                                                        settings.payment_channels.map((channel, i) => (
+                                                            <p key={i}>
+                                                                {channel.bank}: {channel.account_number} ({channel.account_name})
+                                                            </p>
+                                                        ))
+                                                    ) : (
+                                                        <p className="italic text-xs">No bank accounts configured.</p>
+                                                    )}
+                                                    <p className="mt-1 text-xs opacity-80">Please upload the transfer receipt below.</p>
+                                                </div>
+                                            )}
 
                                             <div className="space-y-2">
                                                 <Label htmlFor="proof">Proof URL (Optional)</Label>

@@ -40,11 +40,8 @@ class GenerateInvoices extends Command
             ? Carbon::createFromFormat('Y-m', $inputMonth)->startOfMonth()
             : now()->startOfMonth();
             
-        // Due Date: 20th of the month
-        $dueDate = $period->copy()->day(20);
-
         $this->info("Billing Period: " . $period->format('F Y'));
-        $this->info("Due Date: " . $dueDate->format('Y-m-d'));
+        // $this->info("Due Date: " . $dueDate->format('Y-m-d')); // Removed global due date
         if ($isDryRun) {
             $this->warn("!! DRY RUN MODE - No database changes will be made !!");
         }
@@ -54,9 +51,9 @@ class GenerateInvoices extends Command
         $customers = Customer::whereIn('status', ['active', 'suspended'])
             ->whereHas('package') // Ensure they have a package
             ->with('package')
-            ->chunk(100, function ($chunk) use ($period, $dueDate, $isDryRun) {
+            ->chunk(100, function ($chunk) use ($period, $isDryRun) {
                 foreach ($chunk as $customer) {
-                    $this->processCustomer($customer, $period, $dueDate, $isDryRun);
+                    $this->processCustomer($customer, $period, $isDryRun);
                 }
             });
 
@@ -64,8 +61,18 @@ class GenerateInvoices extends Command
         $this->info("Billing generation completed.");
     }
 
-    private function processCustomer($customer, $period, $dueDate, $isDryRun)
+    private function processCustomer($customer, $period, $isDryRun)
     {
+        // Calculate Due Date based on Join Date (H+30 logic / Anniversary billing)
+        // If join_date is missing, default to 20th
+        $day = $customer->join_date ? $customer->join_date->day : 20;
+        
+        // Handle end of month edge cases (e.g. joined on 31st, but Feb only has 28 days)
+        $daysInMonth = $period->daysInMonth;
+        $day = min($day, $daysInMonth);
+        
+        $dueDate = $period->copy()->day($day);
+        
         // Check Idempotency: Has an invoice been generated for this period?
         $exists = Invoice::where('customer_id', $customer->id)
             ->where('period', $period->format('Y-m-d'))
@@ -78,7 +85,7 @@ class GenerateInvoices extends Command
 
         $amount = $customer->package->price;
 
-        $this->line("Generating invoice for: <comment>{$customer->name}</comment> (Rp " . number_format($amount) . ")");
+        $this->line("Generating invoice for: <comment>{$customer->name}</comment> (Rp " . number_format($amount) . ") - Due: " . $dueDate->format('Y-m-d'));
 
         if (!$isDryRun) {
             Invoice::create([

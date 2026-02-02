@@ -7,6 +7,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\RouterController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SettingController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -27,6 +28,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+// =====================================================
+// Public Payment Routes
+// =====================================================
+Route::get('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class, 'show'])->name('public.invoice.show');
+Route::post('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class, 'pay'])->name('public.invoice.pay');
+Route::post('/callback/tripay', [\App\Http\Controllers\TripayCallbackController::class, 'handle'])->name('callback.tripay');
 
 
 // Authenticated Routes
@@ -75,6 +83,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoices.index');
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
+    Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'download'])
+        ->name('invoices.download');
     Route::get('/customers/{customer}/invoices', [InvoiceController::class, 'customerInvoices'])
         ->name('customers.invoices');
     
@@ -87,6 +97,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('payments.store');
     Route::post('/payments/bulk-import', [PaymentController::class, 'bulkImport'])
         ->name('payments.bulk-import');
+
+    // =====================================================
+    // Settings System
+    // =====================================================
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
 });
 
 // Auth Routes (Login, Register, etc.)

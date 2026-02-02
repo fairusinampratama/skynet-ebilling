@@ -15,4 +15,11 @@ export type PageProps<
         success?: string;
         error?: string;
     };
+    settings: {
+        payment_channels: Array<{
+            bank: string;
+            account_number: string;
+            account_name: string;
+        }>;
+    };
 };

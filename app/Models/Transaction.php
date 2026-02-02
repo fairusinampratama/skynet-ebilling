@@ -13,8 +13,11 @@ class Transaction extends Model
 
     protected $fillable = [
         'invoice_id',
+        'reference',
+        'channel',
         'admin_id',
         'amount',
+        'status',
         'method',
         'proof_url',
         'paid_at',
