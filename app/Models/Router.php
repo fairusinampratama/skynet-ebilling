@@ -10,10 +10,10 @@ class Router extends Model
         'name',
         'ip_address',
         'port',
-        'winbox_port',
         'username',
         'password',
         'is_active',
+        'connection_status',
         'last_scanned_at',
         'last_scan_customers_count',
         'current_online_count',
@@ -28,6 +28,7 @@ class Router extends Model
     protected $casts = [
         'password' => 'encrypted',
         'is_active' => 'boolean',
+        'connection_status' => 'string',
         'last_scanned_at' => 'datetime',
         'last_health_check_at' => 'datetime',
     ];
@@ -35,5 +36,10 @@ class Router extends Model
     public function customers()
     {
         return $this->hasMany(Customer::class);
+    }
+
+    public function profiles()
+    {
+        return $this->hasMany(RouterProfile::class);
     }
 }

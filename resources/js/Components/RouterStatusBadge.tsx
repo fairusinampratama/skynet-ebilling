@@ -4,13 +4,13 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'failed';
 
 interface RouterStatusBadgeProps {
-    isActive: boolean;
+    connectionStatus: 'unknown' | 'online' | 'offline';
     syncStatus?: SyncStatus;
     cpuLoad?: number | null;
 }
 
 export function RouterStatusBadge({
-    isActive,
+    connectionStatus,
     syncStatus = 'idle',
     cpuLoad
 }: RouterStatusBadgeProps) {
@@ -45,18 +45,45 @@ export function RouterStatusBadge({
         );
     }
 
-    // 4. Default State (Active / Unreachable)
+    // 4. Default State (Based on Connection Status)
+    const getConnectionBadge = () => {
+        switch (connectionStatus) {
+            case 'online':
+                return (
+                    <Badge
+                        variant="outline"
+                        className="h-6 px-3 text-xs whitespace-nowrap text-emerald-500 border-emerald-500/20 bg-emerald-500/10"
+                    >
+                        Online
+                    </Badge>
+                );
+            case 'offline':
+                return (
+                    <Badge
+                        variant="outline"
+                        className="h-6 px-3 text-xs whitespace-nowrap text-red-500 border-red-500/20 bg-red-500/10"
+                    >
+                        Offline
+                    </Badge>
+                );
+            default: // 'unknown'
+                return (
+                    <Badge
+                        variant="secondary"
+                        className="h-6 px-3 text-xs whitespace-nowrap text-muted-foreground"
+                    >
+                        Unknown
+                    </Badge>
+                );
+        }
+    };
+
     return (
         <div className="flex items-center gap-2">
-            <Badge
-                variant={isActive ? "outline" : "secondary"}
-                className={`h-6 px-3 text-xs whitespace-nowrap ${isActive ? "text-emerald-500 border-emerald-500/20 bg-emerald-500/10" : "text-muted-foreground"}`}
-            >
-                {isActive ? 'Active' : 'Unreachable'}
-            </Badge>
+            {getConnectionBadge()}
 
-            {/* Show CPU Load only if Active */}
-            {isActive && cpuLoad !== null && cpuLoad !== undefined && (
+            {/* Show CPU Load only if Online */}
+            {connectionStatus === 'online' && cpuLoad !== null && cpuLoad !== undefined && (
                 <Badge variant="secondary" className="h-6 px-3 text-xs whitespace-nowrap bg-muted/50">
                     CPU: {cpuLoad}%
                 </Badge>

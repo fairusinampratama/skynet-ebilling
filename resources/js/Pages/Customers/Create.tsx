@@ -16,13 +16,20 @@ interface Package {
     name: string;
     price: number;
     bandwidth_label: string;
+    router_id: number; // Added for filtering
+}
+
+interface Router {
+    id: number;
+    name: string;
 }
 
 interface Props {
     packages: Package[];
+    routers: Router[];
 }
 
-export default function Create({ packages }: Props) {
+export default function Create({ packages, routers }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         internal_id: '', // Optional, maybe auto-gen?
@@ -30,11 +37,13 @@ export default function Create({ packages }: Props) {
         phone: '',
         nik: '',
         pppoe_user: '',
-        pppoe_pass: '',
+        // pppoe_pass removed
+        router_id: '', // NEW
         package_id: '',
-        status: 'active',
+        status: 'pending_installation',
         geo_lat: '',
         geo_long: '',
+        ktp_photo: null as File | null,
     });
 
     const submit: FormEventHandler = (e) => {
@@ -165,6 +174,19 @@ export default function Create({ packages }: Props) {
                                     />
                                     {errors.address && <p className="text-sm text-destructive">{errors.address}</p>}
                                 </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="ktp_photo">KTP Photo</Label>
+                                    <Input
+                                        id="ktp_photo"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/jpg"
+                                        onChange={(e) => setData('ktp_photo', e.target.files?.[0] || null)}
+                                        className="cursor-pointer"
+                                    />
+                                    {errors.ktp_photo && <p className="text-sm text-destructive">{errors.ktp_photo}</p>}
+                                    <p className="text-xs text-muted-foreground">Max 2MB - JPEG, PNG, JPG</p>
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -235,23 +257,55 @@ export default function Create({ packages }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid gap-2">
+                                    <Label htmlFor="router_id">Select Router <span className="text-red-500">*</span></Label>
+                                    <Select
+                                        value={data.router_id}
+                                        onValueChange={(val) => {
+                                            if (val !== data.router_id) {
+                                                setData((prev) => ({ ...prev, router_id: val, package_id: '' })); // Reset package on router change
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select a Router" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {routers.map((router) => (
+                                                <SelectItem key={router.id} value={String(router.id)}>
+                                                    {router.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
                                     <Label htmlFor="package">Subscription Package <span className="text-red-500">*</span></Label>
                                     <Select
                                         value={data.package_id}
                                         onValueChange={(val) => setData('package_id', val)}
+                                        disabled={!data.router_id}
                                     >
-                                        <SelectTrigger className="bg-background/50">
-                                            <SelectValue placeholder="Select a package" />
+                                        <SelectTrigger className="bg-background/50 disabled:opacity-50">
+                                            <SelectValue placeholder={data.router_id ? "Select a package" : "Select a Router first"} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {packages.map((pkg) => (
-                                                <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                                    <span className="font-medium">{pkg.name}</span>
-                                                    <span className="text-muted-foreground ml-2">
-                                                        ({pkg.bandwidth_label} - Rp {pkg.price.toLocaleString('id-ID')})
-                                                    </span>
-                                                </SelectItem>
-                                            ))}
+                                            {packages
+                                                .filter(pkg => String(pkg.router_id) === data.router_id)
+                                                .map((pkg) => (
+                                                    <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                                        <span className="font-medium">{pkg.name}</span>
+                                                        <span className="text-muted-foreground ml-2">
+                                                            ({pkg.bandwidth_label} - Rp {pkg.price.toLocaleString('id-ID')})
+                                                        </span>
+                                                    </SelectItem>
+                                                ))}
+                                            {packages.filter(pkg => String(pkg.router_id) === data.router_id).length === 0 && (
+                                                <div className="p-2 text-sm text-muted-foreground text-center">
+                                                    No packages found for this router.
+                                                </div>
+                                            )}
                                         </SelectContent>
                                     </Select>
                                     {errors.package_id && <p className="text-sm text-destructive">{errors.package_id}</p>}
@@ -267,10 +321,10 @@ export default function Create({ packages }: Props) {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
+                                            <SelectItem value="pending_installation">Pending Installation</SelectItem>
                                             <SelectItem value="active">Active</SelectItem>
-                                            <SelectItem value="suspended">Suspended</SelectItem>
                                             <SelectItem value="isolated">Isolated</SelectItem>
-                                            <SelectItem value="offboarding">Offboarding</SelectItem>
+                                            <SelectItem value="terminated">Terminated</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -297,17 +351,10 @@ export default function Create({ packages }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="pppoe_pass">Password <span className="text-red-500">*</span></Label>
-                                        <Input
-                                            id="pppoe_pass"
-                                            type="text" // Visible for admin creation convenience usually
-                                            value={data.pppoe_pass}
-                                            onChange={(e) => setData('pppoe_pass', e.target.value)}
-                                            placeholder="Secret123"
-                                            className="font-mono"
-                                            required
-                                        />
-                                        {errors.pppoe_pass && <p className="text-sm text-destructive">{errors.pppoe_pass}</p>}
+                                        <p className="text-[12px] text-muted-foreground bg-muted p-2 rounded border border-border">
+                                            <strong>Note:</strong> Password management is handled entirely by the NOC on the router.
+                                            The app only tracks the Username.
+                                        </p>
                                     </div>
                                 </div>
                             </CardContent>

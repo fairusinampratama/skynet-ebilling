@@ -19,14 +19,21 @@ return new class extends Migration
             
             // PPPoE Credentials
             $table->string('pppoe_user')->unique();
-            $table->string('pppoe_pass');
+            $table->string('pppoe_pass')->nullable(); // Made nullable for hybrid workflow
             
             // Relations
             $table->foreignId('package_id')->constrained()->onDelete('restrict');
             $table->foreignId('router_id')->nullable()->constrained()->onDelete('set null');
             
-            // Status
-            $table->enum('status', ['active', 'suspended', 'isolated', 'offboarding'])->default('active');
+            // Status & Workflow
+            // Default changed to 'pending_installation' for hybrid workflow 
+            // Note: Enum list here is illustrative of application logic. 
+            // Often just string in DB is flexible, but migration had enum before.
+            // Hybrid update changed it to string with default.
+            $table->string('status')->default('pending_installation'); 
+
+            $table->boolean('is_online')->default(false);
+            $table->string('previous_profile')->nullable(); // For isolation handling
             
             // Geolocation
             $table->decimal('geo_lat', 10, 7)->nullable();
@@ -34,7 +41,11 @@ return new class extends Migration
             
             // Metadata
             $table->date('join_date')->nullable();
-            $table->string('ktp_photo_url')->nullable();
+            
+            // KTP / Photos
+            $table->string('ktp_photo_url')->nullable(); // Old? Or redundant? Kept for safety.
+            $table->string('ktp_photo_path')->nullable();
+            $table->string('ktp_external_url')->nullable();
             
             $table->timestamps();
             

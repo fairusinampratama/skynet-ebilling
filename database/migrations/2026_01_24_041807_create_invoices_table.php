@@ -6,17 +6,16 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->nullable()->unique(); // Added
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
             $table->date('period'); // e.g., "2026-02-01" for February billing
             $table->decimal('amount', 10, 2);
             $table->enum('status', ['unpaid', 'paid', 'void'])->default('unpaid');
+            $table->string('payment_link')->nullable(); // Added
             $table->date('due_date');
             $table->timestamp('generated_at')->useCurrent();
             $table->timestamps();
@@ -26,9 +25,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('invoices');

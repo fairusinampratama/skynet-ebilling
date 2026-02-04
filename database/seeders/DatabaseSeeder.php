@@ -24,14 +24,7 @@ class DatabaseSeeder extends Seeder
 
         // Seed in proper order
         $this->call([
-            RouterSeeder::class,      // First: Routers
-            CustomerSeeder::class,    // Second: Customers (needs packages auto-created)
+            RouterSeeder::class,      // Routers only
         ]);
-
-        // Auto-scan network to map customers
-        $this->command->info('Running initial network scan...');
-        \Illuminate\Support\Facades\Artisan::call('network:monitor'); // Get stats first
-        \Illuminate\Support\Facades\Artisan::call('network:scan');    // Then map customers
-        $this->command->info('Network scan completed.');
     }
 }

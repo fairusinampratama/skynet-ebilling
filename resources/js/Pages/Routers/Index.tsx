@@ -16,8 +16,8 @@ interface Router {
     name: string;
     ip_address: string;
     port: number;
-    winbox_port: number | null;
     is_active: boolean;
+    connection_status: 'unknown' | 'online' | 'offline';
     customers_count: number;
     current_online_count: number;
     total_pppoe_count: number;
@@ -50,7 +50,13 @@ export default function Index({ routers, filters = {} }: Props) {
     const [routerToDelete, setRouterToDelete] = useState<number | null>(null);
 
     const handleSyncAll = async () => {
-        const allRouters = routers.data;
+        // Only sync ACTIVE routers (matching backend behavior)
+        const activeRouters = routers.data.filter(r => r.is_active);
+
+        if (activeRouters.length === 0) {
+            toast.error('No active routers to sync');
+            return;
+        }
 
         setIsSyncingAll(true);
         setSyncedIds(new Set());
@@ -59,7 +65,7 @@ export default function Index({ routers, filters = {} }: Props) {
         let succeeded = 0;
         let failed = 0;
 
-        for (const routerItem of allRouters) {
+        for (const routerItem of activeRouters) {
             setCurrentSyncingId(routerItem.id);
 
             try {
@@ -143,7 +149,9 @@ export default function Index({ routers, filters = {} }: Props) {
                     <div className="flex flex-col">
                         <span className="font-medium">{routerData.name}</span>
                         <span className="text-xs text-muted-foreground">
-                            {routerData.is_active ? 'Online' : 'Offline'} • IP: {routerData.ip_address}
+                            {routerData.connection_status === 'online' ? 'Connected' :
+                                routerData.connection_status === 'offline' ? 'Unreachable' :
+                                    'Unknown'} • IP: {routerData.ip_address}
                         </span>
                     </div>
                 </div>
@@ -154,7 +162,7 @@ export default function Index({ routers, filters = {} }: Props) {
             className: "w-[150px]",
             cell: (routerData) => (
                 <RouterStatusBadge
-                    isActive={routerData.is_active}
+                    connectionStatus={routerData.connection_status}
                     syncStatus={getRouterSyncStatus(routerData.id)}
                     cpuLoad={routerData.cpu_load}
                 />
@@ -180,7 +188,7 @@ export default function Index({ routers, filters = {} }: Props) {
             cell: (routerData) => (
                 <div className="flex items-center justify-end gap-2">
                     <EditAction
-                        onClick={() => router.visit(route('routers.show', routerData.id))}
+                        onClick={() => router.visit(route('routers.edit', routerData.id))}
                         title="Edit Router"
                     />
                     <DeleteAction

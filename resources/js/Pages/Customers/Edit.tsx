@@ -25,6 +25,12 @@ interface Package {
     name: string;
     price: number;
     bandwidth_label: string;
+    router_id: number;
+}
+
+interface Router {
+    id: number;
+    name: string;
 }
 
 interface Customer {
@@ -36,18 +42,21 @@ interface Customer {
     nik?: string;
     pppoe_user: string;
     package_id: number;
-    status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    router_id: number; // Added
+    status: 'pending_installation' | 'active' | 'suspended' | 'isolated' | 'offboarding' | 'terminated';
     is_online: boolean;
     geo_lat?: string;
     geo_long?: string;
+    ktp_photo_url?: string | null;
 }
 
 interface Props {
     customer: Customer;
     packages: Package[];
+    routers: Router[];
 }
 
-export default function Edit({ customer, packages }: Props) {
+export default function Edit({ customer, packages, routers }: Props) {
     const { data, setData, put, delete: destroy, processing, errors } = useForm({
         name: customer.name || '',
         internal_id: customer.internal_id || '',
@@ -55,11 +64,13 @@ export default function Edit({ customer, packages }: Props) {
         phone: customer.phone || '',
         nik: customer.nik || '',
         pppoe_user: customer.pppoe_user || '',
-        pppoe_pass: '', // Default to empty for security (only send if changing)
+
+        router_id: customer.router_id ? String(customer.router_id) : '',
         package_id: String(customer.package_id),
         status: customer.status,
         geo_lat: customer.geo_lat || '',
         geo_long: customer.geo_long || '',
+        ktp_photo: null as File | null,
     });
 
     const submit: FormEventHandler = (e) => {
@@ -208,6 +219,31 @@ export default function Edit({ customer, packages }: Props) {
                                     />
                                     {errors.address && <p className="text-sm text-destructive">{errors.address}</p>}
                                 </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="ktp_photo">KTP Photo</Label>
+                                    {customer.ktp_photo_url && (
+                                        <div className="mb-2 border rounded-lg p-2 bg-muted/30">
+                                            <p className="text-xs text-muted-foreground mb-2">Current KTP:</p>
+                                            <img
+                                                src={customer.ktp_photo_url}
+                                                alt="Current KTP"
+                                                className="max-w-[200px] rounded border"
+                                            />
+                                        </div>
+                                    )}
+                                    <Input
+                                        id="ktp_photo"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/jpg"
+                                        onChange={(e) => setData('ktp_photo', e.target.files?.[0] || null)}
+                                        className="cursor-pointer"
+                                    />
+                                    {errors.ktp_photo && <p className="text-sm text-destructive">{errors.ktp_photo}</p>}
+                                    <p className="text-xs text-muted-foreground">
+                                        {customer.ktp_photo_url ? 'Upload new to replace' : 'Max 2MB - JPEG, PNG, JPG'}
+                                    </p>
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -276,30 +312,79 @@ export default function Edit({ customer, packages }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="package">Subscription Package <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="router_id">Assigned Router <span className="text-red-500">*</span></Label>
                                     <Select
-                                        value={data.package_id}
-                                        onValueChange={(val) => setData('package_id', val)}
-                                        disabled
+                                        value={data.router_id}
+                                        onValueChange={(val) => {
+                                            if (val !== data.router_id) {
+                                                setData((prev) => ({ ...prev, router_id: val, package_id: '' })); // Reset package
+                                            }
+                                        }}
                                     >
-                                        <SelectTrigger className="bg-background/50 disabled:opacity-50 disabled:cursor-not-allowed">
-                                            <SelectValue placeholder="Select a package" />
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select a Router" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {packages.map((pkg) => (
-                                                <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                                    <span className="font-medium">{pkg.name}</span>
-                                                    <span className="text-muted-foreground ml-2">
-                                                        ({pkg.bandwidth_label} - Rp {pkg.price.toLocaleString('id-ID')})
-                                                    </span>
+                                            {routers.map((router) => (
+                                                <SelectItem key={router.id} value={String(router.id)}>
+                                                    {router.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     <p className="text-[10px] text-muted-foreground mt-1">
-                                        Package is determined by the Router Profile.
+                                        Changing router will require re-selecting a compatible package.
                                     </p>
+                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="package">Subscription Package <span className="text-red-500">*</span></Label>
+                                    <Select
+                                        value={data.package_id}
+                                        onValueChange={(val) => setData('package_id', val)}
+                                        disabled={!data.router_id}
+                                    >
+                                        <SelectTrigger className="bg-background/50 disabled:opacity-50">
+                                            <SelectValue placeholder={data.router_id ? "Select a package" : "Select a Router first"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {packages
+                                                .filter(pkg => String(pkg.router_id) === data.router_id)
+                                                .map((pkg) => (
+                                                    <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                                        <span className="font-medium">{pkg.name}</span>
+                                                        <span className="text-muted-foreground ml-2">
+                                                            ({pkg.bandwidth_label} - Rp {pkg.price.toLocaleString('id-ID')})
+                                                        </span>
+                                                    </SelectItem>
+                                                ))}
+                                            {packages.filter(pkg => String(pkg.router_id) === data.router_id).length === 0 && (
+                                                <div className="p-2 text-sm text-muted-foreground text-center">
+                                                    No packages found for this router.
+                                                </div>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
                                     {errors.package_id && <p className="text-sm text-destructive">{errors.package_id}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="status">Account Status</Label>
+                                    <Select
+                                        value={data.status}
+                                        onValueChange={(val: any) => setData('status', val)}
+                                    >
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="pending_installation">Pending Installation</SelectItem>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="isolated">Isolated</SelectItem>
+                                            <SelectItem value="terminated">Terminated</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 {/* Status modification removed to enforce use of Toggle on Details page */}
@@ -326,18 +411,8 @@ export default function Edit({ customer, packages }: Props) {
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="pppoe_pass">
-                                            Password
-                                        </Label>
-                                        <Input
-                                            id="pppoe_pass"
-                                            type="password"
-                                            value="********"
-                                            disabled
-                                            className="font-mono bg-muted text-muted-foreground cursor-not-allowed"
-                                        />
-                                        <p className="text-[10px] text-muted-foreground">
-                                            Password management is handled directly via Mikrotik Winbox.
+                                        <p className="text-[12px] text-muted-foreground bg-muted p-2 rounded border border-border">
+                                            <strong>Note:</strong> Password management is handled entirely by the NOC on the router.
                                         </p>
                                     </div>
                                 </div>
@@ -355,7 +430,7 @@ export default function Edit({ customer, packages }: Props) {
                         {!processing && <Save className="ml-2 h-4 w-4" />}
                     </Button>
                 </div>
-            </form>
+            </form >
         </AuthenticatedLayout >
     );
 }

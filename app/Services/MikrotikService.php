@@ -266,7 +266,7 @@ class MikrotikService
     /**
      * Kick an active PPPoE session
      */
-    protected function kickUser(string $username): void
+    public function kickUser(string $username): void
     {
         try {
             $query = (new Query('/ppp/active/print'))

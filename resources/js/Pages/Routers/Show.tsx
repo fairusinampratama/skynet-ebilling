@@ -70,11 +70,19 @@ interface RouterData {
     port: number;
     username: string;
     is_active: boolean;
+    connection_status: 'unknown' | 'online' | 'offline';
     created_at: string;
     customers_count: number;
     last_scanned_at: string | null;
     last_scan_customers_count: number;
     total_pppoe_count: number;
+    profiles: Array<{
+        name: string;
+        rate_limit?: string;
+        bandwidth?: string;
+        local_address?: string;
+        remote_address?: string;
+    }>;
 }
 
 interface Props {
@@ -227,6 +235,10 @@ export default function Show({ router: routerData }: Props) {
                                 <Users className="h-4 w-4 mr-2" />
                                 Customers ({routerData.customers_count})
                             </TabsTrigger>
+                            <TabsTrigger value="profiles">
+                                <Activity className="h-4 w-4 mr-2" />
+                                Profiles ({String(routerData.profiles?.length || 0)})
+                            </TabsTrigger>
                         </TabsList>
 
                         {/* Overview Tab */}
@@ -237,13 +249,20 @@ export default function Show({ router: routerData }: Props) {
                                 <Card className="border-border bg-card">
                                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                         <CardTitle className="text-sm font-medium text-muted-foreground">
-                                            Status
+                                            Connection Status
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <Badge variant={routerData.is_active ? 'default' : 'secondary'}>
-                                            {routerData.is_active ? 'Active' : 'Inactive'}
+                                        <Badge
+                                            variant={routerData.connection_status === 'online' ? 'default' : 'secondary'}
+                                            className={routerData.connection_status === 'online' ? 'bg-emerald-500' : routerData.connection_status === 'offline' ? 'bg-red-500' : ''}
+                                        >
+                                            {routerData.connection_status === 'online' ? 'Online' :
+                                                routerData.connection_status === 'offline' ? 'Offline' : 'Unknown'}
                                         </Badge>
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            {routerData.is_active ? 'Monitoring enabled' : 'Monitoring disabled'}
+                                        </p>
                                     </CardContent>
                                 </Card>
 
@@ -401,6 +420,64 @@ export default function Show({ router: routerData }: Props) {
                                             routerId={routerData.id}
                                             activeConnections={liveStats?.data?.active_connections || []}
                                         />
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Profiles Tab */}
+                        <TabsContent value="profiles" className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Synced Profiles</CardTitle>
+                                    <CardDescription>
+                                        PPP Profiles synced from this router. Used for creating packages.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    {(!routerData.profiles || routerData.profiles.length === 0) ? (
+                                        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                                            <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                                            <h3 className="text-lg font-medium">No Profiles Synced</h3>
+                                            <p className="text-muted-foreground mb-4">
+                                                Run a "Full Sync" to fetch profiles from the router.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                            {routerData.profiles.map((profile) => (
+                                                <div key={profile.name} className="flex items-start justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="font-mono font-semibold text-lg">{profile.name}</span>
+                                                            {profile.bandwidth && (
+                                                                <Badge variant="secondary">{profile.bandwidth}</Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground font-mono space-y-1">
+                                                            {profile.rate_limit && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <Activity className="h-3 w-3" />
+                                                                    {profile.rate_limit}
+                                                                </div>
+                                                            )}
+                                                            {profile.local_address && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <Server className="h-3 w-3" />
+                                                                    Local: {profile.local_address}
+                                                                </div>
+                                                            )}
+                                                            {profile.remote_address && (
+                                                                <div className="flex items-center gap-1">
+                                                                    <Wifi className="h-3 w-3" />
+                                                                    Remote: {profile.remote_address}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>

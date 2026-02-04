@@ -73,6 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/routers/{router}/scan', [RouterController::class, 'scanRouter'])->name('routers.scan');
     Route::post('/routers/{router}/sync', [RouterController::class, 'sync'])->name('routers.sync'); // Unified Sync Route
     Route::get('/api/routers/{router}/customers', [RouterController::class, 'customers'])->name('routers.customers');
+    Route::get('/api/routers/{router}/profiles', [RouterController::class, 'getProfiles'])->name('routers.profiles');
     Route::get('/api/routers/{router}/live-stats', [\App\Http\Controllers\Api\RouterStatsController::class, 'getLiveStats'])->name('routers.live-stats');
     Route::resource('packages', PackageController::class);
     

@@ -10,11 +10,11 @@ class RouterSeeder extends Seeder
     public function run(): void
     {
         $routers = [
-            ['name' => 'Skynet-Tutur', 'ip_address' => '103.156.128.231', 'port' => 8728],
+            ['name' => 'Skynet-Tutur', 'ip_address' => '10.183.10.20', 'port' => 8728],
             ['name' => 'Skynet-Tasikmadu-ITN', 'ip_address' => '103.156.128.226', 'port' => 8728],
-            ['name' => 'Skynet-Srigading', 'ip_address' => '10.77.77.2', 'port' => 8728],
-            ['name' => 'Skynet-Sentul', 'ip_address' => '10.183.10.12', 'port' => 8728],
-            ['name' => 'Skynet-Ngadipuro', 'ip_address' => '103.156.128.228', 'port' => 8728],
+            ['name' => 'Skynet-Srigading', 'ip_address' => '10.77.77.3', 'port' => 8728],
+            ['name' => 'Skynet-Sentul', 'ip_address' => '10.183.10.27', 'port' => 8728],
+            ['name' => 'Skynet-Ngadipuro', 'ip_address' => '10.183.10.19', 'port' => 8728],
             ['name' => 'Skynet-Metro', 'ip_address' => '172.22.254.1', 'port' => 8728],
             ['name' => 'Skynet-Martopuro', 'ip_address' => '10.182.53.2', 'port' => 8728],
             ['name' => 'Skynet-Lawang', 'ip_address' => '10.182.47.2', 'port' => 8728],
@@ -33,8 +33,8 @@ class RouterSeeder extends Seeder
                 ['name' => $router['name']],
                 [
                     'ip_address' => $router['ip_address'],
-                    'username' => 'skynet',
-                    'password' => 'Sky@2026??',
+                    'username' => 'API-EBILLING',
+                    'password' => 'aamprogrammer2026',
                     'port' => $router['port'],
                     'is_active' => true,
                 ]

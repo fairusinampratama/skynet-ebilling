@@ -54,13 +54,14 @@ interface Customer {
     phone: string;
     nik: string;
     pppoe_user: string;
-    status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    status: 'pending_installation' | 'active' | 'suspended' | 'isolated' | 'offboarding' | 'terminated';
     is_online: boolean;
     geo_lat: string;
     geo_long: string;
     join_date: string;
     package: Package;
     invoices: Invoice[];
+    ktp_photo_url?: string | null;
 }
 
 interface Props {
@@ -110,6 +111,7 @@ export default function Show({ customer }: Props) {
 
     const getStatusBadge = (status: string) => {
         const variants: Record<string, string> = {
+            pending_installation: 'text-blue-500 border-blue-500/20 bg-blue-500/10',
             active: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
             params: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10', // Typo fallback
             paid: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
@@ -117,13 +119,14 @@ export default function Show({ customer }: Props) {
             isolated: 'text-red-500 border-red-500/20 bg-red-500/10',
             unpaid: 'text-red-500 border-red-500/20 bg-red-500/10',
             offboarding: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
+            terminated: 'text-zinc-600 border-zinc-600/20 bg-zinc-600/10',
             void: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
         };
         const className = variants[status] || 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10';
 
         return (
             <Badge variant="outline" className={`${className} capitalize border`}>
-                {status}
+                {status.replace('_', ' ')}
             </Badge>
         );
     };
@@ -256,15 +259,9 @@ export default function Show({ customer }: Props) {
                                 </CardHeader>
                                 <CardContent className="space-y-4 text-sm">
                                     <div className="grid grid-cols-3 gap-1 items-center">
-                                        <span className="text-muted-foreground">Connection</span>
-                                        <div className="col-span-2 flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`h-2 w-2 rounded-full ${customer.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]'}`} />
-                                                <span className={`font-medium ${customer.status === 'active' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                                                    {customer.status === 'active' ? 'Active' : 'Isolated'}
-                                                </span>
-                                            </div>
-
+                                        <span className="text-muted-foreground">Account Status</span>
+                                        <div className="col-span-2">
+                                            {getStatusBadge(customer.status)}
                                         </div>
                                     </div>
 
@@ -344,6 +341,25 @@ export default function Show({ customer }: Props) {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            {/* KTP Photo Card */}
+                            {customer.ktp_photo_url && (
+                                <Card className="bg-card/50 backdrop-blur border-border">
+                                    <CardHeader>
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <User className="h-4 w-4 text-violet-500" />
+                                            KTP Photo
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <img
+                                            src={customer.ktp_photo_url}
+                                            alt="KTP Photo"
+                                            className="w-full rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow"
+                                        />
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     </TabsContent>
 

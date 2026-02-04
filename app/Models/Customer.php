@@ -31,7 +31,8 @@ class Customer extends Model
         'router_id',
         'status',
         'join_date',
-        'ktp_photo_url',
+        'ktp_photo_path',
+        'ktp_external_url',
         'previous_profile',
         'is_online',
     ];
@@ -72,5 +73,24 @@ class Customer extends Model
     public function currentUnpaidInvoice()
     {
         return $this->invoices()->where('status', 'unpaid')->latest('period')->first();
+    }
+
+    /**
+     * Get KTP photo URL (smart accessor - returns local or external URL)
+     */
+    public function getKtpPhotoUrlAttribute(): ?string
+    {
+        if ($this->ktp_photo_path) {
+            return asset('storage/' . $this->ktp_photo_path);
+        }
+        return $this->ktp_external_url ?: null;
+    }
+
+    /**
+     * Check if customer has a KTP photo
+     */
+    public function hasKtpPhoto(): bool
+    {
+        return !empty($this->ktp_photo_path) || !empty($this->ktp_external_url);
     }
 }

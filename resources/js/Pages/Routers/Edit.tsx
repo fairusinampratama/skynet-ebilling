@@ -8,43 +8,57 @@ import { Switch } from '@/Components/ui/switch';
 import { ChevronLeft, Save, Server } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
-export default function Create() {
-    const { data, setData, post, processing, errors } = useForm({
-        name: '',
-        ip_address: '',
-        port: 8728,
-        username: 'admin',
+interface RouterData {
+    id: number;
+    name: string;
+    ip_address: string;
+    port: number;
+    username: string;
+    is_active: boolean;
+}
+
+interface Props {
+    router: RouterData;
+}
+
+export default function Edit({ router }: Props) {
+    const { data, setData, put, processing, errors } = useForm({
+        name: router.name || '',
+        ip_address: router.ip_address || '',
+        port: router.port || 8728,
+        username: router.username || '',
         password: '',
-        is_active: true,
+        is_active: router.is_active ?? true,
     });
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        post(route('routers.store'));
+        put(route('routers.update', router.id));
     };
 
     return (
         <AuthenticatedLayout
             breadcrumbs={[
                 { label: 'Routers', href: route('routers.index') },
-                { label: 'Create' }
+                { label: router.name, href: route('routers.show', router.id) },
+                { label: 'Edit' }
             ]}
             header={
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href={route('routers.index')}>
+                        <Link href={route('routers.show', router.id)}>
                             <Button variant="ghost" size="icon" className="rounded-full">
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
                         </Link>
                         <h2 className="text-xl font-semibold leading-tight text-foreground">
-                            Add New Router
+                            Edit Router: {router.name}
                         </h2>
                     </div>
                 </div>
             }
         >
-            <Head title="Add Router" />
+            <Head title={`Edit Router: ${router.name}`} />
 
             <div className="py-12">
                 <div className="mx-auto max-w-3xl sm:px-6 lg:px-8">
@@ -56,7 +70,7 @@ export default function Create() {
                                     Router Configuration
                                 </CardTitle>
                                 <CardDescription>
-                                    Add a new MikroTik router to the network management system.
+                                    Update router settings and credentials.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-6">
@@ -136,20 +150,18 @@ export default function Create() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="password">Password *</Label>
+                                            <Label htmlFor="password">Password</Label>
                                             <Input
                                                 id="password"
                                                 type="password"
                                                 value={data.password}
                                                 onChange={(e) => setData('password', e.target.value)}
-                                                placeholder="••••••••"
-                                                required
-                                                className={errors.password ? 'border-red-500' : ''}
+                                                placeholder="Leave blank to keep current password"
                                             />
                                             {errors.password && (
                                                 <p className="text-sm text-red-500">{errors.password}</p>
                                             )}
-                                            <p className="text-xs text-muted-foreground">Will be encrypted</p>
+                                            <p className="text-xs text-muted-foreground">Only update if changing</p>
                                         </div>
                                     </div>
                                 </div>
@@ -164,21 +176,21 @@ export default function Create() {
                                             onCheckedChange={(checked: boolean) => setData('is_active', checked)}
                                         />
                                         <Label htmlFor="is_active" className="cursor-pointer">
-                                            Active (Router is enabled for operations)
+                                            Active (Router is enabled for monitoring)
                                         </Label>
                                     </div>
                                 </div>
 
                                 {/* Actions */}
                                 <div className="flex items-center justify-between pt-6 border-t">
-                                    <Link href={route('routers.index')}>
+                                    <Link href={route('routers.show', router.id)}>
                                         <Button type="button" variant="outline">
                                             Cancel
                                         </Button>
                                     </Link>
                                     <Button type="submit" disabled={processing}>
                                         <Save className="mr-2 h-4 w-4" />
-                                        {processing ? 'Saving...' : 'Add Router'}
+                                        {processing ? 'Saving...' : 'Update Router'}
                                     </Button>
                                 </div>
                             </CardContent>

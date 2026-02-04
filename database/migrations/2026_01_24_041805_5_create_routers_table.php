@@ -13,10 +13,24 @@ return new class extends Migration
             $table->string('name');
             $table->string('ip_address');
             $table->integer('port')->default(8728);
-            $table->integer('winbox_port')->nullable();
+            // winbox_port removed
             $table->string('username');
             $table->text('password'); // Encrypted
             $table->boolean('is_active')->default(true);
+            $table->enum('connection_status', ['unknown', 'online', 'offline'])->default('unknown');
+            
+            // Monitoring & Health
+            $table->string('isolation_profile')->nullable();
+            $table->timestamp('last_scanned_at')->nullable();
+            $table->timestamp('last_health_check_at')->nullable();
+            $table->integer('last_scan_customers_count')->default(0);
+            $table->integer('current_online_count')->nullable();
+            $table->integer('total_pppoe_count')->default(0);
+            $table->integer('cpu_load')->nullable();
+            $table->string('uptime')->nullable();
+            $table->string('version')->nullable();
+            $table->string('board_name')->nullable();
+
             $table->timestamps();
             
             $table->index(['ip_address', 'port']);

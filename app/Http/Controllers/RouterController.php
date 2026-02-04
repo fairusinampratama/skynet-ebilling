@@ -63,7 +63,6 @@ class RouterController extends Controller
             'name' => 'required|string|max:255',
             'ip_address' => 'required|ip',
             'port' => 'required|integer|min:1|max:65535',
-            'winbox_port' => 'nullable|integer|min:1|max:65535',
             'username' => 'required|string|max:255',
             'password' => 'required|string',
             'is_active' => 'boolean',
@@ -80,6 +79,7 @@ class RouterController extends Controller
      */
     public function show(Router $router)
     {
+        $router->load(['profiles']);
         $router->loadCount('customers');
         // Customers will be loaded lazily via API
         
@@ -116,6 +116,27 @@ class RouterController extends Controller
     }
 
     /**
+     * Get list of PPP profiles from this router (API)
+     */
+    public function getProfiles(Router $router)
+    {
+        // Read from database (synced via routers:sync-profiles command)
+        $profiles = \App\Models\RouterProfile::where('router_id', $router->id)
+            ->get()
+            ->map(function ($profile) {
+                return [
+                    'name' => $profile->name,
+                    'rate_limit' => $profile->rate_limit,
+                    'bandwidth' => $profile->bandwidth,
+                    'local_address' => $profile->local_address,
+                    'remote_address' => $profile->remote_address,
+                ];
+            });
+
+        return response()->json($profiles);
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Router $router)
@@ -134,7 +155,6 @@ class RouterController extends Controller
             'name' => 'required|string|max:255',
             'ip_address' => 'required|ip',
             'port' => 'required|integer|min:1|max:65535',
-            'winbox_port' => 'nullable|integer|min:1|max:65535',
             'username' => 'required|string|max:255',
             'password' => 'nullable|string',
             'is_active' => 'boolean',

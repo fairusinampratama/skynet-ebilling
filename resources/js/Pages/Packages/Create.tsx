@@ -5,13 +5,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useEffect } from 'react';
+import { ProfileSelector } from '@/Components/ProfileSelector';
 
-export default function Create() {
+interface Router {
+    id: number;
+    name: string;
+    profiles: {
+        name: string;
+        bandwidth?: string;
+        rate_limit?: string;
+    }[];
+}
+
+interface Props {
+    routers: Router[];
+}
+
+export default function Create({ routers }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
+        router_id: '',
         price: '',
         bandwidth_label: '',
+        mikrotik_profile: '',
+        rate_limit: '', // Store for reference
     });
 
     const submit: FormEventHandler = (e) => {
@@ -67,6 +85,30 @@ export default function Create() {
                                 </div>
 
                                 <div className="space-y-2">
+                                    <Label htmlFor="router_id">Assigned Router (Optional)</Label>
+                                    <select
+                                        id="router_id"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={data.router_id}
+                                        onChange={(e) => setData('router_id', e.target.value)}
+                                        required
+                                    >
+                                        <option value="" disabled>Select a Router</option>
+                                        {routers.map((router) => (
+                                            <option key={router.id} value={router.id}>
+                                                {router.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-sm text-muted-foreground">
+                                        Packages must be assigned to a specific router.
+                                    </p>
+                                    {errors.router_id && (
+                                        <p className="text-sm text-destructive">{errors.router_id}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
                                     <Label htmlFor="bandwidth_label">Bandwidth Label *</Label>
                                     <Input
                                         id="bandwidth_label"
@@ -80,6 +122,51 @@ export default function Create() {
                                     </p>
                                     {errors.bandwidth_label && (
                                         <p className="text-sm text-destructive">{errors.bandwidth_label}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="mikrotik_profile">Select Mikrotik Profile *</Label>
+                                    <ProfileSelector
+                                        profiles={routers.find(r => r.id.toString() === data.router_id)?.profiles || []}
+                                        selectedProfile={data.mikrotik_profile}
+                                        onSelect={(profile) => {
+                                            setData(prev => ({
+                                                ...prev,
+                                                mikrotik_profile: profile.name,
+                                                bandwidth_label: profile.bandwidth || 'Unknown',
+                                                rate_limit: profile.rate_limit || '',
+                                                name: prev.name || profile.name,
+                                            }))
+                                        }}
+                                        disabled={!data.router_id}
+                                    />
+                                    {errors.mikrotik_profile && (
+                                        <p className="text-sm text-destructive">{errors.mikrotik_profile}</p>
+                                    )}
+                                </div>
+
+                                {data.rate_limit && (
+                                    <div className="rounded-md bg-muted p-3 text-sm">
+                                        <p className="font-semibold mb-1">Rate Limit (from router):</p>
+                                        <code className="text-xs">{data.rate_limit}</code>
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Business Name (for customers) *</Label>
+                                    <Input
+                                        id="name"
+                                        value={data.name}
+                                        onChange={(e) => setData('name', e.target.value)}
+                                        placeholder="e.g., Paket Premium 20Mbps"
+                                        required
+                                    />
+                                    <p className="text-sm text-muted-foreground">
+                                        This is what customers see on invoices
+                                    </p>
+                                    {errors.name && (
+                                        <p className="text-sm text-destructive">{errors.name}</p>
                                     )}
                                 </div>
 

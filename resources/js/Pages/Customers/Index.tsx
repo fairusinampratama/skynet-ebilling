@@ -12,16 +12,16 @@ import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/Dat
 
 const getStatusBadge = (status: string) => {
     const variants: Record<string, string> = {
+        pending_installation: 'text-blue-500 border-blue-500/20 bg-blue-500/10',
         active: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
-        suspended: 'text-orange-500 border-orange-500/20 bg-orange-500/10',
         isolated: 'text-red-500 border-red-500/20 bg-red-500/10',
-        offboarding: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
+        terminated: 'text-zinc-600 border-zinc-600/20 bg-zinc-600/10',
     };
     const className = variants[status] || 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10';
 
     return (
         <Badge variant="outline" className={`${className} capitalize border`}>
-            {status}
+            {status.replace('_', ' ')}
         </Badge>
     );
 };
@@ -40,9 +40,10 @@ interface Customer {
     name: string;
     address: string;
     pppoe_user: string;
-    status: 'active' | 'suspended' | 'isolated' | 'offboarding';
+    status: 'pending_installation' | 'active' | 'isolated' | 'terminated';
     is_online: boolean;
     package: Package;
+    join_date: string;
     created_at: string;
     invoices?: Array<{
         id: number;
@@ -123,6 +124,20 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
             cell: (customer) => getStatusBadge(customer.status)
         },
         {
+            header: "Join Date",
+            accessorKey: "join_date",
+            sortable: true,
+            cell: (customer) => (
+                <span className="text-sm text-muted-foreground">
+                    {new Date(customer.join_date).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                    })}
+                </span>
+            )
+        },
+        {
             header: "Next Due Date",
             cell: (customer) => (
                 customer.invoices && customer.invoices.length > 0 ? (
@@ -179,10 +194,10 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
             key: 'status',
             placeholder: 'All Status',
             options: [
+                { label: 'Pending', value: 'pending_installation' },
                 { label: 'Active', value: 'active' },
-                { label: 'Suspended', value: 'suspended' },
                 { label: 'Isolated', value: 'isolated' },
-                { label: 'Offboarding', value: 'offboarding' },
+                { label: 'Terminated', value: 'terminated' },
             ]
         }
     ];
