@@ -32,15 +32,11 @@ return new class extends Migration
                 // Drop FK
                 $table->dropForeign(['router_id']);
                 
-                // Drop index if exists (Raw SQL for SQLite compatibility)
-                if (DB::getDriverName() === 'sqlite') {
-                    DB::statement('DROP INDEX IF EXISTS packages_router_id_mikrotik_profile_index');
-                } else {
-                     $sm = Schema::getConnection()->getDoctrineSchemaManager();
-                     $indexes = $sm->listTableIndexes('packages');
-                     if (array_key_exists('packages_router_id_mikrotik_profile_index', $indexes)) {
-                         $table->dropIndex('packages_router_id_mikrotik_profile_index');
-                     }
+                // Drop index if exists (try-catch for Laravel 12 compatibility)
+                try {
+                    $table->dropIndex('packages_router_id_mikrotik_profile_index');
+                } catch (\Exception $e) {
+                    // Index doesn't exist, ignore
                 }
             }
         });
