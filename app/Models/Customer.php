@@ -16,8 +16,27 @@ class Customer extends Model
 
     // ...
 
+    protected static function booted()
+    {
+        static::creating(function ($customer) {
+            if (empty($customer->join_date)) {
+                $customer->join_date = now();
+            }
+            
+            if (empty($customer->due_day)) {
+                $customer->due_day = $customer->join_date ? $customer->join_date->day : now()->day;
+            }
+        });
+
+        static::updating(function ($customer) {
+            // Auto-void all unpaid invoices when customer is terminated
+            if ($customer->isDirty('status') && $customer->status === 'terminated') {
+                $customer->invoices()->where('status', 'unpaid')->update(['status' => 'void']);
+            }
+        });
+    }
+
     protected $fillable = [
-        'internal_id',
         'code',
         'name',
         'address',
@@ -26,14 +45,12 @@ class Customer extends Model
         'geo_lat',
         'geo_long',
         'pppoe_user',
-        'pppoe_pass',
         'package_id',
-        'router_id',
+        'area_id',
         'status',
         'join_date',
-        'ktp_photo_path',
-        'ktp_external_url',
-        'previous_profile',
+        'due_day',
+        'ktp_photo_url',
         'is_online',
     ];
 
@@ -48,7 +65,6 @@ class Customer extends Model
         'geo_lat' => 'decimal:8',
         'geo_long' => 'decimal:8',
         'join_date' => 'date',
-        'pppoe_pass' => 'encrypted', // Security: Encrypted storage
         'is_online' => 'boolean',
     ];
 
@@ -57,9 +73,9 @@ class Customer extends Model
         return $this->belongsTo(Package::class);
     }
 
-    public function router(): BelongsTo
+    public function area(): BelongsTo
     {
-        return $this->belongsTo(Router::class);
+        return $this->belongsTo(Area::class);
     }
 
     public function invoices(): HasMany
@@ -76,14 +92,24 @@ class Customer extends Model
     }
 
     /**
-     * Get KTP photo URL (smart accessor - returns local or external URL)
+     * Get KTP photo URL (smart accessor)
      */
-    public function getKtpPhotoUrlAttribute(): ?string
+    public function getKtpPhotoUrlAttribute($value): ?string
     {
-        if ($this->ktp_photo_path) {
-            return asset('storage/' . $this->ktp_photo_path);
+        if (!$value) {
+            return null;
         }
-        return $this->ktp_external_url ?: null;
+
+        // Filter out incomplete legacy URLs (e.g., just the directory path ending in /)
+        if (str_ends_with($value, '/')) {
+            return null;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
+        return asset('storage/' . $value);
     }
 
     /**
@@ -91,6 +117,6 @@ class Customer extends Model
      */
     public function hasKtpPhoto(): bool
     {
-        return !empty($this->ktp_photo_path) || !empty($this->ktp_external_url);
+        return !empty($this->ktp_photo_url);
     }
 }

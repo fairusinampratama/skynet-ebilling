@@ -48,7 +48,7 @@ class GenerateInvoices extends Command
 
         // Fetch eligible customers (Active or Suspended)
         // Suspended users still get billed until offboarded/churned
-        $customers = Customer::whereIn('status', ['active', 'suspended'])
+        $customers = Customer::whereIn('status', ['active', 'isolated'])
             ->whereHas('package') // Ensure they have a package
             ->with('package')
             ->chunk(100, function ($chunk) use ($period, $isDryRun) {
@@ -63,11 +63,11 @@ class GenerateInvoices extends Command
 
     private function processCustomer($customer, $period, $isDryRun)
     {
-        // Calculate Due Date based on Join Date (H+30 logic / Anniversary billing)
-        // If join_date is missing, default to 20th
-        $day = $customer->join_date ? $customer->join_date->day : 20;
+        // Calculate Due Date based on Customer's preferred Due Day
+        // Fallback to join_date day, or 20th if all else fails
+        $day = $customer->due_day ?? ($customer->join_date ? $customer->join_date->day : 20);
         
-        // Handle end of month edge cases (e.g. joined on 31st, but Feb only has 28 days)
+        // Handle end of month edge cases (e.g. Due Day 30, but Feb only has 28 days)
         $daysInMonth = $period->daysInMonth;
         $day = min($day, $daysInMonth);
         

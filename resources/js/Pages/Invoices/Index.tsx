@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
-import { Eye, CreditCard, Calendar, AlertCircle, MoreHorizontal } from "lucide-react";
+import { Eye, CreditCard, Calendar, AlertCircle, MoreHorizontal, Plus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 
@@ -11,11 +11,11 @@ interface Customer {
     id: number;
     name: string;
     code: string | null;
-    internal_id: string | null;
 }
 
 interface Invoice {
     id: number;
+    code: string | null;
     period: string;
     amount: number;
     status: 'unpaid' | 'paid' | 'void';
@@ -76,6 +76,16 @@ export default function Index({ invoices, filters = {} }: Props) {
             cell: (invoice) => (
                 <span className="font-mono text-xs text-muted-foreground font-medium">
                     #{invoice.id}
+                </span>
+            )
+        },
+        {
+            header: "Code",
+            accessorKey: "code",
+            className: "w-[180px]",
+            cell: (invoice) => (
+                <span className="font-mono text-xs font-semibold">
+                    {invoice.code}
                 </span>
             )
         },
@@ -200,6 +210,12 @@ export default function Index({ invoices, filters = {} }: Props) {
                     <h2 className="text-xl font-semibold leading-tight text-foreground">
                         Invoices
                     </h2>
+                    <Link href={route('invoices.create')}>
+                        <Button className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create Invoice
+                        </Button>
+                    </Link>
                 </div>
             }
         >

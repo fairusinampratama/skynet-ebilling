@@ -11,12 +11,17 @@ class PackageController extends Controller
     /**
      * Display a listing of packages
      */
-    public function index()
+    /**
+     * Display a listing of packages
+     */
+    public function index(Request $request)
     {
-        $packages = Package::with(['router:id,name'])
-                          ->withCount('customers')
+        $limit = $request->input('limit', 20);
+        
+        $packages = Package::withCount('customers')
                           ->orderBy('price', 'asc')
-                          ->get();
+                          ->paginate($limit)
+                          ->withQueryString();
 
         return Inertia::render('Packages/Index', [
             'packages' => $packages,
@@ -28,24 +33,7 @@ class PackageController extends Controller
      */
     public function create()
     {
-        $routers = \App\Models\Router::with('profiles')
-            ->where('is_active', true)
-            ->get()
-            ->map(function ($router) {
-                return [
-                    'id' => $router->id,
-                    'name' => $router->name,
-                    'profiles' => $router->profiles->map(fn($p) => [
-                        'name' => $p->name,
-                        'bandwidth' => $p->bandwidth,
-                        'rate_limit' => $p->rate_limit,
-                    ])
-                ];
-            });
-
-        return Inertia::render('Packages/Create', [
-            'routers' => $routers
-        ]);
+        return Inertia::render('Packages/Create');
     }
 
     /**
@@ -55,9 +43,7 @@ class PackageController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'router_id' => 'required|exists:routers,id', // STRICT
             'price' => 'required|numeric|min:0',
-            'bandwidth_label' => 'required|string|max:255',
             'mikrotik_profile' => 'nullable|string|max:255',
         ]);
 
@@ -84,24 +70,8 @@ class PackageController extends Controller
      */
     public function edit(Package $package)
     {
-        $routers = \App\Models\Router::with('profiles')
-            ->where('is_active', true)
-            ->get()
-            ->map(function ($router) {
-                return [
-                    'id' => $router->id,
-                    'name' => $router->name,
-                    'profiles' => $router->profiles->map(fn($p) => [
-                        'name' => $p->name,
-                        'bandwidth' => $p->bandwidth,
-                        'rate_limit' => $p->rate_limit,
-                    ])
-                ];
-            });
-
         return Inertia::render('Packages/Edit', [
             'package' => $package,
-            'routers' => $routers
         ]);
     }
 
@@ -112,9 +82,7 @@ class PackageController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'router_id' => 'required|exists:routers,id', // STRICT
             'price' => 'required|numeric|min:0',
-            'bandwidth_label' => 'required|string|max:255',
             'mikrotik_profile' => 'nullable|string|max:255',
         ]);
 

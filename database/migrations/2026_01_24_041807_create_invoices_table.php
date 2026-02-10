@@ -10,12 +10,13 @@ return new class extends Migration
     {
         Schema::create('invoices', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid')->nullable()->unique(); // Added
+            $table->string('code')->nullable()->unique(); // Consolidated from separate migration
+            $table->uuid('uuid')->nullable()->unique();
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
             $table->date('period'); // e.g., "2026-02-01" for February billing
             $table->decimal('amount', 10, 2);
             $table->enum('status', ['unpaid', 'paid', 'void'])->default('unpaid');
-            $table->string('payment_link')->nullable(); // Added
+            $table->string('payment_link')->nullable();
             $table->date('due_date');
             $table->timestamp('generated_at')->useCurrent();
             $table->timestamps();

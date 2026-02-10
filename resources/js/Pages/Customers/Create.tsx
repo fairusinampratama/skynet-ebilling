@@ -15,31 +15,29 @@ interface Package {
     id: number;
     name: string;
     price: number;
-    bandwidth_label: string;
-    router_id: number; // Added for filtering
+
 }
 
-interface Router {
+interface Area {
     id: number;
     name: string;
 }
 
 interface Props {
     packages: Package[];
-    routers: Router[];
+    areas: Area[];
 }
 
-export default function Create({ packages, routers }: Props) {
+export default function Create({ packages, areas }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
-        internal_id: '', // Optional, maybe auto-gen?
+        // internal_id removed
         address: '',
         phone: '',
         nik: '',
         pppoe_user: '',
-        // pppoe_pass removed
-        router_id: '', // NEW
         package_id: '',
+        area_id: '',
         status: 'pending_installation',
         geo_lat: '',
         geo_long: '',
@@ -116,16 +114,7 @@ export default function Create({ packages, routers }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="internal_id">Internal ID</Label>
-                                        <Input
-                                            id="internal_id"
-                                            value={data.internal_id}
-                                            onChange={(e) => setData('internal_id', e.target.value)}
-                                            placeholder="e.g. 1001"
-                                        />
-                                        {errors.internal_id && <p className="text-sm text-destructive">{errors.internal_id}</p>}
-                                    </div>
+                                    {/* Internal ID removed */}
                                     <div className="col-span-2 grid gap-2">
                                         <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
                                         <Input
@@ -160,6 +149,26 @@ export default function Create({ packages, routers }: Props) {
                                             placeholder="16-digit ID"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="area_id">Area / Location</Label>
+                                    <Select
+                                        value={data.area_id}
+                                        onValueChange={(val) => setData('area_id', val)}
+                                    >
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select Area" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {areas.map((area) => (
+                                                <SelectItem key={area.id} value={String(area.id)}>
+                                                    {area.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.area_id && <p className="text-sm text-destructive">{errors.area_id}</p>}
                                 </div>
 
                                 <div className="grid gap-2">
@@ -257,53 +266,26 @@ export default function Create({ packages, routers }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="router_id">Select Router <span className="text-red-500">*</span></Label>
-                                    <Select
-                                        value={data.router_id}
-                                        onValueChange={(val) => {
-                                            if (val !== data.router_id) {
-                                                setData((prev) => ({ ...prev, router_id: val, package_id: '' })); // Reset package on router change
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger className="bg-background/50">
-                                            <SelectValue placeholder="Select a Router" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {routers.map((router) => (
-                                                <SelectItem key={router.id} value={String(router.id)}>
-                                                    {router.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
-                                </div>
-
-                                <div className="grid gap-2">
                                     <Label htmlFor="package">Subscription Package <span className="text-red-500">*</span></Label>
                                     <Select
                                         value={data.package_id}
                                         onValueChange={(val) => setData('package_id', val)}
-                                        disabled={!data.router_id}
                                     >
-                                        <SelectTrigger className="bg-background/50 disabled:opacity-50">
-                                            <SelectValue placeholder={data.router_id ? "Select a package" : "Select a Router first"} />
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select a package" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {packages
-                                                .filter(pkg => String(pkg.router_id) === data.router_id)
-                                                .map((pkg) => (
-                                                    <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                                        <span className="font-medium">{pkg.name}</span>
-                                                        <span className="text-muted-foreground ml-2">
-                                                            ({pkg.bandwidth_label} - Rp {pkg.price.toLocaleString('id-ID')})
-                                                        </span>
-                                                    </SelectItem>
-                                                ))}
-                                            {packages.filter(pkg => String(pkg.router_id) === data.router_id).length === 0 && (
+                                            {packages.map((pkg) => (
+                                                <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                                    <span className="font-medium">{pkg.name}</span>
+                                                    <span className="text-muted-foreground ml-2">
+                                                        (Rp {pkg.price.toLocaleString('id-ID')})
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                            {packages.length === 0 && (
                                                 <div className="p-2 text-sm text-muted-foreground text-center">
-                                                    No packages found for this router.
+                                                    No packages found. Create one first.
                                                 </div>
                                             )}
                                         </SelectContent>
@@ -360,7 +342,7 @@ export default function Create({ packages, routers }: Props) {
                             </CardContent>
                         </Card>
                     </div>
-                </div>
+                </div >
 
                 <div className="flex justify-end gap-4 mt-8">
                     <Link href={route('customers.index')}>
@@ -371,7 +353,7 @@ export default function Create({ packages, routers }: Props) {
                         {!processing && <Save className="ml-2 h-4 w-4" />}
                     </Button>
                 </div>
-            </form>
-        </AuthenticatedLayout>
+            </form >
+        </AuthenticatedLayout >
     );
 }

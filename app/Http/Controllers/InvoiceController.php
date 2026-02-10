@@ -18,12 +18,14 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $query = Invoice::query()
-            ->with(['customer:id,name,code,internal_id'])
+            ->with(['customer:id,name,code'])
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('customer', function ($c) use ($search) {
-                    $c->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%")
-                      ->orWhere('internal_id', 'like', "%{$search}%");
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('code', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($c) use ($search) {
+                            $c->where('name', 'like', "%{$search}%")
+                              ->orWhere('code', 'like', "%{$search}%");
+                        });
                 });
             })
             ->when($request->status, function ($q, $status) {
@@ -35,7 +37,7 @@ class InvoiceController extends Controller
             ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
             ->latest('period');
 
-        $limit = $request->input('limit', 25);
+        $limit = $request->input('limit', 20);
         $invoices = $query->paginate($limit)->withQueryString();
 
         return Inertia::render('Invoices/Index', [
@@ -77,6 +79,100 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Show the form for creating a new invoice
+     */
+    public function create()
+    {
+        $customers = Customer::whereIn('status', ['active', 'isolated'])
+            ->whereHas('package')
+            ->with('package:id,name,price')
+            ->select('id', 'name', 'code', 'package_id', 'due_day', 'area_id')
+            ->orderBy('name')
+            ->get();
+
+        $areas = \App\Models\Area::select('id', 'name', 'code')->orderBy('name')->get();
+
+        return Inertia::render('Invoices/Create', [
+            'customers' => $customers,
+            'areas' => $areas,
+        ]);
+    }
+
+    /**
+     * Store a newly created invoice
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'period' => 'required|date',
+            'amount' => 'required|numeric|min:0',
+            'due_date' => 'required|date',
+        ]);
+
+        // Convert period to 1st of month for consistency
+        $period = \Carbon\Carbon::parse($validated['period'])->startOfMonth();
+
+        // Check idempotency: prevent duplicate invoice for same customer + period
+        $exists = Invoice::where('customer_id', $validated['customer_id'])
+            ->where('period', $period->format('Y-m-d'))
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors([
+                'period' => 'An invoice already exists for this customer in this billing period.',
+            ])->withInput();
+        }
+
+        Invoice::create([
+            'customer_id' => $validated['customer_id'],
+            'period' => $period->format('Y-m-d'),
+            'amount' => $validated['amount'],
+            'due_date' => $validated['due_date'],
+            'status' => 'unpaid',
+            'generated_at' => now(),
+        ]);
+
+        return redirect()->route('invoices.index')
+            ->with('success', 'Invoice created successfully.');
+    }
+
+    /**
+     * Void an unpaid invoice
+     */
+    public function void(Request $request, Invoice $invoice)
+    {
+        if ($invoice->status !== 'unpaid') {
+            return back()->with('error', 'Only unpaid invoices can be voided.');
+        }
+
+        $invoice->update(['status' => 'void']);
+
+        // Log the reason via activity log (Spatie)
+        activity()
+            ->performedOn($invoice)
+            ->withProperties(['reason' => $request->input('reason', 'No reason provided')])
+            ->log('Invoice voided');
+
+        return back()->with('success', 'Invoice has been voided.');
+    }
+
+    /**
+     * Delete an invoice (only if no payments recorded)
+     */
+    public function destroy(Invoice $invoice)
+    {
+        if ($invoice->transactions()->count() > 0) {
+            return back()->with('error', 'Cannot delete an invoice with recorded payments. Void it instead.');
+        }
+
+        $invoice->delete();
+
+        return redirect()->route('invoices.index')
+            ->with('success', 'Invoice deleted successfully.');
+    }
+
+    /**
      * Download invoice as PDF
      */
     public function download(Invoice $invoice)
@@ -94,6 +190,6 @@ class InvoiceController extends Controller
         
         $pdf = Pdf::loadView('invoices.pdf', compact('invoice', 'company', 'manual_accounts'));
         
-        return $pdf->download("Invoice-{$invoice->code}.pdf");
+        return $pdf->stream("Invoice-{$invoice->code}.pdf");
     }
 }

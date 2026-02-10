@@ -20,13 +20,8 @@ class SettingController extends Controller
             'settings' => $settings,
             'grouped_settings' => [
                 'billing' => [
-                    'payment_channels' => Setting::get('payment_channels', []),
                     'company_name' => Setting::get('company_name', 'Skynet Network'),
                     'company_address' => Setting::get('company_address', ''),
-                    'tripay_api_key' => Setting::get('tripay_api_key', ''),
-                    'tripay_private_key' => Setting::get('tripay_private_key', ''),
-                    'tripay_merchant_code' => Setting::get('tripay_merchant_code', ''),
-                    'tripay_environment' => Setting::get('tripay_environment', 'sandbox'),
                 ]
             ]
         ]);

@@ -89,6 +89,7 @@ export default function DataTable<T extends { id: number | string }>({
 
     // State
     const [search, setSearch] = useState(safeFilters.search || '');
+    const [limit, setLimit] = useState<number>(safeFilters.limit || data.per_page || 20);
     const [activeFilters, setActiveFilters] = useState<Record<string, string>>(() => {
         const initial: Record<string, string> = {};
         filterConfigs.forEach(config => {
@@ -113,6 +114,7 @@ export default function DataTable<T extends { id: number | string }>({
             search: debouncedSearch,
             sort: sortField,
             direction: sortDirection,
+            limit: limit,
         };
 
         // Add active filters excluding 'all'
@@ -133,7 +135,7 @@ export default function DataTable<T extends { id: number | string }>({
                 onFinish: () => setIsLoading(false)
             }
         );
-    }, [debouncedSearch, activeFilters, sortField, sortDirection, routeName]);
+    }, [debouncedSearch, activeFilters, sortField, sortDirection, limit, routeName]);
 
     // Handlers
     const handleSort = (field: string) => {
@@ -255,7 +257,11 @@ export default function DataTable<T extends { id: number | string }>({
                     </div>
 
                     {/* Pagination */}
-                    <DataTablePagination data={data} filters={filters} />
+                    <DataTablePagination
+                        data={data}
+                        filters={{ ...filters, limit }}
+                        onPageSizeChange={(newLimit) => setLimit(newLimit)}
+                    />
                 </CardContent>
             </Card>
         </div>

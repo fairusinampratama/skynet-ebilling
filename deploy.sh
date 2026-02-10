@@ -1,39 +1,37 @@
 #!/bin/sh
 
-# Exit immediately if a command exits with a non-zero status
+# Skynet E-Billing - Coolify Deployment Script
+# This script runs on container startup
+
 set -e
 
-echo "🚀 Starting Deployment Script..."
+echo "🚀 Starting Skynet E-Billing deployment..."
 
-echo "📂 Fixing permissions..."
-chmod -R 777 storage bootstrap/cache
+# 1. Run migrations
+echo "📦 Running database migrations..."
+php artisan migrate --force --isolated
 
-echo "🔗 Linking storage..."
+# 2. Create storage link (ignore if exists)
+echo "🔗 Creating storage symlink..."
 php artisan storage:link || true
 
-echo "⚡ Optimizing application..."
-php artisan optimize:clear
+# 3. Cache optimization
+echo "⚡ Optimizing configuration cache..."
 php artisan config:cache
-php artisan event:cache
 php artisan route:cache
 php artisan view:cache
 
-echo "📦 Running migrations..."
-php artisan migrate --force
+# 4. Start queue worker in background
+echo "📮 Starting queue worker..."
+php artisan queue:work --queue=network-enforcement --tries=3 --timeout=90 --sleep=3 &
 
-echo "✅ Deployment tasks completed."
+# 5. Start scheduler (cron simulation)
+echo "⏰ Starting scheduler..."
+while true; do
+    php artisan schedule:run >> /dev/null 2>&1
+    sleep 60
+done &
 
-echo "🚀 Starting services..."
-
-# Find concurrently executable
-if [ -f "./node_modules/.bin/concurrently" ]; then
-    CONCURRENTLY="./node_modules/.bin/concurrently"
-else
-    CONCURRENTLY="npx concurrently"
-fi
-
-# Run Laravel Serve, Scheduler, and Queue Worker in parallel
-$CONCURRENTLY -c "#93c5fd,#c4b5fd,#fb7185" \
-    "php artisan serve --host=0.0.0.0 --port=8000" \
-    "php artisan schedule:work" \
-    "php artisan queue:work --tries=3 --timeout=90"
+# 6. Start PHP built-in server (Coolify expects this)
+echo "🌐 Starting web server on port 8000..."
+php artisan serve --host=0.0.0.0 --port=8000
