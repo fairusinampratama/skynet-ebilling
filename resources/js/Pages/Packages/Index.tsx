@@ -10,23 +10,19 @@ import { router } from '@inertiajs/react';
 import { EditAction, DeleteAction } from '@/Components/TableActions';
 import { ConfirmDialog } from '@/Components/ConfirmDialog';
 import { useState } from 'react';
+import { PaginatedData } from '@/Components/DataTable';
 
 interface Package {
     id: number;
     name: string;
     price: number;
-    bandwidth_label: string;
     mikrotik_profile?: string;
     rate_limit?: string;
-    router?: {
-        id: number;
-        name: string;
-    };
     customers_count: number;
 }
 
 interface Props {
-    packages: Package[];
+    packages: PaginatedData<Package>;
 }
 
 export default function Index({ packages }: Props) {
@@ -37,19 +33,6 @@ export default function Index({ packages }: Props) {
             minimumFractionDigits: 0,
         }).format(amount);
     };
-
-    const [selectedRouter, setSelectedRouter] = useState<string>('all');
-
-    // Get unique routers from packages for filter dropdown
-    const routers = Array.from(new Set(packages.map(p => p.router ? JSON.stringify({ id: p.router.id, name: p.router.name }) : null)))
-        .filter(Boolean)
-        .map(s => JSON.parse(s as string));
-
-    const filteredPackages = packages.filter(pkg => {
-        if (selectedRouter === 'all') return true;
-        if (selectedRouter === 'global') return !pkg.router;
-        return pkg.router?.id.toString() === selectedRouter;
-    });
 
     return (
         <AuthenticatedLayout
@@ -71,37 +54,13 @@ export default function Index({ packages }: Props) {
             <div className="py-8">
                 <div className="mx-auto max-w-7xl">
 
-                    {/* Filter Bar */}
-                    <div className="mb-6 flex items-center gap-4">
-                        <div className="w-64">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="w-full justify-between">
-                                        {selectedRouter === 'all' ? 'All Routers' :
-                                            selectedRouter === 'global' ? 'Global Only' :
-                                                routers.find(r => r.id.toString() === selectedRouter)?.name || 'Filter by Router'}
-                                        <MoreHorizontal className="ml-2 h-4 w-4 rotate-90" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-64" align="start">
-                                    <DropdownMenuItem onClick={() => setSelectedRouter('all')}>
-                                        All Routers
-                                    </DropdownMenuItem>
-                                    {routers.map(router => (
-                                        <DropdownMenuItem key={router.id} onClick={() => setSelectedRouter(router.id.toString())}>
-                                            {router.name}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                    </div>
+
 
                     <Card className="border-border bg-card/50 backdrop-blur-sm shadow-none">
                         <CardHeader>
                             <CardTitle>Package Management</CardTitle>
                             <CardDescription>
-                                {filteredPackages.length} package(s) shown
+                                {packages.data.length} package(s) shown
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -111,8 +70,6 @@ export default function Index({ packages }: Props) {
                                         <TableRow className="border-border hover:bg-transparent">
                                             <TableHead className="w-[80px]">ID</TableHead>
                                             <TableHead>Package Name</TableHead>
-                                            <TableHead>Assigned Router</TableHead>
-                                            <TableHead>Bandwidth</TableHead>
                                             <TableHead>Tech Profile</TableHead>
                                             <TableHead>Rate Limit</TableHead>
                                             <TableHead>Price</TableHead>
@@ -121,14 +78,14 @@ export default function Index({ packages }: Props) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {filteredPackages.length === 0 ? (
+                                        {packages.data.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                                                    No packages found for selected filter
+                                                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                                                    No packages found
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            filteredPackages.map((pkg) => (
+                                            packages.data.map((pkg) => (
                                                 <TableRow key={pkg.id} className="group hover:bg-muted/50 border-border transition-colors">
                                                     <TableCell className="font-mono text-xs text-muted-foreground font-medium">
                                                         #{pkg.id}
@@ -136,22 +93,7 @@ export default function Index({ packages }: Props) {
                                                     <TableCell className="font-medium text-foreground">
                                                         {pkg.name}
                                                     </TableCell>
-                                                    <TableCell>
-                                                        {pkg.router ? (
-                                                            <Badge variant="outline" className="border-blue-200 text-blue-700 bg-blue-50">
-                                                                {pkg.router.name}
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge variant="outline" className="border-border text-muted-foreground bg-gray-50">
-                                                                Global (All)
-                                                            </Badge>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline" className="border-border text-muted-foreground bg-muted/50">
-                                                            {pkg.bandwidth_label}
-                                                        </Badge>
-                                                    </TableCell>
+
                                                     <TableCell className="font-mono text-xs text-muted-foreground">
                                                         {pkg.mikrotik_profile || '-'}
                                                     </TableCell>

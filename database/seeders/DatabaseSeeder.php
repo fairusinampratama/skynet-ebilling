@@ -16,15 +16,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Create Admin User
-        User::factory()->create([
-            'name' => 'Admin Skynet',
-            'email' => 'admin@skynet.id',
-            'password' => bcrypt('skynet123'),
-        ]);
-
         // Seed in proper order
         $this->call([
-            RouterSeeder::class,      // Routers only
+            UserSeeder::class,      // Create Admin
+            AreaSeeder::class,      // Run first to populate areas
+            LegacyDataSeeder::class,  // Import Customers & Invoices
         ]);
     }
 }

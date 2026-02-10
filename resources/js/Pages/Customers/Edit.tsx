@@ -24,11 +24,10 @@ interface Package {
     id: number;
     name: string;
     price: number;
-    bandwidth_label: string;
-    router_id: number;
+
 }
 
-interface Router {
+interface Area {
     id: number;
     name: string;
 }
@@ -36,37 +35,37 @@ interface Router {
 interface Customer {
     id: number;
     name: string;
-    internal_id?: string;
+    // internal_id removed
     address: string;
     phone?: string;
     nik?: string;
     pppoe_user: string;
     package_id: number;
-    router_id: number; // Added
+    area_id?: number | null;
     status: 'pending_installation' | 'active' | 'suspended' | 'isolated' | 'offboarding' | 'terminated';
-    is_online: boolean;
     geo_lat?: string;
     geo_long?: string;
     ktp_photo_url?: string | null;
+    // ktp_photo_path removed
 }
 
 interface Props {
     customer: Customer;
     packages: Package[];
-    routers: Router[];
+    areas: Area[];
 }
 
-export default function Edit({ customer, packages, routers }: Props) {
+export default function Edit({ customer, packages, areas }: Props) {
     const { data, setData, put, delete: destroy, processing, errors } = useForm({
         name: customer.name || '',
-        internal_id: customer.internal_id || '',
+        // internal_id removed
         address: customer.address || '',
         phone: customer.phone || '',
         nik: customer.nik || '',
         pppoe_user: customer.pppoe_user || '',
 
-        router_id: customer.router_id ? String(customer.router_id) : '',
         package_id: String(customer.package_id),
+        area_id: customer.area_id ? String(customer.area_id) : '',
         status: customer.status,
         geo_lat: customer.geo_lat || '',
         geo_long: customer.geo_long || '',
@@ -101,11 +100,6 @@ export default function Edit({ customer, packages, routers }: Props) {
                             <h2 className="text-xl font-semibold leading-tight text-foreground">
                                 Edit Customer: {customer.name}
                             </h2>
-                            {customer.is_online ? (
-                                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" title="Online" />
-                            ) : (
-                                <span className="flex h-2.5 w-2.5 rounded-full bg-zinc-300" title="Offline" />
-                            )}
                         </div>
                     </div>
                     {/* Delete Action - using Dialog as fallback */}
@@ -165,16 +159,7 @@ export default function Edit({ customer, packages, routers }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-3 gap-4">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="internal_id">Internal ID</Label>
-                                        <Input
-                                            id="internal_id"
-                                            value={data.internal_id}
-                                            onChange={(e) => setData('internal_id', e.target.value)}
-                                            placeholder="e.g. 1001"
-                                        />
-                                        {errors.internal_id && <p className="text-sm text-destructive">{errors.internal_id}</p>}
-                                    </div>
+                                    {/* Internal ID removed */}
                                     <div className="col-span-2 grid gap-2">
                                         <Label htmlFor="name">Full Name <span className="text-red-500">*</span></Label>
                                         <Input
@@ -312,30 +297,23 @@ export default function Edit({ customer, packages, routers }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="router_id">Assigned Router <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="area_id">Area</Label>
                                     <Select
-                                        value={data.router_id}
-                                        onValueChange={(val) => {
-                                            if (val !== data.router_id) {
-                                                setData((prev) => ({ ...prev, router_id: val, package_id: '' })); // Reset package
-                                            }
-                                        }}
+                                        value={data.area_id}
+                                        onValueChange={(val) => setData('area_id', val)}
                                     >
                                         <SelectTrigger className="bg-background/50">
-                                            <SelectValue placeholder="Select a Router" />
+                                            <SelectValue placeholder="Select Area" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {routers.map((router) => (
-                                                <SelectItem key={router.id} value={String(router.id)}>
-                                                    {router.name}
+                                            {areas.map((area) => (
+                                                <SelectItem key={area.id} value={String(area.id)}>
+                                                    {area.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <p className="text-[10px] text-muted-foreground mt-1">
-                                        Changing router will require re-selecting a compatible package.
-                                    </p>
-                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
+                                    {errors.area_id && <p className="text-sm text-destructive">{errors.area_id}</p>}
                                 </div>
 
                                 <div className="grid gap-2">
@@ -343,27 +321,19 @@ export default function Edit({ customer, packages, routers }: Props) {
                                     <Select
                                         value={data.package_id}
                                         onValueChange={(val) => setData('package_id', val)}
-                                        disabled={!data.router_id}
                                     >
-                                        <SelectTrigger className="bg-background/50 disabled:opacity-50">
-                                            <SelectValue placeholder={data.router_id ? "Select a package" : "Select a Router first"} />
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select a package" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {packages
-                                                .filter(pkg => String(pkg.router_id) === data.router_id)
-                                                .map((pkg) => (
-                                                    <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                                        <span className="font-medium">{pkg.name}</span>
-                                                        <span className="text-muted-foreground ml-2">
-                                                            ({pkg.bandwidth_label} - Rp {pkg.price.toLocaleString('id-ID')})
-                                                        </span>
-                                                    </SelectItem>
-                                                ))}
-                                            {packages.filter(pkg => String(pkg.router_id) === data.router_id).length === 0 && (
-                                                <div className="p-2 text-sm text-muted-foreground text-center">
-                                                    No packages found for this router.
-                                                </div>
-                                            )}
+                                            {packages.map((pkg) => (
+                                                <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                                    <span className="font-medium">{pkg.name}</span>
+                                                    <span className="text-muted-foreground ml-2">
+                                                        (Rp {pkg.price.toLocaleString('id-ID')})
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.package_id && <p className="text-sm text-destructive">{errors.package_id}</p>}
@@ -386,8 +356,6 @@ export default function Edit({ customer, packages, routers }: Props) {
                                         </SelectContent>
                                     </Select>
                                 </div>
-
-                                {/* Status modification removed to enforce use of Toggle on Details page */}
 
                                 <div className="border-t border-border/50 my-6"></div>
 
@@ -431,6 +399,7 @@ export default function Edit({ customer, packages, routers }: Props) {
                     </Button>
                 </div>
             </form >
+
         </AuthenticatedLayout >
     );
 }

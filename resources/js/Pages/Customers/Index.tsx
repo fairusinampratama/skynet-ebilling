@@ -15,7 +15,7 @@ const getStatusBadge = (status: string) => {
         pending_installation: 'text-blue-500 border-blue-500/20 bg-blue-500/10',
         active: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
         isolated: 'text-red-500 border-red-500/20 bg-red-500/10',
-        terminated: 'text-zinc-600 border-zinc-600/20 bg-zinc-600/10',
+        terminated: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
     };
     const className = variants[status] || 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10';
 
@@ -30,19 +30,24 @@ interface Package {
     id: number;
     name: string;
     price: number;
-    bandwidth_label: string;
+
+}
+
+interface Area {
+    id: number;
+    name: string;
 }
 
 interface Customer {
     id: number;
-    internal_id: string;
     code: string;
     name: string;
     address: string;
     pppoe_user: string;
     status: 'pending_installation' | 'active' | 'isolated' | 'terminated';
-    is_online: boolean;
+    // is_online removed
     package: Package;
+    area?: Area;
     join_date: string;
     created_at: string;
     invoices?: Array<{
@@ -57,23 +62,25 @@ interface Customer {
 interface Props {
     customers: PaginatedData<Customer>;
     packages: Package[];
+    areas: Area[];
     filters: {
         search?: string;
         status?: string;
         package_id?: string;
+        area_id?: string;
         sort?: string;
         direction?: 'asc' | 'desc';
     };
 }
 
-export default function Index({ customers, packages = [], filters = {} }: Props) {
+export default function Index({ customers, packages = [], areas = [], filters = {} }: Props) {
     const columns: Column<Customer>[] = [
         {
             header: "ID",
             className: "w-[100px]",
             cell: (customer) => (
                 <span className="font-mono text-xs text-muted-foreground font-medium">
-                    {customer.code || customer.internal_id}
+                    {customer.code}
                 </span>
             )
         },
@@ -85,14 +92,20 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
                 <div className="flex flex-col">
                     <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground">{customer.name}</span>
-                        {customer.is_online ? (
-                            <span className="flex h-2 w-2 rounded-full bg-emerald-500" title="Online" />
-                        ) : (
-                            <span className="flex h-2 w-2 rounded-full bg-zinc-300" title="Offline" />
-                        )}
                     </div>
                     <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                         {customer.address}
+                    </span>
+                </div>
+            )
+        },
+        {
+            header: "Area",
+            sortable: false,
+            cell: (customer) => (
+                <div className="flex flex-col">
+                    <span className="text-sm text-foreground">
+                        {customer.area?.name || '-'}
                     </span>
                 </div>
             )
@@ -107,9 +120,6 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
                         <span className="text-sm font-medium text-foreground">
                             {customer.package.name}
                         </span>
-                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-muted text-muted-foreground hover:bg-muted/80">
-                            {customer.package.bandwidth_label}
-                        </Badge>
                     </div>
                     <span className="text-xs font-mono text-muted-foreground">
                         Rp {customer.package.price.toLocaleString('id-ID')}
@@ -189,6 +199,11 @@ export default function Index({ customers, packages = [], filters = {} }: Props)
             key: 'package_id',
             placeholder: 'All Packages',
             options: packages.map(pkg => ({ label: pkg.name, value: String(pkg.id) }))
+        },
+        {
+            key: 'area_id',
+            placeholder: 'All Areas',
+            options: areas.map(area => ({ label: area.name, value: String(area.id) }))
         },
         {
             key: 'status',

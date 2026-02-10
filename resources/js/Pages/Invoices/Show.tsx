@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import { Badge } from '@/Components/ui/badge';
@@ -17,6 +17,7 @@ import {
 } from "@/Components/ui/dialog";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
+import { Textarea } from "@/Components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -27,7 +28,7 @@ import {
 import {
     User, MapPin, Phone, Hash, Calendar, DollarSign,
     CreditCard, FileText, CheckCircle2, Clock, AlertCircle,
-    Download, ExternalLink, Plus, ChevronLeft
+    Download, ExternalLink, Plus, ChevronLeft, Ban, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,6 +53,7 @@ interface Transaction {
 
 interface Invoice {
     id: number;
+    code: string;
     period: string;
     amount: number;
     status: 'unpaid' | 'paid' | 'void';
@@ -70,16 +72,44 @@ import { PageProps } from '@/types';
 export default function Show({ invoice }: Props) {
     const { settings } = usePage<PageProps>().props;
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+    const [isVoidOpen, setIsVoidOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [voidReason, setVoidReason] = useState('');
+    const [voidProcessing, setVoidProcessing] = useState(false);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
 
-    const totalPaid = invoice.transactions.reduce((sum, t) => sum + t.amount, 0);
-    const balance = invoice.amount - totalPaid;
+    const totalPaid = invoice.transactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const balance = Number(invoice.amount) - totalPaid;
+    const hasTransactions = invoice.transactions.length > 0;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         amount: balance,
         method: 'cash',
         paid_at: new Date().toISOString().slice(0, 16), // datetime-local format
-        proof_url: '',
+        proof: null as File | null,
     });
+
+    const handleVoid = () => {
+        setVoidProcessing(true);
+        router.post(route('invoices.void', invoice.id), { reason: voidReason }, {
+            onSuccess: () => {
+                setIsVoidOpen(false);
+                setVoidReason('');
+                toast.success('Invoice has been voided.');
+            },
+            onFinish: () => setVoidProcessing(false),
+        });
+    };
+
+    const handleDelete = () => {
+        setDeleteProcessing(true);
+        router.delete(route('invoices.destroy', invoice.id), {
+            onSuccess: () => {
+                toast.success('Invoice deleted successfully.');
+            },
+            onFinish: () => setDeleteProcessing(false),
+        });
+    };
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
@@ -143,7 +173,7 @@ export default function Show({ invoice }: Props) {
                         </Link>
                         <div>
                             <h2 className="text-xl font-semibold leading-tight text-foreground">
-                                Invoice #{invoice.id}
+                                Invoice #{invoice.code || invoice.id}
                             </h2>
                             <p className="text-sm text-muted-foreground mt-0.5">
                                 {invoice.customer.name} • {formatDate(invoice.generated_at)}
@@ -238,7 +268,6 @@ export default function Show({ invoice }: Props) {
                                                     <SelectContent>
                                                         <SelectItem value="cash">Cash</SelectItem>
                                                         <SelectItem value="transfer">Bank Transfer</SelectItem>
-                                                        <SelectItem value="payment_gateway">Payment Gateway</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -260,12 +289,12 @@ export default function Show({ invoice }: Props) {
                                             )}
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="proof">Proof URL (Optional)</Label>
+                                                <Label htmlFor="proof">Proof of Payment (Image)</Label>
                                                 <Input
                                                     id="proof"
-                                                    placeholder="https://..."
-                                                    value={data.proof_url}
-                                                    onChange={(e) => setData('proof_url', e.target.value)}
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => setData('proof', e.target.files ? e.target.files[0] : null)}
                                                 />
                                             </div>
 
@@ -282,7 +311,81 @@ export default function Show({ invoice }: Props) {
                                 </Dialog>
                             )}
 
-                            {/* Download Button moved to Header */}
+                            {/* Void Invoice Dialog */}
+                            {invoice.status === 'unpaid' && (
+                                <Dialog open={isVoidOpen} onOpenChange={setIsVoidOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" className="gap-2 text-orange-600 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20">
+                                            <Ban className="w-4 h-4" />
+                                            Void
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[425px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Void Invoice</DialogTitle>
+                                            <DialogDescription>
+                                                This will mark the invoice as void. The record will be kept for auditing purposes.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4 pt-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="reason">Reason (optional)</Label>
+                                                <Textarea
+                                                    id="reason"
+                                                    placeholder="e.g. Customer terminated, duplicate invoice..."
+                                                    value={voidReason}
+                                                    onChange={(e) => setVoidReason(e.target.value)}
+                                                    rows={3}
+                                                />
+                                            </div>
+                                        </div>
+                                        <DialogFooter className="pt-4">
+                                            <Button type="button" variant="outline" onClick={() => setIsVoidOpen(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                onClick={handleVoid}
+                                                disabled={voidProcessing}
+                                                className="bg-orange-600 hover:bg-orange-700 text-white"
+                                            >
+                                                {voidProcessing ? 'Voiding...' : 'Void Invoice'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
+
+                            {/* Delete Invoice Dialog */}
+                            {!hasTransactions && (invoice.status === 'unpaid' || invoice.status === 'void') && (
+                                <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" className="gap-2 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                            <Trash2 className="w-4 h-4" />
+                                            Delete
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[425px]">
+                                        <DialogHeader>
+                                            <DialogTitle className="text-red-600">Delete Invoice</DialogTitle>
+                                            <DialogDescription>
+                                                This will permanently delete Invoice #{invoice.code || invoice.id}. This action cannot be undone.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <DialogFooter className="pt-4">
+                                            <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button
+                                                onClick={handleDelete}
+                                                disabled={deleteProcessing}
+                                                variant="destructive"
+                                            >
+                                                {deleteProcessing ? 'Deleting...' : 'Delete Permanently'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
                         </div>
                     </div>
 

@@ -49,11 +49,11 @@ export function DataTablePagination<T>({
                 <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium">Rows per page</p>
                     <Select
-                        value={String(data.per_page)}
+                        value={data.per_page ? String(data.per_page) : "20"}
                         onValueChange={handlePageSizeChange}
                     >
                         <SelectTrigger className="h-8 w-[70px]">
-                            <SelectValue placeholder={String(data.per_page)} />
+                            <SelectValue placeholder="20" />
                         </SelectTrigger>
                         <SelectContent>
                             {[10, 20, 30, 40, 50, 100].map((pageSize) => (

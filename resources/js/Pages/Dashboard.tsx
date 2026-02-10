@@ -3,7 +3,7 @@ import { Head } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import { Badge } from '@/Components/ui/badge';
-import { Activity, CreditCard, DollarSign, AlertCircle, Wifi, Server } from 'lucide-react';
+import { Activity, CreditCard, DollarSign, AlertCircle, Wifi, Server, CheckCircle2, FileWarning, BarChart3 } from 'lucide-react';
 
 interface Transaction {
     id: number;
@@ -29,22 +29,19 @@ interface DashboardStats {
     actual_revenue: number;
     outstanding: number;
     overdue_count: number;
-}
-
-interface NetworkStats {
-    total_routers: number;
-    active_routers: number;
-    isolated_customers: number;
-    mapping_percentage: number;
+    active_customers: number;
+    paid_invoices: number;
+    unpaid_invoices: number;
+    collection_rate: number;
+    customers_without_invoice: number;
 }
 
 interface Props {
     stats: DashboardStats;
-    network_stats: NetworkStats;
     recent_payments: Transaction[];
 }
 
-export default function Dashboard({ stats, network_stats, recent_payments }: Props) {
+export default function Dashboard({ stats, recent_payments }: Props) {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -167,70 +164,84 @@ export default function Dashboard({ stats, network_stats, recent_payments }: Pro
                     </Card>
                 </div>
 
-                {/* Network Health Card */}
-                <Card className="border-border bg-card">
+                {/* Billing Health */}
+                <Card className="border-border bg-card/50 backdrop-blur-sm shadow-none">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Wifi className="h-5 w-5 text-primary" />
-                            Network Health
-                        </CardTitle>
-                        <CardDescription>
-                            Router status and customer mapping overview
-                        </CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5 text-blue-500" />
+                                    Billing Health
+                                </CardTitle>
+                                <CardDescription>
+                                    Invoice collection status for the current billing period
+                                </CardDescription>
+                            </div>
+                            <Badge variant="outline" className="font-mono text-sm">
+                                {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                            </Badge>
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-6 md:grid-cols-4">
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Server className="h-4 w-4" />
-                                    <span>Active Routers</span>
-                                </div>
-                                <div className="text-2xl font-bold">
-                                    {network_stats.active_routers}/{network_stats.total_routers}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    {network_stats.total_routers > 0
-                                        ? Math.round((network_stats.active_routers / network_stats.total_routers) * 100)
-                                        : 0}% online
-                                </div>
+                    <CardContent className="space-y-6">
+                        {/* Collection Rate Progress Bar */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Collection Rate</span>
+                                <span className="font-bold text-lg text-foreground">{stats.collection_rate}%</span>
                             </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <span>Isolated Customers</span>
-                                </div>
-                                <div className="text-2xl font-bold text-red-500">
-                                    {network_stats.isolated_customers}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Blocked for non-payment
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Activity className="h-4 w-4" />
-                                    <span>Router Mapping</span>
-                                </div>
-                                <div className="text-2xl font-bold">
-                                    {network_stats.mapping_percentage}%
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Customers linked to routers
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Wifi className="h-4 w-4" />
-                                    <span>System Status</span>
-                                </div>
-                                <Badge variant={network_stats.active_routers === network_stats.total_routers ? 'default' : 'secondary'}>
-                                    {network_stats.active_routers === network_stats.total_routers ? 'All Systems Operational' : 'Some Routers Offline'}
-                                </Badge>
+                            <div className="h-3 bg-muted rounded-full overflow-hidden">
+                                <div
+                                    className="h-full rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-emerald-500 to-emerald-400"
+                                    style={{ width: `${Math.min(stats.collection_rate, 100)}%` }}
+                                />
                             </div>
                         </div>
+
+                        {/* Stats Row */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                    <span className="text-xs text-muted-foreground">Paid</span>
+                                </div>
+                                <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                    {stats.paid_invoices}
+                                </span>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <span className="text-xs text-muted-foreground">Unpaid</span>
+                                </div>
+                                <span className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                    {stats.unpaid_invoices}
+                                </span>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                    <FileWarning className="h-4 w-4 text-orange-500" />
+                                    <span className="text-xs text-muted-foreground">Missing</span>
+                                </div>
+                                <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                                    {stats.customers_without_invoice}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Warning Alert */}
+                        {stats.customers_without_invoice > 0 && (
+                            <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-sm">
+                                <FileWarning className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="font-medium text-orange-500">
+                                        {stats.customers_without_invoice} customer{stats.customers_without_invoice > 1 ? 's' : ''} missing invoices
+                                    </p>
+                                    <p className="text-muted-foreground text-xs mt-0.5">
+                                        Run <code className="bg-orange-500/15 px-1 py-0.5 rounded font-mono text-orange-500">php artisan billing:generate</code> or create invoices manually.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

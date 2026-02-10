@@ -119,7 +119,7 @@ export default function Authenticated({
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                 <Input
                                     type="search"
-                                    placeholder="Search (⌘K)..."
+                                    placeholder="Search ..."
                                     className="w-full appearance-none bg-muted/50 pl-9 shadow-none md:w-full lg:w-96 rounded-xl focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary border-transparent hover:bg-muted transition-all"
                                 />
                             </div>

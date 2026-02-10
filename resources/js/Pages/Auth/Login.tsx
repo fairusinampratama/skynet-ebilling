@@ -155,33 +155,6 @@ export default function Login({
                                 </div>
                             </form>
 
-                            <div className="relative">
-                                <div className="absolute inset-0 flex items-center">
-                                    <span className="w-full border-t" />
-                                </div>
-                                <div className="relative flex justify-center text-xs uppercase">
-                                    <span className="bg-background px-2 text-muted-foreground">
-                                        Demo Access
-                                    </span>
-                                </div>
-                            </div>
-
-                            <Button
-                                variant="outline"
-                                type="button"
-                                className="w-full h-auto py-4 flex flex-col items-center gap-1 border-dashed hover:border-primary hover:bg-primary/5 transition-colors"
-                                onClick={() => {
-                                    setData('email', 'admin@skynet.id');
-                                    setData('password', 'skynet123');
-                                }}
-                            >
-                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Click to autofill</span>
-                                <div className="flex items-center gap-4 text-sm font-mono text-foreground">
-                                    <span>admin@skynet.id</span>
-                                    <span className="w-1 h-1 bg-border rounded-full" />
-                                    <span>skynet123</span>
-                                </div>
-                            </Button>
                         </div>
 
                         <p className="px-8 text-center text-sm text-muted-foreground">

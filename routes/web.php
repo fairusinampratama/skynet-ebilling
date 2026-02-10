@@ -5,9 +5,9 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PackageController;
-use App\Http\Controllers\RouterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\AnalyticsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -33,8 +33,6 @@ Route::get('/', function () {
 // Public Payment Routes
 // =====================================================
 Route::get('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class, 'show'])->name('public.invoice.show');
-Route::post('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class, 'pay'])->name('public.invoice.pay');
-Route::post('/callback/tripay', [\App\Http\Controllers\TripayCallbackController::class, 'handle'])->name('callback.tripay');
 
 
 // Authenticated Routes
@@ -67,23 +65,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Package Management
     // =====================================================
     Route::resource('customers', CustomerController::class);
-    Route::resource('routers', RouterController::class);
-    Route::post('/routers/sync-all', [RouterController::class, 'syncAll'])->name('routers.sync-all');
-    Route::post('/routers/{router}/test-connection', [RouterController::class, 'testConnection'])->name('routers.test');
-    Route::post('/routers/{router}/scan', [RouterController::class, 'scanRouter'])->name('routers.scan');
-    Route::post('/routers/{router}/sync', [RouterController::class, 'sync'])->name('routers.sync'); // Unified Sync Route
-    Route::get('/api/routers/{router}/customers', [RouterController::class, 'customers'])->name('routers.customers');
-    Route::get('/api/routers/{router}/profiles', [RouterController::class, 'getProfiles'])->name('routers.profiles');
-    Route::get('/api/routers/{router}/live-stats', [\App\Http\Controllers\Api\RouterStatsController::class, 'getLiveStats'])->name('routers.live-stats');
     Route::resource('packages', PackageController::class);
+    Route::resource('areas', \App\Http\Controllers\AreaController::class);
     
     // =====================================================
     // Invoice Management
     // =====================================================
     Route::get('/invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index');
+    Route::get('/invoices/create', [InvoiceController::class, 'create'])
+        ->name('invoices.create');
+    Route::post('/invoices', [InvoiceController::class, 'store'])
+        ->name('invoices.store');
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
+    Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void'])
+        ->name('invoices.void');
+    Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])
+        ->name('invoices.destroy');
     Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'download'])
         ->name('invoices.download');
     Route::get('/customers/{customer}/invoices', [InvoiceController::class, 'customerInvoices'])
@@ -98,6 +97,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('payments.store');
     Route::post('/payments/bulk-import', [PaymentController::class, 'bulkImport'])
         ->name('payments.bulk-import');
+
+    
+    // =====================================================
+    // Analytics & Reports
+    // =====================================================
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('/api/analytics/revenue-trend', [AnalyticsController::class, 'revenueTrend'])->name('api.analytics.revenue-trend');
+    Route::get('/api/analytics/mrr', [AnalyticsController::class, 'mrr'])->name('api.analytics.mrr');
+    Route::get('/api/analytics/collection-rate', [AnalyticsController::class, 'collectionRate'])->name('api.analytics.collection-rate');
+    Route::get('/api/analytics/revenue-by-area', [AnalyticsController::class, 'revenueByArea'])->name('api.analytics.revenue-by-area');
+    Route::get('/api/analytics/package-performance', [AnalyticsController::class, 'packagePerformance'])->name('api.analytics.package-performance');
+    Route::get('/api/analytics/payment-methods', [AnalyticsController::class, 'paymentMethods'])->name('api.analytics.payment-methods');
+    Route::get('/api/analytics/outstanding-aging', [AnalyticsController::class, 'outstandingAging'])->name('api.analytics.outstanding-aging');
+    Route::get('/api/analytics/customer-growth', [AnalyticsController::class, 'customerGrowth'])->name('api.analytics.customer-growth');
 
     // =====================================================
     // Settings System

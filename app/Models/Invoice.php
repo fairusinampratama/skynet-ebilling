@@ -29,6 +29,15 @@ class Invoice extends Model
             if (empty($invoice->uuid)) {
                 $invoice->uuid = (string) \Illuminate\Support\Str::uuid();
             }
+            
+            if (empty($invoice->code)) {
+                // Generate code: INV-YYYYMM-CUSTID-RAND
+                $date = $invoice->created_at ?? now();
+                $prefix = 'INV-' . $date->format('Ym');
+                $customerCode = $invoice->customer ? $invoice->customer->code : 'UNK';
+                $random = strtoupper(\Illuminate\Support\Str::random(4));
+                $invoice->code = "{$prefix}-{$customerCode}-{$random}";
+            }
         });
     }
 

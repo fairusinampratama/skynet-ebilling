@@ -27,7 +27,6 @@ interface Package {
     id: number;
     name: string;
     price: number;
-    bandwidth_label: string;
     customers_count: number;
     customers?: Customer[];
 }
@@ -83,9 +82,7 @@ export default function Show({ package: pkg }: Props) {
                             <h2 className="text-xl font-semibold leading-tight text-foreground">
                                 {pkg.name}
                             </h2>
-                            <p className="text-sm text-muted-foreground">
-                                {pkg.bandwidth_label}
-                            </p>
+
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -196,10 +193,7 @@ export default function Show({ package: pkg }: Props) {
                                     <p className="text-sm font-medium text-muted-foreground">Package Name</p>
                                     <p className="text-base font-semibold mt-1">{pkg.name}</p>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Bandwidth</p>
-                                    <p className="text-base font-semibold mt-1">{pkg.bandwidth_label}</p>
-                                </div>
+
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Price</p>
                                     <p className="text-base font-semibold mt-1">{formatCurrency(pkg.price)}</p>

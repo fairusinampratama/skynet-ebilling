@@ -211,6 +211,9 @@
 </head>
 <body>
     <div class="container">
+        @php
+            \Carbon\Carbon::setLocale('id');
+        @endphp
         <!-- Header: Logo and Invoice Metadata -->
         <div class="header">
             <div class="header-left">
@@ -224,27 +227,14 @@
             <div class="header-right">
                 <div class="invoice-meta">
                     <div><strong>Invoice #:</strong> {{ $invoice->code }}</div>
-                    <div><strong>Periode:</strong> {{ \Carbon\Carbon::parse($invoice->period)->format('F Y') }}</div>
-                    <div><strong>Jatuh Tempo:</strong> {{ \Carbon\Carbon::parse($invoice->due_date)->format('d F Y') }}</div>
+                    <div><strong>Periode:</strong> {{ \Carbon\Carbon::parse($invoice->period)->translatedFormat('F Y') }}</div>
+                    <div><strong>Jatuh Tempo:</strong> {{ \Carbon\Carbon::parse($invoice->due_date)->translatedFormat('d F Y') }}</div>
                     <div><strong>ID Pelanggan:</strong> {{ $invoice->customer->code }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- Company and Customer Information -->
-        <div class="info-section">
-            <div class="company-info">
-                <div class="section-title">{{ $company['name'] }}</div>
-                <div class="info-line">{{ $company['address'] }}</div>
-                <div class="info-line">{{ $company['email'] }}</div>
-                <div class="info-line">{{ $company['phone'] }}</div>
-            </div>
-            <div class="customer-info">
-                <div class="section-title">{{ strtoupper($invoice->customer->name) }}</div>
-                <div class="info-line">{{ $invoice->customer->address }}</div>
-                <div class="info-line">{{ $invoice->customer->phone }}</div>
-            </div>
-        </div>
+        <!-- ... (middle sections) ... -->
 
         <!-- Line Items -->
         <table class="items-table">
@@ -259,7 +249,7 @@
                     <td>
                         <strong>{{ $invoice->customer->package->name }}</strong>
                         <div class="text-muted" style="font-size: 9pt;">
-                            ({{ \Carbon\Carbon::parse($invoice->period)->format('F Y') }})
+                            ({{ \Carbon\Carbon::parse($invoice->period)->translatedFormat('F Y') }})
                         </div>
                     </td>
                     <td class="amount">{{ number_format($invoice->amount, 0, ',', '.') }}</td>
@@ -281,12 +271,12 @@
         <!-- Total Section -->
         <div class="total-section">
             <span class="total-label">Total:</span>
-            <span class="total-amount">Rp {{ number_format($invoice->amount - $totalPaid, 0, ',', '.') }}</span>
+            <span class="total-amount">Rp {{ number_format($invoice->amount, 0, ',', '.') }}</span>
         </div>
 
         <!-- Payment Methods -->
         <div class="payment-section">
-            <div class="payment-title">Metode Pembayaran Via Cash atau Transfer Ke:</div>
+            <div class="payment-title">Info Pembayaran:</div>
             
             @foreach($manual_accounts as $account)
             <div class="payment-details">
@@ -294,20 +284,11 @@
                 <div class="account-number">{{ $account['account_number'] }}</div>
             </div>
             @endforeach
-
-            @if($invoice->uuid)
-            <div class="payment-subtitle" style="margin-top: 20px;">Metode Pembayaran Via Payment Gateway:</div>
-            <div class="payment-details">
-                <a href="{{ url('/pay/' . $invoice->uuid) }}" style="color: #1e40af; text-decoration: none;">
-                    {{ url('/pay/' . $invoice->uuid) }}
-                </a>
-            </div>
-            @endif
         </div>
 
         <!-- Footer -->
         <div class="footer">
-            <div class="footer-date">{{ \Carbon\Carbon::parse($invoice->period)->format('F Y') }}</div>
+            <div class="footer-date">{{ \Carbon\Carbon::parse($invoice->period)->translatedFormat('F Y') }}</div>
             <div class="footer-company">{{ $company['name'] }}</div>
         </div>
     </div>

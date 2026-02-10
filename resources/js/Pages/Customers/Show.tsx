@@ -42,24 +42,23 @@ interface Package {
     id: number;
     name: string;
     price: number;
-    bandwidth_label: string;
+
 }
 
 interface Customer {
     id: number;
     name: string;
-    internal_id: string;
     code: string;
     address: string;
     phone: string;
     nik: string;
     pppoe_user: string;
     status: 'pending_installation' | 'active' | 'suspended' | 'isolated' | 'offboarding' | 'terminated';
-    is_online: boolean;
     geo_lat: string;
     geo_long: string;
     join_date: string;
     package: Package;
+    area?: { id: number; name: string };
     invoices: Invoice[];
     ktp_photo_url?: string | null;
 }
@@ -150,20 +149,9 @@ export default function Show({ customer }: Props) {
                                 <h2 className="text-xl font-semibold leading-tight text-foreground">
                                     {customer.name}
                                 </h2>
-                                {customer.is_online ? (
-                                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] px-2 h-5 gap-1.5 flex items-center">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        Online
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline" className="bg-zinc-500/10 text-zinc-500 border-zinc-500/20 text-[10px] px-2 h-5 gap-1.5 flex items-center">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-                                        Offline
-                                    </Badge>
-                                )}
                             </div>
                             <p className="text-sm text-muted-foreground mt-1 font-mono">
-                                ID: {customer.code || customer.internal_id} | PPPoE: {customer.pppoe_user}
+                                ID: {customer.code} | PPPoE: {customer.pppoe_user}
                             </p>
                         </div>
                     </div>
@@ -239,6 +227,10 @@ export default function Show({ customer }: Props) {
                                         <span className="col-span-2 font-mono">{customer.phone || '-'}</span>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
+                                        <span className="text-muted-foreground">Area</span>
+                                        <span className="col-span-2 font-medium">{customer.area?.name || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Address</span>
                                         <span className="col-span-2">{customer.address}</span>
                                     </div>
@@ -267,30 +259,23 @@ export default function Show({ customer }: Props) {
 
                                     <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50 mt-4">
                                         <div>
-                                            <h4 className="font-medium">Internet Access</h4>
+                                            <h4 className="font-medium">Service Status</h4>
                                             <p className="text-sm text-muted-foreground">
-                                                {customer.status === 'active' ? 'Customer has internet access' : 'Internet access is blocked'}
+                                                {customer.status === 'active' ? 'Customer service is ACTIVE' : 'Customer service is SUSPENDED'}
                                             </p>
                                         </div>
                                         <Button
                                             variant={customer.status === 'active' ? "destructive" : "default"}
                                             onClick={handleToggleBlock}
                                         >
-                                            {customer.status === 'active' ? 'Block Access' : 'Restore Access'}
+                                            {customer.status === 'active' ? 'Suspend Service' : 'Activate Service'}
                                         </Button>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Package</span>
                                         <span className="col-span-2 font-medium">{customer.package.name}</span>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <span className="text-muted-foreground">Bandwidth</span>
-                                        <span className="col-span-2">
-                                            <Badge variant="secondary" className="font-normal">
-                                                {customer.package.bandwidth_label}
-                                            </Badge>
-                                        </span>
-                                    </div>
+
                                     <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Price</span>
                                         <span className="col-span-2 font-medium">{formatCurrency(customer.package.price)} / mo</span>
@@ -343,23 +328,36 @@ export default function Show({ customer }: Props) {
                             </Card>
 
                             {/* KTP Photo Card */}
-                            {customer.ktp_photo_url && (
-                                <Card className="bg-card/50 backdrop-blur border-border">
-                                    <CardHeader>
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <User className="h-4 w-4 text-violet-500" />
-                                            KTP Photo
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <img
-                                            src={customer.ktp_photo_url}
-                                            alt="KTP Photo"
-                                            className="w-full rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow"
-                                        />
-                                    </CardContent>
-                                </Card>
-                            )}
+                            <Card className="bg-card/50 backdrop-blur border-border">
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <User className="h-4 w-4 text-violet-500" />
+                                        KTP Photo
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {customer.ktp_photo_url ? (
+                                        <div className="space-y-3">
+                                            <div className="rounded-lg border border-border overflow-hidden h-48 bg-muted/30 flex items-center justify-center">
+                                                <img
+                                                    src={customer.ktp_photo_url}
+                                                    alt="KTP Photo"
+                                                    className="w-full h-full object-cover transition-transform hover:scale-105"
+                                                />
+                                            </div>
+                                            <Button variant="outline" size="sm" className="w-full" onClick={() => window.open(customer.ktp_photo_url!, '_blank')}>
+                                                <Eye className="w-3.5 h-3.5 mr-2" />
+                                                View Full Image
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-border/50 rounded-lg bg-muted/20 text-muted-foreground gap-2">
+                                            <User className="h-8 w-8 opacity-20" />
+                                            <span className="text-xs">No KTP Photo Uploaded</span>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
                         </div>
                     </TabsContent>
 
@@ -473,11 +471,11 @@ export default function Show({ customer }: Props) {
             <ConfirmDialog
                 open={confirmOpen}
                 onOpenChange={setConfirmOpen}
-                title={confirmAction === 'block' ? "Block Internet Access" : "Restore Internet Access"}
+                title={confirmAction === 'block' ? "Suspend Customer Service" : "Activate Customer Service"}
                 description={confirmAction === 'block'
-                    ? "Are you sure you want to block internet access for this customer? They will not be able to connect."
-                    : "Are you sure you want to restore internet access for this customer?"}
-                confirmText={confirmAction === 'block' ? "Block Access" : "Restore Access"}
+                    ? "Are you sure you want to suspend this customer? Their status will be updated to ISOLATED."
+                    : "Are you sure you want to activate this customer? Their status will be updated to ACTIVE."}
+                confirmText={confirmAction === 'block' ? "Suspend" : "Activate"}
                 variant={confirmAction === 'block' ? "destructive" : "default"}
                 onConfirm={confirmToggle}
             />
