@@ -24,13 +24,14 @@ return new class extends Migration
 
         // Packages table
         if (!Schema::hasTable('packages')) {
-            Schema::create('packages', function (Blueprint $table) {
                 $table->id();
                 $table->string('code')->unique();
                 $table->string('name');
                 $table->text('description')->nullable();
                 $table->decimal('price', 10, 2);
-                $table->integer('speed_mbps');
+                $table->integer('speed_mbps')->nullable(); // Make nullable as seeder doesn't set it explicitly
+                $table->string('mikrotik_profile')->nullable();
+                $table->string('rate_limit')->nullable();
                 $table->boolean('is_active')->default(true);
                 $table->timestamps();
             });
