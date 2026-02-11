@@ -11,6 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Clean start for consolidated migration
+        Schema::dropIfExists('activity_log');
+        Schema::dropIfExists('invoice_broadcasts');
+        Schema::dropIfExists('settings');
+        Schema::dropIfExists('transactions');
+        Schema::dropIfExists('invoices');
+        Schema::dropIfExists('customers');
+        Schema::dropIfExists('packages');
+        Schema::dropIfExists('areas');
+
         // Areas table
         Schema::create('areas', function (Blueprint $table) {
             $table->id();
