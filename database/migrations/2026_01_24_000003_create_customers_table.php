@@ -21,15 +21,17 @@ return new class extends Migration
                 $table->text('address');
                 $table->foreignId('area_id')->nullable()->constrained('areas')->nullOnDelete();
                 $table->foreignId('package_id')->constrained('packages')->restrictOnDelete();
-                $table->string('pppoe_username')->unique();
-                $table->text('pppoe_password'); // encrypted
-                $table->enum('status', ['active', 'suspended', 'inactive'])->default('active');
-                $table->string('ktp_number')->nullable();
+                $table->string('pppoe_user')->unique();
+                $table->text('pppoe_password')->nullable(); // encrypted
+                $table->enum('status', ['active', 'suspended', 'inactive', 'isolated', 'terminated', 'pending_installation'])->default('active');
+                $table->string('nik')->nullable();
                 $table->string('ktp_photo_url')->nullable();
                 $table->string('ktp_external_url')->nullable();
-                $table->string('gps_coordinates')->nullable();
-                $table->date('installation_date')->nullable();
-                $table->integer('due_day')->default(5);
+                $table->decimal('geo_lat', 10, 8)->nullable();
+                $table->decimal('geo_long', 11, 8)->nullable();
+                $table->date('join_date')->nullable();
+                $table->boolean('is_online')->default(false);
+                $table->integer('due_day')->default(20);
                 $table->timestamps();
             });
         }
