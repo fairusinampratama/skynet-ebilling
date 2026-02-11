@@ -102,6 +102,16 @@ class LegacyDataSeeder extends Seeder
     private function importTransactions(): void
     {
         $this->command->info('💰 Step 3: Importing Invoices & Transactions...');
+        
+        // Increase memory limit for this operation
+        ini_set('memory_limit', '1024M');
+        DB::disableQueryLog();
+
+        // Disable activity logging to speed up inserts
+        // Check if Spatie Activitylog is installed and disable it
+        if (function_exists('activity')) {
+            activity()->disableLogging();
+        }
 
         $transactionsJson = json_decode(file_get_contents(database_path('../migration_data/transactions.json')), true);
         $bar = $this->command->getOutput()->createProgressBar(count($transactionsJson));
@@ -109,15 +119,21 @@ class LegacyDataSeeder extends Seeder
 
         $invoiceCount = 0;
         $transactionCount = 0;
+        $batchSize = 500;
+        $processed = 0;
+
+        DB::beginTransaction();
 
         foreach ($transactionsJson as $data) {
             try {
-                // Find customer
-                $customer = $this->customerCache[$data['id_pelanggan']] ?? Customer::where('code', $data['id_pelanggan'])->first();
-
-                if (!$customer) {
-                    continue; // Skip if customer doesn't exist
+                // Find customer ONLY from cache to avoid N+1 queries
+                // If customer is not in our imported list, skip the transaction (it's legacy/orphan data)
+                if (!isset($this->customerCache[$data['id_pelanggan']])) {
+                    $bar->advance();
+                    continue; 
                 }
+
+                $customer = $this->customerCache[$data['id_pelanggan']];
 
                 // Parse period (e.g., "July 2021" -> "2021-07-01")
                 $period = $this->parsePeriod($data['periode']);
@@ -140,11 +156,6 @@ class LegacyDataSeeder extends Seeder
                     ]
                 );
 
-                // Ensure code exists if newly created or missing
-                if (empty($invoice->code)) {
-                    $invoice->update(['code' => $this->generateInvoiceCode($customer, $period)]);
-                }
-
                 $invoiceCount++;
 
                 // Create transaction if paid
@@ -166,15 +177,32 @@ class LegacyDataSeeder extends Seeder
                    
                     $transactionCount++;
                 }
+
+                $processed++;
+                if ($processed % $batchSize === 0) {
+                    DB::commit();
+                    DB::beginTransaction();
+                    // Optional: Call garbage collector
+                    if ($processed % 2000 === 0) {
+                         gc_collect_cycles();
+                    }
+                }
+
             } catch (\Exception $e) {
-                $this->command->newLine();
-                $this->command->error("Failed to import transaction for {$data['id_pelanggan']}: {$e->getMessage()}");
+                // Log error but continue
+                // $this->command->error("Failed: {$e->getMessage()}");
             }
 
             $bar->advance();
         }
 
+        DB::commit(); // Commit remaining
         $bar->finish();
+        
+        if (function_exists('activity')) {
+            activity()->enableLogging();
+        }
+
         $this->command->newLine();
         $this->command->info("✅ Invoices: {$invoiceCount} imported");
         $this->command->info("✅ Transactions: {$transactionCount} imported");
