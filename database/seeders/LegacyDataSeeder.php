@@ -132,6 +132,7 @@ class LegacyDataSeeder extends Seeder
                         'period' => $period,
                     ],
                     [
+                        'code' => $this->generateInvoiceCode($customer, $period),
                         'amount' => $data['nominal_harus_dibayar'],
                         'status' => $invoiceStatus,
                         'due_date' => Carbon::parse($period)->addDays(28), // Default to 28 days
@@ -156,6 +157,7 @@ class LegacyDataSeeder extends Seeder
                         'amount' => $data['nominal_pembayaran'],
                         'paid_at' => $this->parsePaymentDate($data['waktu_entry']),
                     ], [
+                        'reference' => 'TRX-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(10)),
                         'method' => $this->mapPaymentMethod($data['metode']),
                         'status' => 'paid',
                         'admin_id' => $adminId,
@@ -199,6 +201,7 @@ class LegacyDataSeeder extends Seeder
                 'price' => $price,
             ],
             [
+                'code' => \Illuminate\Support\Str::slug($packageName . '-' . $price),
                 'mikrotik_profile' => $packageName, 
                 'rate_limit' => null, 
             ]
