@@ -80,7 +80,7 @@ export default function Index({ grouped_settings }: Props) {
                                     <Input
                                         value={data.company_name}
                                         onChange={e => setData('company_name', e.target.value)}
-                                        placeholder="e.g. Skynet Network"
+                                        placeholder="e.g. PT. SKYNET LINTAS NUSANTARA"
                                     />
                                 </div>
                                 <div className="space-y-2">

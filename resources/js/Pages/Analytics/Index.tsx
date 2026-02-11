@@ -165,14 +165,18 @@ export default function Index() {
                                 <CardContent>
                                     <ResponsiveContainer width="100%" height={350}>
                                         <LineChart data={revenueTrendData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="month" />
-                                            <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
-                                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                                            <Legend />
-                                            <Line type="monotone" dataKey="total_invoiced" stroke="#8884d8" name="Invoiced" strokeWidth={2} />
-                                            <Line type="monotone" dataKey="total_collected" stroke="#82ca9d" name="Collected" strokeWidth={2} />
-                                            <Line type="monotone" dataKey="outstanding" stroke="#ffc658" name="Outstanding" strokeWidth={2} />
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                                            <XAxis dataKey="month" stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
+                                                itemStyle={{ color: 'var(--color-foreground)' }}
+                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                            />
+                                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                            <Line type="monotone" dataKey="total_invoiced" stroke="var(--color-chart-1)" name="Invoiced" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                                            <Line type="monotone" dataKey="total_collected" stroke="var(--color-chart-2)" name="Collected" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                                            <Line type="monotone" dataKey="outstanding" stroke="var(--color-chart-3)" name="Outstanding" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -187,12 +191,16 @@ export default function Index() {
                                 <CardContent>
                                     <ResponsiveContainer width="100%" height={300}>
                                         <BarChart data={outstandingAgingData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="age_bucket" />
-                                            <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
-                                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                                            <Legend />
-                                            <Bar dataKey="total_amount" fill="#ff8042" name="Amount" />
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                                            <XAxis dataKey="age_bucket" stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <Tooltip
+                                                cursor={{ fill: 'var(--color-muted)', opacity: 0.1 }}
+                                                contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
+                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                            />
+                                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                            <Bar dataKey="total_amount" fill="var(--color-chart-5)" radius={[4, 4, 0, 0]} name="Amount" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -207,14 +215,18 @@ export default function Index() {
                                 </CardHeader>
                                 <CardContent>
                                     <ResponsiveContainer width="100%" height={400}>
-                                        <BarChart data={areaData} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis type="number" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
-                                            <YAxis dataKey="area_name" type="category" width={150} />
-                                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                                            <Legend />
-                                            <Bar dataKey="total_collected" fill="#82ca9d" name="Collected" />
-                                            <Bar dataKey="total_billed" fill="#8884d8" name="Billed" />
+                                        <BarChart data={areaData} layout="vertical" margin={{ left: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+                                            <XAxis type="number" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <YAxis dataKey="area_name" type="category" width={150} stroke="var(--color-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <Tooltip
+                                                cursor={{ fill: 'var(--color-muted)', opacity: 0.1 }}
+                                                contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
+                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                            />
+                                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                            <Bar dataKey="total_collected" fill="var(--color-chart-2)" stackId="a" radius={[0, 4, 4, 0]} name="Collected" />
+                                            <Bar dataKey="total_billed" fill="var(--color-chart-1)" stackId="a" radius={[0, 4, 4, 0]} name="Billed (Total)" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -229,13 +241,17 @@ export default function Index() {
                                 </CardHeader>
                                 <CardContent>
                                     <ResponsiveContainer width="100%" height={400}>
-                                        <BarChart data={packageData} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis type="number" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
-                                            <YAxis dataKey="package_name" type="category" width={200} />
-                                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                                            <Legend />
-                                            <Bar dataKey="total_revenue" fill="#8884d8" name="Revenue (3mo)" />
+                                        <BarChart data={packageData} layout="vertical" margin={{ left: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+                                            <XAxis type="number" tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} stroke="var(--color-muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <YAxis dataKey="package_name" type="category" width={200} stroke="var(--color-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                                            <Tooltip
+                                                cursor={{ fill: 'var(--color-muted)', opacity: 0.1 }}
+                                                contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
+                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                            />
+                                            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                            <Bar dataKey="total_revenue" fill="var(--color-chart-4)" radius={[0, 4, 4, 0]} name="Revenue (3mo)" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -255,17 +271,19 @@ export default function Index() {
                                                 data={paymentMethodData}
                                                 cx="50%"
                                                 cy="50%"
-                                                labelLine={false}
-                                                label={(entry: any) => `${entry.method}: ${entry.transaction_count}`}
+                                                innerRadius={60}
                                                 outerRadius={100}
-                                                fill="#8884d8"
+                                                paddingAngle={5}
                                                 dataKey="transaction_count"
                                             >
                                                 {paymentMethodData.map((entry: any, index: number) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    <Cell key={`cell-${index}`} fill={`var(--color-chart-${(index % 5) + 1})`} stroke="var(--color-card)" strokeWidth={2} />
                                                 ))}
                                             </Pie>
-                                            <Tooltip formatter={(value) => `${value} transactions`} />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
+                                                formatter={(value: any) => `${value} transactions`}
+                                            />
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </CardContent>

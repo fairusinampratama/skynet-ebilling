@@ -49,48 +49,50 @@
 
 .dark {
   /* DARK MODE OVERRIDES - Midnight Soft */
-  --bg: oklch(15% 0.02 240);
-  /* Deep Zinc (was 5%) - Softer background */
+  --bg: oklch(10% 0.02 240);
+  /* Darker background for contrast */
   --fg: oklch(98% 0 0);
 
-  --card: oklch(20% 0.03 240);
-  /* Elevated Grey (was 10%) - Discernible cards */
+  --card: oklch(18% 0.03 240);
+  /* Slightly lighter than bg */
   --card-fg: oklch(98% 0 0);
 
-  --popover: oklch(20% 0.03 240);
-  /* Matching Card */
+  --popover: oklch(18% 0.03 240);
   --popover-fg: oklch(98% 0 0);
 
-  /* Primary: Electric Blue (Consistent) */
+  /* Primary: Electric Blue */
   --primary: oklch(55% 0.22 260);
   --primary-fg: oklch(100% 0 0);
 
-  --secondary: oklch(25% 0.02 240);
-  /* Lighter secondary */
+  /* Secondary: Significantly lighter for badges */
+  --secondary: oklch(30% 0.04 240);
   --secondary-fg: oklch(98% 0 0);
 
-  --muted: oklch(25% 0.02 240);
-  /* Lighter muted */
-  --muted-fg: oklch(70% 0.01 240);
+  --muted: oklch(25% 0.03 240);
+  --muted-fg: oklch(75% 0.02 240);
+  /* Brighter muted text */
 
-  --accent: oklch(25% 0.02 240);
-  /* Lighter accent */
+  --accent: oklch(25% 0.03 240);
   --accent-fg: oklch(98% 0 0);
 
   --destructive: oklch(30.6% 0.132 29);
   --destructive-fg: oklch(98% 0 0);
 
-  --border: oklch(25% 0.02 240);
-  /* Lighter border (was 15%) */
-  --input: oklch(25% 0.02 240);
+  --border: oklch(25% 0.03 240);
+  --input: oklch(25% 0.03 240);
   --ring: oklch(55% 0.22 260 / 0.5);
 
-  /* Charts - Dark */
-  --chart-1: oklch(50% 0.137 263);
-  --chart-2: oklch(45% 0.096 171);
-  --chart-3: oklch(55% 0.144 56);
-  --chart-4: oklch(60% 0.126 293);
-  --chart-5: oklch(55% 0.141 12);
+  /* Charts - Vibrant Dark */
+  --chart-1: oklch(60% 0.18 260);
+  /* Blue */
+  --chart-2: oklch(65% 0.20 150);
+  /* Green */
+  --chart-3: oklch(70% 0.18 30);
+  /* Orange */
+  --chart-4: oklch(65% 0.18 290);
+  /* Purple */
+  --chart-5: oklch(70% 0.15 80);
+  /* Yellow */
 }
 
 /* 
@@ -147,5 +149,16 @@
   ::backdrop,
   ::file-selector-button {
     border-color: var(--color-border, currentColor);
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
   }
 }
