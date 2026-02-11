@@ -1,6 +1,14 @@
 import { Link, usePage } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/Components/ui/dropdown-menu';
 
 export function AppSidebar() {
     const { url } = usePage(); // Use usePage hook to get current URL
@@ -52,16 +60,30 @@ export function AppSidebar() {
             </div>
             {/* User Footer Section */}
             <div className="border-t border-border p-4 bg-card">
-                <div className="flex items-center gap-3 rounded-lg border border-border p-3 bg-muted/20">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                        {/* We need user from page props */}
-                        U
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                        <p className="truncate text-sm font-medium">Admin</p>
-                        <p className="truncate text-xs text-muted-foreground">admin@skynet.id</p>
-                    </div>
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className="flex w-full items-center gap-3 rounded-lg border border-border p-3 bg-muted/20 hover:bg-muted/40 transition-colors text-left outline-none">
+                            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                U
+                            </div>
+                            <div className="flex-1 overflow-hidden">
+                                <p className="truncate text-sm font-medium">Admin</p>
+                                <p className="truncate text-xs text-muted-foreground">admin@skynet.id</p>
+                            </div>
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent side="top" align="start" className="w-56 mb-2">
+                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href={route('logout')} method="post" as="button" className="w-full cursor-pointer flex items-center gap-2 text-destructive focus:text-destructive">
+                                <LogOut className="h-4 w-4" />
+                                <span>Log Out</span>
+                            </Link>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </aside>
     );

@@ -124,7 +124,7 @@ export default function Index({ areas, filters }: Props) {
                                     areas.data.map((area) => (
                                         <TableRow key={area.id}>
                                             <TableCell className="font-medium">{area.name}</TableCell>
-                                            <TableCell className="font-mono text-xs">{area.code}</TableCell>
+                                            <TableCell className="font-mono text-sm">{area.code}</TableCell>
                                             <TableCell>
                                                 <Badge variant="secondary">
                                                     {area.customers_count || 0} Customers
