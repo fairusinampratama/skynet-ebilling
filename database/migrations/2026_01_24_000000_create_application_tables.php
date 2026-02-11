@@ -65,12 +65,15 @@ return new class extends Migration
         if (!Schema::hasTable('invoices')) {
             Schema::create('invoices', function (Blueprint $table) {
                 $table->id();
+                $table->uuid('uuid')->nullable()->unique(); // Added
                 $table->string('code')->unique();
                 $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
                 $table->date('period');
                 $table->decimal('amount', 10, 2);
-                $table->enum('status', ['unpaid', 'paid', 'overdue'])->default('unpaid');
+                $table->enum('status', ['unpaid', 'paid', 'overdue', 'void'])->default('unpaid'); // Added 'void'
                 $table->date('due_date');
+                $table->timestamp('generated_at')->nullable(); // Added
+                $table->string('payment_link')->nullable(); // Added
                 $table->timestamps();
                 
                 $table->unique(['customer_id', 'period']);
@@ -85,9 +88,9 @@ return new class extends Migration
                 $table->foreignId('invoice_id')->constrained('invoices')->cascadeOnDelete();
                 $table->foreignId('admin_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->decimal('amount', 10, 2);
-                $table->enum('channel', ['whatsapp', 'manual'])->default('manual');
+                $table->enum('channel', ['whatsapp', 'manual', 'tripay'])->default('manual'); 
                 $table->enum('method', ['cash', 'transfer', 'qris', 'other'])->nullable();
-                $table->enum('status', ['pending', 'verified', 'rejected'])->default('verified');
+                $table->enum('status', ['pending', 'verified', 'rejected', 'paid', 'failed'])->default('verified');
                 $table->string('proof_url')->nullable();
                 $table->timestamp('paid_at')->nullable();
                 $table->text('notes')->nullable();
@@ -102,6 +105,8 @@ return new class extends Migration
                 $table->string('key')->unique();
                 $table->text('value')->nullable();
                 $table->string('type')->default('string');
+                $table->string('group')->default('general'); // Added
+                $table->string('label')->nullable(); // Added
                 $table->text('description')->nullable();
                 $table->timestamps();
             });
@@ -112,9 +117,11 @@ return new class extends Migration
             Schema::create('invoice_broadcasts', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('invoice_id')->constrained('invoices')->cascadeOnDelete();
+                $table->string('type')->default('invoice_created'); // Added
                 $table->enum('channel', ['whatsapp', 'email', 'sms'])->default('whatsapp');
                 $table->enum('status', ['pending', 'sent', 'failed'])->default('pending');
                 $table->text('message')->nullable();
+                $table->string('message_id')->nullable(); // Added
                 $table->text('error_message')->nullable();
                 $table->timestamp('sent_at')->nullable();
                 $table->timestamps();
@@ -130,6 +137,8 @@ return new class extends Migration
                 $table->string('log_name')->nullable();
                 $table->text('description');
                 $table->nullableMorphs('subject', 'subject');
+                $table->string('event')->nullable(); // Added
+                $table->uuid('batch_uuid')->nullable(); // Added
                 $table->nullableMorphs('causer', 'causer');
                 $table->json('properties')->nullable();
                 $table->timestamps();
