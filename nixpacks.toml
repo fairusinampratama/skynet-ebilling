@@ -2,7 +2,7 @@
 # Based on successful setup from skynet-customer-health
 
 [variables]
-PORT = "8000"
+PORT = "3000"
 
 [phases.setup]
 nixPkgs = [
