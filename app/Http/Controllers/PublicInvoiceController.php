@@ -15,7 +15,7 @@ class PublicInvoiceController extends Controller
         return Inertia::render('Public/Payment/Show', [
             'invoice' => $invoice,
             'company' => [
-                'name' => Setting::get('company_name', 'Skynet Network'),
+                'name' => Setting::get('company_name', 'PT. SKYNET LINTAS NUSANTARA'),
                 'address' => Setting::get('company_address', ''),
             ],
             'manual_accounts' => Setting::get('payment_channels', []),

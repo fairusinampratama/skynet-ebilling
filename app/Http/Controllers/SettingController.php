@@ -20,7 +20,7 @@ class SettingController extends Controller
             'settings' => $settings,
             'grouped_settings' => [
                 'billing' => [
-                    'company_name' => Setting::get('company_name', 'Skynet Network'),
+                    'company_name' => Setting::get('company_name', 'PT. SKYNET LINTAS NUSANTARA'),
                     'company_address' => Setting::get('company_address', ''),
                 ]
             ]

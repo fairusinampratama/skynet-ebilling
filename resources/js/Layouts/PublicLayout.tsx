@@ -14,7 +14,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                             <ApplicationLogo className="block h-9 w-auto fill-current text-foreground group-hover:text-primary transition-colors" />
                             <div className="flex flex-col">
                                 <span className="text-base font-bold text-foreground leading-none">
-                                    Skynet Network
+                                    PT. SKYNET LINTAS NUSANTARA
                                 </span>
                                 <span className="text-xs text-muted-foreground">
                                     Secure Payment Portal

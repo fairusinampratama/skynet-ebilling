@@ -12,19 +12,19 @@ class SettingSeeder extends Seeder
      */
     public function run(): void
     {
-        Setting::set('company_name', 'Skynet Network', 'text', 'billing');
+        Setting::set('company_name', 'PT. SKYNET LINTAS NUSANTARA', 'text', 'billing');
         Setting::set('company_address', 'Jl. Raya Randuagung No. 123', 'text', 'billing');
         
         Setting::set('payment_channels', [
             [
                 'bank' => 'BCA',
                 'account_number' => '1234567890',
-                'account_name' => 'PT Skynet Network'
+                'account_name' => 'PT. SKYNET LINTAS NUSANTARA'
             ],
             [
                 'bank' => 'Mandiri',
                 'account_number' => '0987654321',
-                'account_name' => 'PT Skynet Network'
+                'account_name' => 'PT. SKYNET LINTAS NUSANTARA'
             ]
         ], 'json', 'billing');
 
