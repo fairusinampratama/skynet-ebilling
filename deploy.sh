@@ -33,5 +33,5 @@ while true; do
 done &
 
 # 6. Start PHP built-in server (Coolify expects this)
-echo "🌐 Starting web server on port 8000..."
-php artisan serve --host=0.0.0.0 --port=8000
+echo "🌐 Starting web server on port 3000..."
+php artisan serve --host=0.0.0.0 --port=3000
