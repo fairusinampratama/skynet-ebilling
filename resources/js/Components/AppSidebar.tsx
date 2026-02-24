@@ -28,7 +28,7 @@ export function AppSidebar() {
             <div className="flex h-16 items-center border-b border-border px-6 bg-card">
                 <Link href="/" className="flex items-center gap-2 font-semibold">
                     <ApplicationLogo className="h-6 w-6 fill-current text-primary" />
-                    <span className="text-lg tracking-tight">Skynet Admin</span>
+                    <span className="text-lg tracking-tight">Pelanginet Admin</span>
                 </Link>
             </div>
             <div className="flex-1 overflow-auto py-4 bg-card">
@@ -68,7 +68,7 @@ export function AppSidebar() {
                             </div>
                             <div className="flex-1 overflow-hidden">
                                 <p className="truncate text-sm font-medium">Admin</p>
-                                <p className="truncate text-xs text-muted-foreground">admin@skynet.id</p>
+                                <p className="truncate text-xs text-muted-foreground">admin@pelanginet.id</p>
                             </div>
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                         </button>

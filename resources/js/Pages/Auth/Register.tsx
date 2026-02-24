@@ -45,7 +45,7 @@ export default function Register() {
                             Create Account
                         </CardTitle>
                         <CardDescription className="text-center">
-                            Register for Skynet E-Billing
+                            Register for Pelanginet E-Billing
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

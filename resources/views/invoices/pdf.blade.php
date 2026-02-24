@@ -222,7 +222,7 @@
                     $logoData = base64_encode(file_get_contents($logoPath));
                     $logoSrc = 'data:image/png;base64,' . $logoData;
                 @endphp
-                <img src="{{ $logoSrc }}" alt="Skynet Logo" class="logo">
+                <img src="{{ $logoSrc }}" alt="Pelanginet Logo" class="logo">
             </div>
             <div class="header-right">
                 <div class="invoice-meta">

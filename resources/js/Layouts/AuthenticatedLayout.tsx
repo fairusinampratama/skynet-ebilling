@@ -70,7 +70,7 @@ export default function Authenticated({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 font-semibold">
                                 <ApplicationLogo className="h-6 w-6 fill-current text-primary" />
-                                <span className="text-lg">Skynet</span>
+                                <span className="text-lg">Pelanginet</span>
                             </div>
                             <Button
                                 variant="ghost"

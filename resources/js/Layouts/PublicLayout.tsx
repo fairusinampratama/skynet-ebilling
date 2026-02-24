@@ -14,7 +14,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                             <ApplicationLogo className="block h-9 w-auto fill-current text-foreground group-hover:text-primary transition-colors" />
                             <div className="flex flex-col">
                                 <span className="text-base font-bold text-foreground leading-none">
-                                    PT. SKYNET LINTAS NUSANTARA
+                                    PT. PELANGINET LINTAS NUSANTARA
                                 </span>
                                 <span className="text-xs text-muted-foreground">
                                     Secure Payment Portal
@@ -42,7 +42,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
             <footer className="border-t border-border bg-card/30 mt-auto">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-                        <p>© {new Date().getFullYear()} PT. Skynet Lintas Nusantara. All rights reserved.</p>
+                        <p>© {new Date().getFullYear()} PT. Pelanginet Lintas Nusantara. All rights reserved.</p>
                         <div className="flex items-center gap-4">
                             <span className="flex items-center gap-1">
                                 <Shield className="w-3 h-3" />

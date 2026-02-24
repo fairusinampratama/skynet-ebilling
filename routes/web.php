@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes - Skynet E-Billing
+| Web Routes - Pelanginet E-Billing
 |--------------------------------------------------------------------------
 |
 | Routes organized by feature:

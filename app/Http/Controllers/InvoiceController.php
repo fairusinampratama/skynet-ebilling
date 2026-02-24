@@ -180,7 +180,7 @@ class InvoiceController extends Controller
         $invoice->load(['customer.package', 'transactions']);
         
         $company = [
-            'name' => Setting::get('company_name', 'PT. SKYNET LINTAS NUSANTARA'),
+            'name' => Setting::get('company_name', 'PT. PELANGINET LINTAS NUSANTARA'),
             'address' => Setting::get('company_address', 'Randuagung Gg VIII RT3, RW7, No.01 Singosari - Malang 65153'),
             'email' => 'cs@sky.net.id',
             'phone' => '081252095394',
