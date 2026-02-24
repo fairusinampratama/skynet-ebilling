@@ -1,6 +1,9 @@
 # Nixpacks Configuration for Skynet E-Billing
 # Based on successful setup from skynet-customer-health
 
+[variables]
+PORT = "8000"
+
 [phases.setup]
 nixPkgs = [
     "php83",
