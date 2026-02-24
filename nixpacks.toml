@@ -1,5 +1,5 @@
-# Nixpacks Configuration for Skynet E-Billing
-# Based on successful setup from skynet-customer-health
+# Nixpacks Configuration for Pelanginet E-Billing
+# Based on successful setup from pelanginet-customer-health
 
 [variables]
 PORT = "8000"

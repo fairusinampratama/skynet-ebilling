@@ -47,7 +47,7 @@ export default function Login({
 
                     <div className="relative z-10 flex items-center gap-2 text-lg font-bold text-foreground">
                         <Command className="h-6 w-6" />
-                        <span>Skynet E-Billing</span>
+                        <span>Pelanginet E-Billing</span>
                     </div>
 
                     <div className="relative z-10">

@@ -1,11 +1,11 @@
 #!/bin/sh
 
-# Skynet E-Billing - Coolify Deployment Script
+# Pelanginet E-Billing - Coolify Deployment Script
 # This script runs on container startup
 
 set -e
 
-echo "🚀 Starting Skynet E-Billing deployment..."
+echo "🚀 Starting Pelanginet E-Billing deployment..."
 
 # 1. Run migrations
 echo "📦 Running database migrations..."
