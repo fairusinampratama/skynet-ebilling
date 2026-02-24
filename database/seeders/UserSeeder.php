@@ -15,7 +15,7 @@ class UserSeeder extends Seeder
     {
         // Create Admin User if not exists
         User::firstOrCreate(
-            ['email' => 'admin@skynet.id'],
+            ['email' => 'admin@pelanginet.id'],
             [
                 'name' => 'Admin Skynet',
                 'password' => Hash::make('skynet123'),
@@ -25,7 +25,7 @@ class UserSeeder extends Seeder
 
         // Aisyah
         User::firstOrCreate(
-            ['email' => 'aisyah@skynet.id'],
+            ['email' => 'aisyah@pelanginet.id'],
             [
                 'name' => 'Aisyah',
                 'password' => Hash::make('skynet123'),
@@ -35,7 +35,7 @@ class UserSeeder extends Seeder
 
         // Hawwin
         User::firstOrCreate(
-            ['email' => 'hawwin@skynet.id'],
+            ['email' => 'hawwin@pelanginet.id'],
             [
                 'name' => 'Hawwin',
                 'password' => Hash::make('skynet123'),
@@ -45,7 +45,7 @@ class UserSeeder extends Seeder
 
         // NOC
         User::firstOrCreate(
-            ['email' => 'noc@skynet.id'],
+            ['email' => 'noc@pelanginet.id'],
             [
                 'name' => 'NOC Skynet',
                 'password' => Hash::make('skynet123'),
