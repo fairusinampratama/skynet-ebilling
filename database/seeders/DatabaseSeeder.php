@@ -19,8 +19,7 @@ class DatabaseSeeder extends Seeder
         // Seed in proper order
         $this->call([
             UserSeeder::class,      // Create Admin
-            AreaSeeder::class,      // Run first to populate areas
-            LegacyDataSeeder::class,  // Import Customers & Invoices
+            CustomerSeeder::class,  // Import Customers from the newly parsed JSON
         ]);
     }
 }

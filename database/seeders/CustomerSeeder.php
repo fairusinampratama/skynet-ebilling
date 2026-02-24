@@ -39,16 +39,17 @@ class CustomerSeeder extends Seeder
         // Fallback package if mismatch
         $defaultPackage = Package::firstOrCreate(
             ['name' => 'Paket Unknown'],
-            ['price' => 100000, 'bandwidth_label' => 'Unknown']
+            ['code' => 'paket-unknown', 'price' => 100000, 'speed_mbps' => 0]
         );
 
         $count = 0;
         foreach ($customers as $data) {
-            $pppoeUser = $data['pppoe_username'] ?? null;
-            
-            // Skip invalid data
+            $pppoeUser = !empty($data['pppoe_username']) ? trim($data['pppoe_username']) : null;
+            $code = !empty($data['code']) ? $data['code'] : 'CUST-' . strtoupper(substr(md5(uniqid()), 0, 6));
+
             if (!$pppoeUser) {
-                continue;
+                // Generate a fallback pppoe_user based on their code or name to satisfy uniqueness
+                $pppoeUser = $code . '_PPPOE';
             }
 
             // Find or Create Package
@@ -58,8 +59,10 @@ class CustomerSeeder extends Seeder
                 $createdPackage = Package::firstOrCreate(
                     ['name' => $packageName],
                     [
+                        'code' => \Illuminate\Support\Str::slug($packageName . '-' . ($data['price'] ?? 0)),
                         'price' => $data['price'] ?? 0,
-                        'bandwidth_label' => $data['bandwidth'] ?? 'Unknown',
+                        'speed_mbps' => (int) filter_var($data['bandwidth'] ?? '0', FILTER_SANITIZE_NUMBER_INT),
+                        'mikrotik_profile' => $packageName,
                     ]
                 );
                 $packages->put($packageName, $createdPackage);
@@ -69,7 +72,7 @@ class CustomerSeeder extends Seeder
 
             // Map Status
             $status = strtolower($data['status'] ?? 'active');
-            if (!in_array($status, ['active', 'suspended', 'isolated', 'offboarding'])) {
+            if (!in_array($status, ['active', 'suspended', 'inactive', 'isolated', 'terminated', 'pending_installation'])) {
                 $status = 'active';
             }
 
@@ -82,9 +85,7 @@ class CustomerSeeder extends Seeder
                 $joinDate = now();
             }
 
-            // Check if code already exists
-            $code = $data['code'] ?? null;
-            if ($code && Customer::where('code', $code)->where('pppoe_user', '!=', $pppoeUser)->exists()) {
+            if (Customer::where('code', $code)->where('pppoe_user', '!=', $pppoeUser)->exists()) {
                 // Code exists for different customer, make it unique
                 $code = $code . '-' . substr(md5($pppoeUser), 0, 4);
             }
@@ -93,7 +94,6 @@ class CustomerSeeder extends Seeder
                 ['pppoe_user' => $pppoeUser], // Unique Key
                 [
                     'code' => $code,
-                    'internal_id' => $data['internal_id'] ?? null,
                     'name' => $data['name'] ?? 'Unknown',
                     'address' => $data['address'] ?? '-',
                     'phone' => $data['phone'] ?? null,
@@ -104,7 +104,7 @@ class CustomerSeeder extends Seeder
                     'geo_lat' => (is_numeric($data['latitude']) && abs($data['latitude']) <= 90) ? $data['latitude'] : null,
                     'geo_long' => (is_numeric($data['longitude']) && abs($data['longitude']) <= 180) ? $data['longitude'] : null,
                     // Default password for imports if not specified
-                    'pppoe_pass' => $data['pppoe_password'] ?? '123456', 
+                    'pppoe_password' => $data['pppoe_password'] ?? '123456', 
                 ]
             );
 
