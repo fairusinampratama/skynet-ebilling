@@ -65,6 +65,19 @@ class LegacyDataSeeder extends Seeder
                 // Parse join_date
                 $joinDate = $this->parseJoinDate($data['tanggal_registrasi'] ?? null);
 
+                $pppoeUser = !empty($data['pppoe_username']) ? $data['pppoe_username'] : ($customerId . '_PPPOE');
+                
+                // Ensure PPPOE uniqueness if it exists for a DIFFERENT customer code
+                // Using DB facade to avoid loading full model and save memory
+                $existingPppoe = \Illuminate\Support\Facades\DB::table('customers')
+                    ->where('pppoe_user', $pppoeUser)
+                    ->where('code', '!=', $customerId)
+                    ->exists();
+                    
+                if ($existingPppoe) {
+                    $pppoeUser = $pppoeUser . '_' . \Illuminate\Support\Str::random(3);
+                }
+
                 // Create or update customer
                 $customer = Customer::updateOrCreate(
                     ['code' => $customerId],
@@ -73,7 +86,7 @@ class LegacyDataSeeder extends Seeder
                         'address' => $data['alamat'] ?? null,
                         'phone' => $data['telepon'] ?? null,
                         'nik' => $data['nik'] ?? null,
-                        'pppoe_user' => !empty($data['pppoe_username']) ? $data['pppoe_username'] : ($customerId . '_PPPOE'),
+                        'pppoe_user' => $pppoeUser,
                         'package_id' => $package->id,
                         'area_id' => $areaId,
                         'status' => $status,
@@ -222,14 +235,16 @@ class LegacyDataSeeder extends Seeder
             return $this->packageCache[$cacheKey];
         }
 
+        $code = \Illuminate\Support\Str::slug($packageName . '-' . $price);
+
         // Find or create package
         $package = Package::firstOrCreate(
             [
-                'name' => $packageName,
-                'price' => $price,
+                'code' => $code,
             ],
             [
-                'code' => \Illuminate\Support\Str::slug($packageName . '-' . $price),
+                'name' => $packageName,
+                'price' => $price,
                 'mikrotik_profile' => $packageName, 
                 'rate_limit' => null, 
             ]
