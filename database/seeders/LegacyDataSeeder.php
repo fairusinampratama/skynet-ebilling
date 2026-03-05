@@ -24,7 +24,7 @@ class LegacyDataSeeder extends Seeder
 
         // $this->importRouters(); // Removed
         $this->importCustomers();
-        // $this->importTransactions(); // Disabled for Randuagung branch
+        $this->importTransactions();
 
         $this->command->info('✅ Migration completed successfully!');
     }
