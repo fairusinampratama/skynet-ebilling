@@ -71,6 +71,7 @@ interface DataTableProps<T> {
     loading?: boolean;
     onRowClick?: (item: T) => void;
     routeName: string; // Base route name for router.get() e.g. "customers.index"
+    routeParams?: any; // Parameters required for the route e.g. { id: 1 }
 }
 
 export default function DataTable<T extends { id: number | string }>({
@@ -83,7 +84,8 @@ export default function DataTable<T extends { id: number | string }>({
     filterConfigs = [],
     actions,
     onRowClick,
-    routeName
+    routeName,
+    routeParams
 }: DataTableProps<T>) {
     const safeFilters = Array.isArray(filters) ? {} : (filters || {});
 
@@ -126,7 +128,7 @@ export default function DataTable<T extends { id: number | string }>({
 
         setIsLoading(true);
         router.get(
-            route(routeName),
+            route(routeName, routeParams),
             params,
             {
                 preserveState: true,
@@ -135,7 +137,7 @@ export default function DataTable<T extends { id: number | string }>({
                 onFinish: () => setIsLoading(false)
             }
         );
-    }, [debouncedSearch, activeFilters, sortField, sortDirection, limit, routeName]);
+    }, [debouncedSearch, activeFilters, sortField, sortDirection, limit, routeName, routeParams]);
 
     // Handlers
     const handleSort = (field: string) => {
