@@ -21,17 +21,6 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# 4. Start queue worker in background
-echo "📮 Starting queue worker..."
-php artisan queue:work --queue=network-enforcement --tries=3 --timeout=90 --sleep=3 &
-
-# 5. Start scheduler (cron simulation)
-echo "⏰ Starting scheduler..."
-while true; do
-    php artisan schedule:run >> /dev/null 2>&1
-    sleep 60
-done &
-
-# 6. Start PHP built-in server (Coolify expects this)
-echo "🌐 Starting web server on port 8000..."
-php artisan serve --host=0.0.0.0 --port=8000
+# Start Supervisor which will run PHP-FPM, Nginx, Queue Worker, and Scheduler
+echo "🚀 Starting Supervisor to manage all processes..."
+exec supervisord -c /etc/supervisord.conf
