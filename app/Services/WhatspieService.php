@@ -34,14 +34,24 @@ class WhatspieService
         // Format phone number: convert 08xxx to 628xxx
         $formattedPhone = $this->formatPhoneNumber($phone);
         
-        // Ensure Device ID is clean (some users might copy paste with spaces)
-        // Adjust this based on Whatspie requirements. If they require exactly what is shown (with spaces), then keep it.
-        // But usually APIs prefer clean strings. The error "Device not found" suggests a mismatch.
-        // Let's try sending it exactly as provided first, but maybe the surrounding quotes were the issue?
-        // Actually, the previous error log showed the request was made.
-        
-        // Let's try to pass the device ID exactly as is, but trimming whitespace.
+        // Ensure Device ID is clean
         $deviceId = trim($this->deviceId);
+
+        // LOCAL TESTING SAFEGUARD
+        if (app()->environment('local')) {
+            $testNumber = config('services.whatspie.test_number', env('WHATSPIE_TEST_NUMBER'));
+            
+            // If test number is defined and this phone matches it, allow it.
+            // Otherwise, just simulate a success response to avoid spamming real users locally.
+            if (empty($testNumber) || $this->formatPhoneNumber($testNumber) !== $formattedPhone) {
+                Log::info("[LOCAL SAFEGUARD] Simulated WhatsApp to {$formattedPhone}: {$message}");
+                return [
+                    'status' => 'success',
+                    'message' => 'Simulated message in local environment',
+                    'simulated' => true
+                ];
+            }
+        }
 
         try {
             $response = Http::withHeaders([
@@ -69,20 +79,26 @@ class WhatspieService
     }
 
     /**
-     * Convert local phone format to international format (62...)
+     * Normalize phone number to international Indonesian format (62...).
+     * Handles: +62xxx, 62xxx, 08xxx, 8xxx, spaces, dashes, dots.
      */
     private function formatPhoneNumber(string $phone): string
     {
-        $phone = preg_replace('/[^0-9]/', '', $phone);
+        // Strip all non-numeric characters (spaces, dashes, dots, +)
+        $phone = preg_replace('/[^0-9]/', '', trim($phone));
 
-        if (str_starts_with($phone, '08')) {
-            return '62' . substr($phone, 1);
-        }
-        
-        if (str_starts_with($phone, '8')) {
-            return '62' . $phone;
+        // Remove leading zeros beyond one (e.g. 0008 -> keep processing)
+        // 08xxxxxxxxx -> 628xxxxxxxxx
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
         }
 
+        // 8xxxxxxxxx (without country code) -> 628xxxxxxxxx
+        elseif (str_starts_with($phone, '8')) {
+            $phone = '62' . $phone;
+        }
+
+        // Already correct: 62xxxxxxxxx — no change needed
         return $phone;
     }
 }

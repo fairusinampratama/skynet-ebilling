@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut, Send } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,6 +20,7 @@ export function AppSidebar() {
         { name: 'Invoices', route: 'invoices.index', icon: FileText },
         { name: 'Packages', route: 'packages.index', icon: Package },
         { name: 'Areas', route: 'areas.index', icon: MapPin },
+        { name: 'Broadcasts', route: 'broadcasts.index', icon: Send },
         { name: 'Settings', route: 'settings.index', icon: Settings },
     ];
 
@@ -35,7 +36,8 @@ export function AppSidebar() {
                 <nav className="grid items-start px-4 text-sm font-medium space-y-1">
                     {navItems.map((item) => {
                         // Check active state
-                        const isActive = route().current(item.route.replace('.index', '') + '*');
+                        const baseRoute = item.route.split('.')[0];
+                        const isActive = route().current(`${baseRoute}.*`) || route().current(item.route);
 
                         return (
                             <Link

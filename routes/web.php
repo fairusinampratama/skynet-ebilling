@@ -113,6 +113,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/analytics/customer-growth', [AnalyticsController::class, 'customerGrowth'])->name('api.analytics.customer-growth');
 
     // =====================================================
+    // Broadcast & Campaigns
+    // =====================================================
+    Route::get('/broadcasts', [\App\Http\Controllers\WaCampaignController::class, 'index'])->name('broadcasts.index');
+    Route::get('/broadcasts/create', [\App\Http\Controllers\WaCampaignController::class, 'create'])->name('broadcasts.create');
+    Route::post('/broadcasts', [\App\Http\Controllers\WaCampaignController::class, 'store'])->name('broadcasts.store');
+    Route::get('/broadcasts/{campaign}', [\App\Http\Controllers\WaCampaignController::class, 'show'])->name('broadcasts.show');
+    Route::post('/broadcasts/{campaign}/retry', [\App\Http\Controllers\WaCampaignController::class, 'retryFailed'])->name('broadcasts.retry');
+
+    // =====================================================
     // Settings System
     // =====================================================
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
