@@ -2,6 +2,10 @@
 # Based on successful setup from skynet-customer-health
 
 [phases.setup]
+aptPkgs = [
+    "nginx",
+    "supervisor"
+]
 nixPkgs = [
     "php83",
     "php83Packages.composer",
@@ -34,7 +38,10 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "npm run build"
+    "npm run build",
+    "mkdir -p /var/log/nginx /var/lib/nginx /tmp/nginx",
+    "cp docker/nginx.conf /etc/nginx/nginx.conf || cp docker/nginx.conf /etc/nginx/sites-available/default",
+    "cp docker/supervisord.conf /etc/supervisord.conf"
 ]
 
 [start]
