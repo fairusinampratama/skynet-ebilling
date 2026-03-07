@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('wa_campaigns', function (Blueprint $table) {
-            $table->string('target_type')->change();
-        });
+        if (\Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
+            \Illuminate\Support\Facades\DB::statement("ALTER TABLE wa_campaigns MODIFY target_type VARCHAR(255) NOT NULL DEFAULT 'all'");
+        } else {
+            Schema::table('wa_campaigns', function (Blueprint $table) {
+                $table->string('target_type')->change();
+            });
+        }
     }
 
     /**
@@ -21,10 +25,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('wa_campaigns', function (Blueprint $table) {
-            // Reversing an enum change in sqlite can be tricky, 
-            // string is safer to keep as down() rollback.
-            $table->string('target_type')->change();
-        });
+        if (\Illuminate\Support\Facades\DB::getDriverName() === 'mysql') {
+            \Illuminate\Support\Facades\DB::statement("ALTER TABLE wa_campaigns MODIFY target_type ENUM('all', 'isolated', 'area', 'custom') NOT NULL DEFAULT 'all'");
+        } else {
+            Schema::table('wa_campaigns', function (Blueprint $table) {
+                $table->string('target_type')->change();
+            });
+        }
     }
 };
