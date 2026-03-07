@@ -3,8 +3,7 @@
 
 [phases.setup]
 aptPkgs = [
-    "nginx",
-    "supervisor"
+    "nginx"
 ]
 nixPkgs = [
     "php83",
@@ -40,9 +39,8 @@ cmds = [
 cmds = [
     "npm run build",
     "mkdir -p /var/log/nginx /var/lib/nginx /tmp/nginx",
-    "cp docker/nginx.conf /etc/nginx/nginx.conf || cp docker/nginx.conf /etc/nginx/sites-available/default",
-    "cp docker/supervisord.conf /etc/supervisord.conf"
+    "cp docker/nginx.conf /etc/nginx/nginx.conf || cp docker/nginx.conf /etc/nginx/sites-available/default"
 ]
 
 [start]
-cmd = "sh deploy.sh"
+cmd = "sh deploy.sh && php-fpm -y /usr/local/etc/php-fpm.conf & nginx -g 'daemon off;'"
