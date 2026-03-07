@@ -67,7 +67,7 @@ export default function Index({ campaigns, filters }: Props) {
                     <span className="font-semibold text-foreground">{campaign.name}</span>
                     <span className="text-xs text-muted-foreground">
                         Target: <span className="capitalize">{campaign.target_type}</span>
-                        {campaign.target_type === 'area' && campaign.target_area && ` (${campaign.target_area.name})`}
+                        {campaign.target_area ? ` (${campaign.target_area.name})` : ' (All Areas)'}
                     </span>
                 </div>
             )

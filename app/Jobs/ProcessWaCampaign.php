@@ -25,14 +25,19 @@ class ProcessWaCampaign implements ShouldQueue
     {
         $this->campaign->update(['status' => 'processing']);
 
-        $customers = collect();
-        if ($this->campaign->target_type === 'all') {
-            $customers = Customer::whereNotNull('phone')->get();
+        $query = Customer::whereNotNull('phone');
+        
+        if ($this->campaign->target_type === 'active') {
+            $query->where('status', 'active');
         } elseif ($this->campaign->target_type === 'isolated') {
-            $customers = Customer::whereNotNull('phone')->where('status', 'isolated')->get();
-        } elseif ($this->campaign->target_type === 'area') {
-            $customers = Customer::whereNotNull('phone')->where('area_id', $this->campaign->target_area_id)->get();
+            $query->where('status', 'isolated');
         }
+
+        if ($this->campaign->target_area_id) {
+            $query->where('area_id', $this->campaign->target_area_id);
+        }
+
+        $customers = $query->get();
 
         $this->campaign->update(['total_recipients' => $customers->count()]);
 

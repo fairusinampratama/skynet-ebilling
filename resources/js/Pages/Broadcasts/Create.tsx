@@ -69,30 +69,28 @@ export default function Create({ areas }: Props) {
                                     value={data.target_type}
                                     onChange={e => setData('target_type', e.target.value)}
                                 >
-                                    <option value="all">All Active Customers</option>
-                                    <option value="isolated">Isolated Customers</option>
-                                    <option value="area">Specific Area</option>
+                                    <option value="all">All Customers</option>
+                                    <option value="active">Active Customers Only</option>
+                                    <option value="isolated">Isolated Customers Only</option>
                                 </select>
                                 {errors.target_type && <p className="text-sm text-destructive">{errors.target_type}</p>}
                             </div>
 
-                            {data.target_type === 'area' && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="target_area_id">Select Area</Label>
-                                    <select
-                                        id="target_area_id"
-                                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={data.target_area_id}
-                                        onChange={e => setData('target_area_id', e.target.value)}
-                                    >
-                                        <option value="">-- Choose Area --</option>
-                                        {areas.map(area => (
-                                            <option key={area.id} value={area.id}>{area.name}</option>
-                                        ))}
-                                    </select>
-                                    {errors.target_area_id && <p className="text-sm text-destructive">{errors.target_area_id}</p>}
-                                </div>
-                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="target_area_id">Filter by Area</Label>
+                                <select
+                                    id="target_area_id"
+                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={data.target_area_id}
+                                    onChange={e => setData('target_area_id', e.target.value)}
+                                >
+                                    <option value="">-- All Areas --</option>
+                                    {areas.map(area => (
+                                        <option key={area.id} value={area.id}>{area.name}</option>
+                                    ))}
+                                </select>
+                                {errors.target_area_id && <p className="text-sm text-destructive">{errors.target_area_id}</p>}
+                            </div>
                         </div>
 
                         <div className="space-y-2">
