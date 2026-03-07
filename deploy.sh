@@ -21,6 +21,4 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# Start Supervisor which will run PHP-FPM, Nginx, Queue Worker, and Scheduler
-echo "🚀 Starting Supervisor to manage all processes..."
-exec supervisord -c /etc/supervisord.conf
+echo "✅ Deployment scripting complete. Passing control to Nixpacks..."
