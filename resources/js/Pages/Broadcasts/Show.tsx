@@ -149,6 +149,9 @@ export default function Show({ campaign, recipients, filters = {} }: Props) {
                                 {getStatusBadge(campaign.status)}
                             </h2>
                             <p className="text-sm text-muted-foreground mt-1">
+                                Target: <span className="capitalize">{campaign.target_type}</span> {campaign.target_area ? ` (${campaign.target_area.name})` : ' (All Areas)'}
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-0.5">
                                 Created on {new Date(campaign.created_at).toLocaleDateString('id-ID', {
                                     year: 'numeric', month: 'long', day: 'numeric'
                                 })}

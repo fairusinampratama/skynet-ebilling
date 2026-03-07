@@ -30,8 +30,8 @@ class WaCampaignController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'target_type' => 'required|in:all,isolated,area,custom',
-            'target_area_id' => 'required_if:target_type,area|nullable|exists:areas,id',
+            'target_type' => 'required|in:all,active,isolated',
+            'target_area_id' => 'nullable|exists:areas,id',
             'message_template' => 'required|string',
         ]);
 
