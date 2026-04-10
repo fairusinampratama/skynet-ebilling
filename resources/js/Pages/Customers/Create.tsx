@@ -23,12 +23,18 @@ interface Area {
     name: string;
 }
 
+interface Router {
+    id: number;
+    name: string;
+}
+
 interface Props {
     packages: Package[];
     areas: Area[];
+    routers: Router[];
 }
 
-export default function Create({ packages, areas }: Props) {
+export default function Create({ packages, areas, routers }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         // internal_id removed
@@ -38,6 +44,8 @@ export default function Create({ packages, areas }: Props) {
         pppoe_user: '',
         package_id: '',
         area_id: '',
+        router_id: '',
+        mikrotik_profile: '',
         status: 'pending_installation',
         geo_lat: '',
         geo_long: '',
@@ -309,6 +317,39 @@ export default function Create({ packages, areas }: Props) {
                                             <SelectItem value="terminated">Terminated</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {errors.status && <p className="text-sm text-destructive">{errors.status}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="router_id">Mikrotik Router</Label>
+                                    <Select
+                                        value={data.router_id}
+                                        onValueChange={(val) => setData('router_id', val)}
+                                    >
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select Router" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">-- None (Manual Mode) --</SelectItem>
+                                            {routers.map((router) => (
+                                                <SelectItem key={router.id} value={String(router.id)}>
+                                                    {router.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="mikrotik_profile">Mikrotik Profile (Speed)</Label>
+                                    <Input
+                                        id="mikrotik_profile"
+                                        value={data.mikrotik_profile}
+                                        onChange={(e) => setData('mikrotik_profile', e.target.value)}
+                                        placeholder="e.g. 10MB"
+                                    />
+                                    {errors.mikrotik_profile && <p className="text-sm text-destructive">{errors.mikrotik_profile}</p>}
                                 </div>
 
                                 <div className="border-t border-border/50 my-6"></div>

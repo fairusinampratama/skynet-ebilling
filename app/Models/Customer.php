@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 
 class Customer extends Model
 {
-    use LogsActivity;
+    use LogsActivity, SoftDeletes;
 
     // ...
 
@@ -47,12 +48,19 @@ class Customer extends Model
         'pppoe_user',
         'package_id',
         'area_id',
+        'router_id',
+        'mikrotik_profile',
         'status',
         'join_date',
         'due_day',
         'ktp_photo_url',
         'is_online',
     ];
+
+    public function router(): BelongsTo
+    {
+        return $this->belongsTo(Router::class);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

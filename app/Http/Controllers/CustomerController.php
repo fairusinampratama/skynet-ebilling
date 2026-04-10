@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\Area;
+use App\Models\Router;
+use App\Services\MikrotikService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -74,6 +76,7 @@ class CustomerController extends Controller
         return Inertia::render('Customers/Create', [
             'packages' => Package::select('id', 'name', 'price')->get(),
             'areas' => Area::select('id', 'name')->orderBy('name')->get(),
+            'routers' => Router::select('id', 'name')->get(),
         ]);
     }
 
@@ -90,6 +93,8 @@ class CustomerController extends Controller
             'pppoe_user' => 'required|string|unique:customers,pppoe_user',
             'package_id' => 'required|exists:packages,id',
             'area_id' => 'nullable|exists:areas,id',
+            'router_id' => 'nullable|exists:routers,id',
+            'mikrotik_profile' => 'nullable|string',
             'status' => 'required|in:pending_installation,active,isolated,terminated',
             'geo_lat' => 'nullable|numeric|between:-90,90',
             'geo_long' => 'nullable|numeric|between:-180,180',
@@ -141,6 +146,7 @@ class CustomerController extends Controller
             'customer' => $customer,
             'packages' => Package::select('id', 'name', 'price')->get(),
             'areas' => Area::select('id', 'name')->orderBy('name')->get(),
+            'routers' => Router::select('id', 'name')->get(),
         ]);
     }
 
@@ -153,6 +159,8 @@ class CustomerController extends Controller
             'name' => 'required|string|max:255',
             'package_id' => 'required|exists:packages,id',
             'area_id' => 'nullable|exists:areas,id',
+            'router_id' => 'nullable|exists:routers,id',
+            'mikrotik_profile' => 'nullable|string',
             'address' => 'required|string',
             'phone' => 'nullable|string',
             'nik' => 'nullable|string',
@@ -198,22 +206,42 @@ class CustomerController extends Controller
     }
     
     /**
-     * Isolate the customer (block internet - Manual Mode)
+     * Isolate the customer (block internet via Mikrotik)
      */
     public function isolate(Customer $customer)
     {
+        if ($customer->router_id && $customer->pppoe_user) {
+            try {
+                $mikrotik = new MikrotikService($customer->router);
+                $mikrotik->isolateCustomer($customer);
+                $customer->update(['status' => 'isolated']);
+                return back()->with('success', "Customer {$customer->name} isolated on router.");
+            } catch (\Exception $e) {
+                return back()->with('error', "Mikrotik Error: " . $e->getMessage());
+            }
+        }
+
         $customer->update(['status' => 'isolated']);
-        
-        return back()->with('success', 'Customer status set to ISOLATED.');
+        return back()->with('success', 'Customer status set to ISOLATED (Manual).');
     }
 
     /**
-     * Reconnect the customer (restore internet - Manual Mode)
+     * Reconnect the customer (restore internet via Mikrotik)
      */
     public function reconnect(Customer $customer)
     {
-        $customer->update(['status' => 'active']);
+        if ($customer->router_id && $customer->pppoe_user) {
+            try {
+                $mikrotik = new MikrotikService($customer->router);
+                $mikrotik->reconnectCustomer($customer);
+                $customer->update(['status' => 'active']);
+                return back()->with('success', "Customer {$customer->name} reconnected on router.");
+            } catch (\Exception $e) {
+                return back()->with('error', "Mikrotik Error: " . $e->getMessage());
+            }
+        }
 
-        return back()->with('success', 'Customer status set to ACTIVE.');
+        $customer->update(['status' => 'active']);
+        return back()->with('success', 'Customer status set to ACTIVE (Manual).');
     }
 }

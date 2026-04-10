@@ -18,6 +18,7 @@ export function AppSidebar() {
         { name: 'Analytics', route: 'analytics.index', icon: BarChart3 },
         { name: 'Customers', route: 'customers.index', icon: Users },
         { name: 'Invoices', route: 'invoices.index', icon: FileText },
+        { name: 'Routers', route: 'routers.index', icon: Server },
         { name: 'Packages', route: 'packages.index', icon: Package },
         { name: 'Areas', route: 'areas.index', icon: MapPin },
         { name: 'Broadcasts', route: 'broadcasts.index', icon: Send },

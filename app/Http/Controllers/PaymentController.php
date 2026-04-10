@@ -31,8 +31,8 @@ class PaymentController extends Controller
     {
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0',
-            'method' => 'required|in:cash,transfer',
-            'proof' => 'nullable|file|image|max:2048', // Ensure file validation
+            'method' => 'required|in:cash,transfer,payment_gateway',
+            'proof' => 'nullable|image|max:2048', // 2MB max
             'paid_at' => 'nullable|date',
         ]);
 

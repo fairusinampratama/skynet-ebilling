@@ -41,43 +41,42 @@ class RouterScopedPackageSyncTest extends TestCase
         // Package for Router A
         $pkgScopeA = Package::create([
             'name' => 'Paket A 10M',
+            'code' => 'PKG-A-' . uniqid(),
             'mikrotik_profile' => '10MB',
             'router_id' => $routerA->id,
             'price' => 100000,
-            'bandwidth_label' => '10 Mbps',
         ]);
 
         // Package for Router B
         $pkgScopeB = Package::create([
             'name' => 'Paket B 10M',
+            'code' => 'PKG-B-' . uniqid(),
             'mikrotik_profile' => '10MB',
             'router_id' => $routerB->id,
             'price' => 120000,
-            'bandwidth_label' => '10 Mbps',
         ]);
 
         // Global Package (Scenario: Should be ignored if scoped exists)
         $pkgGlobal = Package::create([
             'name' => 'Paket Global 10M',
+            'code' => 'PKG-G-' . uniqid(),
             'mikrotik_profile' => '10MB',
             'router_id' => null,
             'price' => 90000,
-            'bandwidth_label' => '10 Mbps',
         ]);
 
         // 3. Setup Customer on Router A
         // Initially on Global Package (or wrong one)
         $customer = Customer::create([
+            'code' => 'CUST-' . uniqid(),
             'name' => 'User on Router A',
             'phone' => '08123456789',
             'address' => 'Test Address',
-            'coordinates' => '-7.123,112.123',
             'pppoe_user' => 'user.a',
-            'pppoe_password' => 'secret',
             'router_id' => $routerA->id,
             'package_id' => $pkgGlobal->id, // Wrong package initially
             'status' => 'active',
-            'register_date' => now(),
+            'join_date' => now(),
         ]);
 
         // 4. Mock Mikrotik Service for Router A

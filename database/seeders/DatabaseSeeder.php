@@ -15,12 +15,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create Admin User
-        // Seed in proper order
         $this->call([
             UserSeeder::class,      // Create Admin
-            AreaSeeder::class,      // Run first to populate areas
-            LegacyDataSeeder::class,  // Import Customers & Invoices
+            RouterSeeder::class,    // Seed production routers
+            LegacyDataSeeder::class,  // Import Customers, Areas & Invoices
         ]);
     }
 }

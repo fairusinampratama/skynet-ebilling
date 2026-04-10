@@ -34,6 +34,10 @@ Route::get('/', function () {
 // =====================================================
 Route::get('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class, 'show'])->name('public.invoice.show');
 
+// Tripay Webhook (Public)
+Route::post('/api/payments/callback', [\App\Http\Controllers\TripayCallbackController::class, 'handle'])
+    ->name('payments.callback');
+
 
 // Authenticated Routes
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -67,6 +71,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('customers', CustomerController::class);
     Route::resource('packages', PackageController::class);
     Route::resource('areas', \App\Http\Controllers\AreaController::class);
+    Route::resource('routers', \App\Http\Controllers\RouterController::class);
+    Route::post('/routers/{router}/sync-online', [\App\Http\Controllers\RouterController::class, 'syncOnlineStatus'])
+        ->name('routers.sync-online');
     
     // =====================================================
     // Invoice Management
