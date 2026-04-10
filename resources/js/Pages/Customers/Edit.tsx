@@ -32,6 +32,11 @@ interface Area {
     name: string;
 }
 
+interface Router {
+    id: number;
+    name: string;
+}
+
 interface Customer {
     id: number;
     name: string;
@@ -46,16 +51,18 @@ interface Customer {
     geo_lat?: string;
     geo_long?: string;
     ktp_photo_url?: string | null;
-    // ktp_photo_path removed
+    router_id?: number | null;
+    mikrotik_profile?: string | null;
 }
 
 interface Props {
     customer: Customer;
     packages: Package[];
     areas: Area[];
+    routers: Router[];
 }
 
-export default function Edit({ customer, packages, areas }: Props) {
+export default function Edit({ customer, packages, areas, routers }: Props) {
     const { data, setData, put, delete: destroy, processing, errors } = useForm({
         name: customer.name || '',
         // internal_id removed
@@ -66,6 +73,8 @@ export default function Edit({ customer, packages, areas }: Props) {
 
         package_id: String(customer.package_id),
         area_id: customer.area_id ? String(customer.area_id) : '',
+        router_id: customer.router_id ? String(customer.router_id) : '',
+        mikrotik_profile: customer.mikrotik_profile || '',
         status: customer.status,
         geo_lat: customer.geo_lat || '',
         geo_long: customer.geo_long || '',
@@ -355,6 +364,39 @@ export default function Edit({ customer, packages, areas }: Props) {
                                             <SelectItem value="terminated">Terminated</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {errors.status && <p className="text-sm text-destructive">{errors.status}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="router_id">Mikrotik Router</Label>
+                                    <Select
+                                        value={data.router_id}
+                                        onValueChange={(val) => setData('router_id', val)}
+                                    >
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select Router" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="">-- None (Manual Mode) --</SelectItem>
+                                            {routers.map((router) => (
+                                                <SelectItem key={router.id} value={String(router.id)}>
+                                                    {router.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="mikrotik_profile">Mikrotik Profile (Speed)</Label>
+                                    <Input
+                                        id="mikrotik_profile"
+                                        value={data.mikrotik_profile}
+                                        onChange={(e) => setData('mikrotik_profile', e.target.value)}
+                                        placeholder="e.g. 10MB"
+                                    />
+                                    {errors.mikrotik_profile && <p className="text-sm text-destructive">{errors.mikrotik_profile}</p>}
                                 </div>
 
                                 <div className="border-t border-border/50 my-6"></div>

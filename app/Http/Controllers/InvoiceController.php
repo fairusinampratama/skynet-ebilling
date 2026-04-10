@@ -18,7 +18,9 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $query = Invoice::query()
-            ->with(['customer:id,name,code'])
+            ->with(['customer' => function($q) {
+                $q->select('id', 'name', 'code')->withTrashed();
+            }])
             ->when($request->search, function ($q, $search) {
                 $q->where(function ($sub) use ($search) {
                     $sub->where('code', 'like', "%{$search}%")
@@ -55,7 +57,10 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice)
     {
-        $invoice->load(['customer.package', 'transactions.admin']);
+        $invoice->load([
+            'customer' => function($q) { $q->withTrashed()->with('package'); },
+            'transactions.admin'
+        ]);
 
         return Inertia::render('Invoices/Show', [
             'invoice' => $invoice,
@@ -177,7 +182,10 @@ class InvoiceController extends Controller
      */
     public function download(Invoice $invoice)
     {
-        $invoice->load(['customer.package', 'transactions']);
+        $invoice->load([
+            'customer' => function($q) { $q->withTrashed()->with('package'); },
+            'transactions'
+        ]);
         
         $company = [
             'name' => Setting::get('company_name', 'PT. SKYNET LINTAS NUSANTARA'),
