@@ -42,4 +42,8 @@ return [
         'base_url'      => env('TRIPAY_BASE_URL', 'https://tripay.co.id/api-sandbox'),
     ],
 
+    'legacy_scraper' => [
+        'url' => env('LEGACY_SCRAPER_URL', 'http://scraping-ebilling.103.156.128.102.sslip.io'),
+    ],
+
 ];
