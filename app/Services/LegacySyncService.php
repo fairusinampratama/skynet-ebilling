@@ -117,26 +117,36 @@ class LegacySyncService
                 $area = Area::where('name', $normalizedDataAreaName)->first();
                 $areaId = $area?->id;
             } else {
-                // Infer area from package string
+                // Infer area from package string OR address
                 $packageStr = !empty($data['package']) ? $data['package']['name'] : '';
-                $inferredAreaName = $this->normalizeAreaName($this->inferAreaFromPackage($packageStr));
+                $addressStr = $data['address'] ?? '';
+                
+                $inferredAreaName = $this->inferAreaFromText($packageStr . ' ' . $addressStr);
+                $normalizedInferred = $this->normalizeAreaName($inferredAreaName);
+                
                 $inferredArea = Area::firstOrCreate(
-                    ['name' => $inferredAreaName],
-                    ['code' => Str::slug($inferredAreaName)]
+                    ['name' => $normalizedInferred],
+                    ['code' => Str::slug($normalizedInferred)]
                 );
                 $areaId = $inferredArea->id;
             }
 
             $joinDate = !empty($data['join_date']) ? Carbon::parse($data['join_date']) : null;
 
-            $pppoeUser = !empty($data['pppoe_user']) ? $data['pppoe_user'] : ($data['id'] . '_PPPOE_' . Str::random(3));
-            $existingPppoe = \Illuminate\Support\Facades\DB::table('customers')
-                ->where('pppoe_user', $pppoeUser)
-                ->where('code', '!=', $data['id'])
-                ->exists();
+            $pppoeUser = !empty($data['pppoe_user']) ? $data['pppoe_user'] : ($data['id'] . '_USR_' . Str::random(5));
+            
+            // Deduplicate if missing or colliding
+            $attempts = 0;
+            while ($attempts < 5) {
+                $exists = \Illuminate\Support\Facades\DB::table('customers')
+                    ->where('pppoe_user', $pppoeUser)
+                    ->where('code', '!=', $data['id'])
+                    ->exists();
                 
-            if ($existingPppoe) {
+                if (!$exists) break;
+                
                 $pppoeUser = $pppoeUser . '_' . Str::random(3);
+                $attempts++;
             }
 
             $phone = !empty($data['phone']) ? $data['phone'] : '';
@@ -197,7 +207,7 @@ class LegacySyncService
         $count = 0;
 
         foreach ($invoices as $data) {
-            $customer = Customer::where('code', $data['customer_id'])->first();
+            $customer = Customer::withTrashed()->where('code', $data['customer_id'])->first();
             if (!$customer) {
                 // If customer is missing locally, we cannot assign the invoice.
                 Log::warning("Skipping invoice sync for missing customer: {$data['customer_id']}");
@@ -227,9 +237,9 @@ class LegacySyncService
         return $count;
     }
 
-    private function inferAreaFromPackage(string $packageName): string
+    private function inferAreaFromText(string $text): string
     {
-        $name = strtoupper($packageName);
+        $name = strtoupper($text);
         
         if (str_contains($name, 'KRIAN')) return 'SKYNET-KRIAN';
         if (str_contains($name, 'WAJAK')) return 'SKYNET-WAJAK';
@@ -240,7 +250,19 @@ class LegacySyncService
         if (str_contains($name, 'BLITAR')) return 'SKYNET-BLITAR';
         if (str_contains($name, 'MARTOPURO')) return 'SKYNET-MARTOPURO';
         if (str_contains($name, 'COMBORAN')) return 'SKYNET-COMBORAN';
-        if (str_contains($name, 'PUROWOSARI')) return 'SKYNET-PURWOSARI';
+        if (str_contains($name, 'PURWOSARI') || str_contains($name, 'PUROWOSARI')) return 'SKYNET-PURWOSARI';
+        if (str_contains($name, 'PAKIS')) return 'SKYNET-PAKIS';
+        if (str_contains($name, 'SRIGADING')) return 'SKYNET-SRIGADING';
+        if (str_contains($name, 'ARJOSARI')) return 'SKYNET-ARJOSARI';
+        if (str_contains($name, 'KASIN')) return 'SKYNET-KASIN';
+        if (str_contains($name, 'BANTARAN')) return 'SKYNET-BANTARAN';
+        if (str_contains($name, 'LAWANG')) return 'SKYNET-LAWANG';
+        if (str_contains($name, 'SUKOREJO')) return 'SKYNET-SUKOREJO';
+        if (str_contains($name, 'KARANGPLOSO')) return 'SKYNET-KARANGPLOSO';
+        if (str_contains($name, 'SENTUL')) return 'SKYNET-BUKIT-SENTUL';
+        if (str_contains($name, 'KUNCI')) return 'SKYNET-KUNCI';
+        if (str_contains($name, 'RANDUAGUNG')) return 'SKYNET-RANDUAGUNG';
+        if (str_contains($name, 'KERTOSARI')) return 'SKYNET-KERTOSARI';
         
         return 'SKYNET-GENERAL';
     }

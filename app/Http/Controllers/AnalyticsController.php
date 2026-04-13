@@ -26,7 +26,7 @@ class AnalyticsController extends Controller
      */
     public function revenueTrend(Request $request)
     {
-        $months = $request->input('months', 12);
+        $months = $request->input('months', 60);
         $refresh = $request->boolean('refresh', false);
 
         $cacheKey = "analytics.revenue_trend.{$months}";
@@ -284,7 +284,7 @@ class AnalyticsController extends Controller
      */
     public function customerGrowth(Request $request)
     {
-        $months = $request->input('months', 12);
+        $months = $request->input('months', 60);
         $refresh = $request->boolean('refresh', false);
 
         $cacheKey = "analytics.customer_growth.{$months}";

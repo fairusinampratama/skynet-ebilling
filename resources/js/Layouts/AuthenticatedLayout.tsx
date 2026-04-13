@@ -80,12 +80,30 @@ export default function Authenticated({
                                 <X className="h-5 w-5" />
                             </Button>
                         </div>
-                        {/* Mobile Nav Links - Simplified for now, can extract later if needed */}
-                        <div className="mt-8 space-y-4">
-                            <p className="text-muted-foreground text-sm">Navigation</p>
-                            {/* Reusing Sidebar Logic here would be ideal, but for now keeping it simple or duplicating logic */}
-                            {/* ... (Mobile links implementation - skipping for brevity to focus on Desktop Layout) ... */}
-                            <div className="text-sm text-muted-foreground italic">Mobile menu logic here</div>
+                        {/* Mobile Nav Links */}
+                        <div className="mt-8 overflow-y-auto max-h-[calc(100vh-200px)]">
+                            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-4 px-2">Navigation</p>
+                            <nav className="grid gap-1">
+                                {require('@/Components/AppSidebar').navItems.map((item: any) => {
+                                    const baseRoute = item.route.split('.')[0];
+                                    const isActive = route().current(`${baseRoute}.*`) || route().current(item.route);
+
+                                    return (
+                                        <Link
+                                            key={item.route}
+                                            href={route(item.route)}
+                                            onClick={() => setShowingNavigationDropdown(false)}
+                                            className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${isActive
+                                                ? 'bg-primary/10 text-primary font-bold shadow-sm'
+                                                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                                }`}
+                                        >
+                                            <item.icon className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                                            <span className="text-base">{item.name}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </nav>
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut, Send } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut, Send, LucideIcon } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -10,20 +10,25 @@ import {
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
 
-export function AppSidebar() {
-    const { url } = usePage(); // Use usePage hook to get current URL
+export interface NavItem {
+    name: string;
+    route: string;
+    icon: LucideIcon;
+}
 
-    const navItems = [
-        { name: 'Dashboard', route: 'dashboard', icon: LayoutDashboard },
-        { name: 'Analytics', route: 'analytics.index', icon: BarChart3 },
-        { name: 'Customers', route: 'customers.index', icon: Users },
-        { name: 'Invoices', route: 'invoices.index', icon: FileText },
-        { name: 'Routers', route: 'routers.index', icon: Server },
-        { name: 'Packages', route: 'packages.index', icon: Package },
-        { name: 'Areas', route: 'areas.index', icon: MapPin },
-        { name: 'Broadcasts', route: 'broadcasts.index', icon: Send },
-        { name: 'Settings', route: 'settings.index', icon: Settings },
-    ];
+export const navItems: NavItem[] = [
+    { name: 'Dashboard', route: 'dashboard', icon: LayoutDashboard },
+    { name: 'Analytics', route: 'analytics.index', icon: BarChart3 },
+    { name: 'Customers', route: 'customers.index', icon: Users },
+    { name: 'Invoices', route: 'invoices.index', icon: FileText },
+    { name: 'Routers', route: 'routers.index', icon: Server },
+    { name: 'Packages', route: 'packages.index', icon: Package },
+    { name: 'Areas', route: 'areas.index', icon: MapPin },
+    { name: 'Broadcasts', route: 'broadcasts.index', icon: Send },
+    { name: 'Settings', route: 'settings.index', icon: Settings },
+];
+
+export function AppSidebar() {
 
     return (
         <aside className="hidden w-64 flex-col border-r border-border bg-card text-card-foreground md:flex shadow-sm z-30">
