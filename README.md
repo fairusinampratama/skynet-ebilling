@@ -59,3 +59,5 @@ To get the application up and running on your local machine using Docker (Larave
 ## 🔒 Security
 
 If you discover any security-related issues, please avoid using the public issue tracker and instead communicate directly with the development team.
+
+<!-- Last updated: 2026-04-23 -->
