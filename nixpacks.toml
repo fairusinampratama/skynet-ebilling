@@ -6,33 +6,35 @@ aptPkgs = [
     "nginx"
 ]
 nixPkgs = [
-    "php83",
-    "php83Packages.composer",
-    "php83Extensions.pdo_mysql",
-    "php83Extensions.bcmath",
-    "php83Extensions.sockets",
-    "php83Extensions.xml",
-    "php83Extensions.mbstring",
-    "php83Extensions.ctype",
-    "php83Extensions.curl",
-    "php83Extensions.dom",
-    "php83Extensions.fileinfo",
-    "php83Extensions.filter",
-    "php83Extensions.tokenizer",
-    "php83Extensions.pcntl",
-    "php83Extensions.posix",
-    "php83Extensions.zip",
-    "php83Extensions.gd",
-    "php83Extensions.intl",
+    "php84",
+    "php84Packages.composer",
+    "php84Extensions.pdo_mysql",
+    "php84Extensions.bcmath",
+    "php84Extensions.sockets",
+    "php84Extensions.xml",
+    "php84Extensions.mbstring",
+    "php84Extensions.ctype",
+    "php84Extensions.curl",
+    "php84Extensions.dom",
+    "php84Extensions.fileinfo",
+    "php84Extensions.filter",
+    "php84Extensions.tokenizer",
+    "php84Extensions.pcntl",
+    "php84Extensions.posix",
+    "php84Extensions.zip",
+    "php84Extensions.gd",
+    "php84Extensions.intl",
+    "php84Extensions.redis",
     "nodejs_20",
     "npm-9_x",
+    "python311Packages.supervisor",
     "iputils"
 ]
 
 [phases.install]
 cmds = [
-    "composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-req=php",
-    "npm install"
+    "composer install --no-dev --optimize-autoloader --no-interaction",
+    "npm ci"
 ]
 
 [phases.build]
@@ -43,4 +45,4 @@ cmds = [
 ]
 
 [start]
-cmd = "sh deploy.sh && php-fpm -y /usr/local/etc/php-fpm.conf & nginx -g 'daemon off;'"
+cmd = "sh deploy.sh && supervisord -c supervisord.conf"
