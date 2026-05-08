@@ -16,6 +16,13 @@ mkdir -p \
     storage/logs \
     bootstrap/cache
 
+echo "🔐 Fixing writable directory permissions..."
+if chown -R www-data:www-data storage bootstrap/cache 2>/dev/null; then
+  chmod -R 775 storage bootstrap/cache
+else
+  chmod -R 777 storage bootstrap/cache
+fi
+
 echo "🧹 Removing stale bootstrap cache files..."
 rm -f bootstrap/cache/*.php
 
@@ -58,12 +65,5 @@ php artisan view:clear || true
 echo "⚡ Optimizing application cache..."
 php artisan config:cache
 php artisan view:cache
-
-echo "🔐 Fixing writable directory permissions..."
-if chown -R www-data:www-data storage bootstrap/cache 2>/dev/null; then
-  chmod -R 775 storage bootstrap/cache
-else
-  chmod -R 777 storage bootstrap/cache
-fi
 
 echo "✅ Deployment tasks complete. Starting application processes..."
