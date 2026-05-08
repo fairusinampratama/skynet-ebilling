@@ -33,6 +33,7 @@ return new class extends Migration
                 $table->boolean('is_online')->default(false);
                 $table->integer('due_day')->default(20);
                 $table->timestamps();
+                $table->softDeletes();
             });
         }
     }
