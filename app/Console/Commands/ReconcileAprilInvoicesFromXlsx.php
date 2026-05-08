@@ -144,11 +144,28 @@ class ReconcileAprilInvoicesFromXlsx extends Command
 
     private function resolvePath(string $path): string
     {
-        if (str_starts_with($path, '/')) {
-            return $path;
+        $candidates = [$path];
+
+        $normalizedPath = preg_replace('/\s+/', ' ', trim($path));
+        if ($normalizedPath !== null && $normalizedPath !== $path) {
+            $candidates[] = $normalizedPath;
         }
 
-        return base_path($path);
+        foreach ($candidates as $candidate) {
+            $resolved = str_starts_with($candidate, '/')
+                ? $candidate
+                : base_path($candidate);
+
+            if (is_file($resolved)) {
+                return $resolved;
+            }
+        }
+
+        $fallback = end($candidates);
+
+        return str_starts_with($fallback, '/')
+            ? $fallback
+            : base_path($fallback);
     }
 
     /**
