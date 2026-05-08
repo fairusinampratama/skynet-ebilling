@@ -16,16 +16,28 @@ mkdir -p \
     storage/logs \
     bootstrap/cache
 
+echo "🧹 Removing stale bootstrap cache files..."
+rm -f bootstrap/cache/*.php
+
 echo "⏳ Waiting for database connection..."
+attempt=1
+max_attempts=60
 until php artisan db:show > /dev/null 2>&1; do
+  if [ "$attempt" -ge "$max_attempts" ]; then
+    echo "❌ Database connection failed after $max_attempts attempts."
+    php artisan db:show
+    exit 1
+  fi
+
   echo "  (Still waiting for database...)"
+  attempt=$((attempt + 1))
   sleep 2
 done
 echo "📡 Database is ready!"
 
 # 1. Run migrations
 echo "📦 Running database migrations..."
-php artisan migrate --force --isolated
+php artisan migrate --force
 
 # 2. Seed only safe default users.
 # Do not run DatabaseSeeder here: it imports legacy/test data and can overwrite operational data.
