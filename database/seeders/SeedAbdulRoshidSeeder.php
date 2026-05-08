@@ -14,8 +14,9 @@ class SeedAbdulRoshidSeeder extends Seeder
         $package = Package::firstOrCreate(
             ['name' => 'Paket 5M Krian'],
             [
+                'code' => 'PKG-5M-KRIAN',
                 'price' => 125000,
-                'bandwidth_label' => '5Mbps', // Assumed column name based on JSON 'bandwidth'
+                'rate_limit' => '5Mbps',
             ]
         );
 
@@ -24,7 +25,6 @@ class SeedAbdulRoshidSeeder extends Seeder
             ['pppoe_user' => 'ABDULROSHIDRT16@SKY-KRI-31'],
             [
                 'code' => 'KRN119',
-                'internal_id' => '3908',
                 'name' => 'ABDUL ROSID',
                 'address' => 'RT.16/RW.06 BADAS',
                 'phone' => '0',

@@ -46,6 +46,7 @@ class Customer extends Model
         'geo_lat',
         'geo_long',
         'pppoe_user',
+        'pppoe_password',
         'package_id',
         'area_id',
         'router_id',
