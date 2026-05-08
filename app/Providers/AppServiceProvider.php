@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
         
-        if ($this->app->environment('production')) {
+        if (config('app.force_https')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
     }
