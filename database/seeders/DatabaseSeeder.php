@@ -16,9 +16,15 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,      // Create Admin
-            RouterSeeder::class,    // Seed production routers
-            LegacyDataSeeder::class,  // Import Customers, Areas & Invoices
+            UserSeeder::class,              // Create Admin & Staff
+            SettingSeeder::class,           // General App Settings
+            BillingSettingsSeeder::class,   // Billing Configuration
+            IsolationProfileSeeder::class,  // Mikrotik Isolation Profiles
+            RouterSeeder::class,            // Seed network routers
+            AreaSeeder::class,              // Operational Areas
+            ImportPackagesSeeder::class,    // Internet Packages
+            LegacyDataSeeder::class,        // Import Production Customers & Invoices
+            TestBillingSeeder::class,       // Add Specific Test Scenarios (H-5, Due, Overdue)
         ]);
     }
 }
