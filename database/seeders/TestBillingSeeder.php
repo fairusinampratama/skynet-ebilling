@@ -25,7 +25,11 @@ class TestBillingSeeder extends Seeder
         // Ensure Package exists
         $package = Package::firstOrCreate(
             ['name' => 'Paket Test 10Mbps'],
-            ['price' => 150000, 'bandwidth_label' => '10M/10M']
+            [
+                'code' => 'PKG-TEST-10M',
+                'price' => 150000,
+                'rate_limit' => '10M/10M',
+            ]
         );
 
         $testPhone = '6289688597253'; // User's phone
@@ -42,7 +46,7 @@ class TestBillingSeeder extends Seeder
             'address' => 'Test Address 1',
             'package_id' => $package->id,
             'pppoe_user' => 'test_h5',
-            'pppoe_pass' => '123456',
+            'pppoe_password' => '123456',
             'status' => 'active',
             'join_date' => now()->subMonth()->setDay($dateH5->day), // Recently joined, cycle aligned
         ]);
@@ -59,7 +63,7 @@ class TestBillingSeeder extends Seeder
             'address' => 'Test Address 2',
             'package_id' => $package->id,
             'pppoe_user' => 'test_hday',
-            'pppoe_pass' => '123456',
+            'pppoe_password' => '123456',
             'status' => 'active',
             'join_date' => now()->subMonth()->setDay($dateHDay->day),
         ]);
@@ -77,7 +81,7 @@ class TestBillingSeeder extends Seeder
             'address' => 'Test Address 3',
             'package_id' => $package->id,
             'pppoe_user' => 'test_overdue',
-            'pppoe_pass' => '123456',
+            'pppoe_password' => '123456',
             'status' => 'active', // Will be switched to isolated by system
             'join_date' => now()->subMonths(2)->setDay($dateOverdue->day),
         ]);

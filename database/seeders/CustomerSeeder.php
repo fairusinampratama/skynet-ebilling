@@ -39,7 +39,11 @@ class CustomerSeeder extends Seeder
         // Fallback package if mismatch
         $defaultPackage = Package::firstOrCreate(
             ['name' => 'Paket Unknown'],
-            ['price' => 100000, 'bandwidth_label' => 'Unknown']
+            [
+                'code' => 'PKG-UNKNOWN',
+                'price' => 100000,
+                'rate_limit' => 'Unknown',
+            ]
         );
 
         $count = 0;
@@ -59,7 +63,8 @@ class CustomerSeeder extends Seeder
                     ['name' => $packageName],
                     [
                         'price' => $data['price'] ?? 0,
-                        'bandwidth_label' => $data['bandwidth'] ?? 'Unknown',
+                        'code' => 'PKG-' . strtoupper(substr(md5($packageName), 0, 8)),
+                        'rate_limit' => $data['bandwidth'] ?? 'Unknown',
                     ]
                 );
                 $packages->put($packageName, $createdPackage);
@@ -93,7 +98,6 @@ class CustomerSeeder extends Seeder
                 ['pppoe_user' => $pppoeUser], // Unique Key
                 [
                     'code' => $code,
-                    'internal_id' => $data['internal_id'] ?? null,
                     'name' => $data['name'] ?? 'Unknown',
                     'address' => $data['address'] ?? '-',
                     'phone' => $data['phone'] ?? null,
@@ -104,7 +108,7 @@ class CustomerSeeder extends Seeder
                     'geo_lat' => (is_numeric($data['latitude']) && abs($data['latitude']) <= 90) ? $data['latitude'] : null,
                     'geo_long' => (is_numeric($data['longitude']) && abs($data['longitude']) <= 180) ? $data['longitude'] : null,
                     // Default password for imports if not specified
-                    'pppoe_pass' => $data['pppoe_password'] ?? '123456', 
+                    'pppoe_password' => $data['pppoe_password'] ?? '123456', 
                 ]
             );
 

@@ -85,8 +85,9 @@ class ImportPackagesSeeder extends Seeder
             Package::firstOrCreate(
                 ['name' => $pkg['name']],
                 [
+                    'code' => 'PKG-' . strtoupper(substr(md5($pkg['name']), 0, 8)),
                     'price' => $pkg['price'], 
-                    'bandwidth_label' => $pkg['bandwidth_label']
+                    'rate_limit' => $pkg['bandwidth_label'],
                 ]
             );
         }

@@ -209,7 +209,7 @@ class RouterSyncService
                             'router_id' => $router->id,
                             'mikrotik_profile' => $profileName,
                             'price' => 0,
-                            'bandwidth_label' => 'Sync Detected',
+                            'rate_limit' => 'Sync Detected',
                         ]);
                         Log::info("Auto-created package during import for {$router->name}: {$profileName}");
                     }
@@ -225,7 +225,7 @@ class RouterSyncService
                         'status' => 'active', // Assume active if on router
                         'phone' => '', // Unknown
                         'address' => $secret['comment'] ?? 'Imported from Router',
-                        'registered_at' => now(),
+                        'join_date' => now(),
                     ]);
 
                     Log::info("Auto-imported customer from router {$router->name}: {$pppoeUsername}");
@@ -379,7 +379,7 @@ class RouterSyncService
                         'router_id' => $router->id,
                         'mikrotik_profile' => $profileName,
                         'price' => 0, // Defaults to 0, flagged for review
-                        'bandwidth_label' => 'Sync Detected',
+                        'rate_limit' => 'Sync Detected',
                     ]);
                     Log::info("Auto-created package for Router {$router->name}: {$profileName}");
                 }
