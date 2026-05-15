@@ -12,6 +12,9 @@ class Transaction extends Model
     use LogsActivity;
 
     protected $fillable = [
+        'legacy_id',
+        'legacy_customer_code',
+        'legacy_period',
         'invoice_id',
         'reference',
         'channel',
@@ -33,6 +36,7 @@ class Transaction extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'paid_at' => 'datetime',
+        'legacy_period' => 'date',
     ];
 
     public function invoice(): BelongsTo

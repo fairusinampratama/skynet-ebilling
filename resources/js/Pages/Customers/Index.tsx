@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EditAction, DeleteAction } from '@/Components/TableActions';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
+import { PageProps } from '@/types';
 
 
 
@@ -74,6 +75,9 @@ interface Props {
 }
 
 export default function Index({ customers, packages = [], areas = [], filters = {} }: Props) {
+    const { auth } = usePage<PageProps>().props;
+    const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
+
     const columns: Column<Customer>[] = [
         {
             header: "ID",
@@ -170,10 +174,10 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                 )
             )
         },
-        {
+        ...(isAdmin ? [{
             header: "Actions",
             className: "text-right w-[100px]",
-            cell: (customer) => (
+            cell: (customer: Customer) => (
                 <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                     <EditAction
                         onClick={() => router.visit(route('customers.edit', customer.id))}
@@ -185,7 +189,7 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                     />
                 </div>
             )
-        },
+        }] : []),
     ];
 
     const handleDelete = (id: number) => {
@@ -224,11 +228,13 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                     <h2 className="text-xl font-semibold leading-tight text-foreground">
                         Customers
                     </h2>
-                    <Link href={route('customers.create')}>
-                        <Button className="bg-foreground text-background hover:bg-foreground/90">
-                            Add Customer
-                        </Button>
-                    </Link>
+                    {isAdmin && (
+                        <Link href={route('customers.create')}>
+                            <Button className="bg-foreground text-background hover:bg-foreground/90">
+                                Add Customer
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             }
         >

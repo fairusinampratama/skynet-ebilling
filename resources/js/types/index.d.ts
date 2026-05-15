@@ -2,6 +2,9 @@ export interface User {
     id: number;
     name: string;
     email: string;
+    role: 'superadmin' | 'admin';
+    scope: 'superadmin' | 'global_admin' | 'scoped_admin';
+    area_ids: number[];
     email_verified_at?: string;
 }
 

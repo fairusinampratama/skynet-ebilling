@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
 import { Eye, CreditCard, Calendar, AlertCircle, MoreHorizontal, Plus } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
+import { PageProps } from '@/types';
 
 interface Customer {
     id: number;
@@ -34,6 +35,9 @@ interface Props {
 }
 
 export default function Index({ invoices, filters = {} }: Props) {
+    const { auth } = usePage<PageProps>().props;
+    const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -160,7 +164,7 @@ export default function Index({ invoices, filters = {} }: Props) {
             className: "text-right w-[120px]",
             cell: (invoice) => (
                 <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                    {invoice.status === 'unpaid' && (
+                    {isAdmin && invoice.status === 'unpaid' && (
                         <Link href={route('invoices.show', invoice.id)}>
                             <Button size="sm" className="h-8 px-2 text-xs">
                                 <CreditCard className="mr-1.5 h-3 w-3" />
@@ -210,12 +214,14 @@ export default function Index({ invoices, filters = {} }: Props) {
                     <h2 className="text-xl font-semibold leading-tight text-foreground">
                         Invoices
                     </h2>
-                    <Link href={route('invoices.create')}>
-                        <Button className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            Create Invoice
-                        </Button>
-                    </Link>
+                    {isAdmin && (
+                        <Link href={route('invoices.create')}>
+                            <Button className="gap-2">
+                                <Plus className="h-4 w-4" />
+                                Create Invoice
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             }
         >

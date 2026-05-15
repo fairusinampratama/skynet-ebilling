@@ -13,6 +13,8 @@ class Invoice extends Model
     use LogsActivity;
 
     protected $fillable = [
+        'code',
+        'legacy_id',
         'uuid',
         'customer_id',
         'period',
@@ -20,6 +22,7 @@ class Invoice extends Model
         'status',
         'due_date',
         'generated_at',
+        'last_synced_at',
         'payment_link',
     ];
 
@@ -53,6 +56,7 @@ class Invoice extends Model
         'due_date' => 'date',
         'amount' => 'decimal:2',
         'generated_at' => 'datetime',
+        'last_synced_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo

@@ -12,4 +12,9 @@ class Area extends Model
     {
         return $this->hasMany(Customer::class);
     }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class)->withTimestamps();
+    }
 }

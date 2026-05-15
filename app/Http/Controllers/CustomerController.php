@@ -7,6 +7,7 @@ use App\Models\Package;
 use App\Models\Area;
 use App\Models\Router;
 use App\Services\MikrotikService;
+use App\Support\AreaScope;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -24,6 +25,7 @@ class CustomerController extends Controller
                 $q->where('status', 'unpaid')->orderBy('due_date', 'asc')->limit(1);
             }
         ]);
+        AreaScope::applyToCustomers($query, $request->user());
 
         // Search functionality
         if ($request->has('search') && $request->search) {
@@ -60,11 +62,14 @@ class CustomerController extends Controller
         $limit = $request->input('limit', 20);
         $customers = $query->paginate($limit)->withQueryString();
 
+        $areasQuery = Area::select('id', 'name')->orderBy('name');
+        AreaScope::applyToAreas($areasQuery, $request->user());
+
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
             'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'sort', 'direction', 'limit']),
             'packages' => Package::all(), // For filter dropdown
-            'areas' => Area::select('id', 'name')->orderBy('name')->get(),
+            'areas' => $areasQuery->get(),
         ]);
     }
 
@@ -73,9 +78,12 @@ class CustomerController extends Controller
      */
     public function create()
     {
+        $areasQuery = Area::select('id', 'name')->orderBy('name');
+        AreaScope::applyToAreas($areasQuery, request()->user());
+
         return Inertia::render('Customers/Create', [
             'packages' => Package::select('id', 'name', 'price')->get(),
-            'areas' => Area::select('id', 'name')->orderBy('name')->get(),
+            'areas' => $areasQuery->get(),
             'routers' => Router::select('id', 'name')->get(),
         ]);
     }
@@ -100,6 +108,7 @@ class CustomerController extends Controller
             'geo_long' => 'nullable|numeric|between:-180,180',
             'ktp_photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
+        AreaScope::authorizeAreaId(isset($validated['area_id']) ? (int) $validated['area_id'] : null, $request->user());
 
         // Auto-generate join date if not provided
         $validated['join_date'] = now();
@@ -123,6 +132,8 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, request()->user());
+
         $customer->load([
             'package', 
             'area', 
@@ -142,10 +153,14 @@ class CustomerController extends Controller
      */
     public function edit(Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, request()->user());
+        $areasQuery = Area::select('id', 'name')->orderBy('name');
+        AreaScope::applyToAreas($areasQuery, request()->user());
+
         return Inertia::render('Customers/Edit', [
             'customer' => $customer,
             'packages' => Package::select('id', 'name', 'price')->get(),
-            'areas' => Area::select('id', 'name')->orderBy('name')->get(),
+            'areas' => $areasQuery->get(),
             'routers' => Router::select('id', 'name')->get(),
         ]);
     }
@@ -155,6 +170,8 @@ class CustomerController extends Controller
      */
     public function update(Request $request, Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, $request->user());
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'package_id' => 'required|exists:packages,id',
@@ -169,6 +186,7 @@ class CustomerController extends Controller
             'geo_long' => 'nullable|numeric|between:-180,180',
             'ktp_photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
+        AreaScope::authorizeAreaId(isset($validated['area_id']) ? (int) $validated['area_id'] : null, $request->user());
 
         // Handle KTP photo upload
         if ($request->hasFile('ktp_photo')) {
@@ -195,6 +213,8 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, request()->user());
+
         if ($customer->status === 'active') {
             return back()->with('error', 'Cannot delete an active customer. Please terminate service first.');
         }
@@ -210,6 +230,8 @@ class CustomerController extends Controller
      */
     public function isolate(Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, request()->user());
+
         if ($customer->router_id && $customer->pppoe_user) {
             try {
                 $mikrotik = new MikrotikService($customer->router);
@@ -230,6 +252,8 @@ class CustomerController extends Controller
      */
     public function reconnect(Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, request()->user());
+
         if ($customer->router_id && $customer->pppoe_user) {
             try {
                 $mikrotik = new MikrotikService($customer->router);

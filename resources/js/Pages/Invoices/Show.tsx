@@ -45,7 +45,7 @@ interface Transaction {
     amount: number;
     method: string;
     paid_at: string;
-    proof_url: string | null;
+    proof_url?: string | null;
     admin: {
         name: string;
     } | null;
@@ -70,7 +70,8 @@ interface Props {
 import { PageProps } from '@/types';
 
 export default function Show({ invoice }: Props) {
-    const { settings } = usePage<PageProps>().props;
+    const { settings, auth } = usePage<PageProps>().props;
+    const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isVoidOpen, setIsVoidOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -214,7 +215,7 @@ export default function Show({ invoice }: Props) {
 
                         <div className="flex items-center gap-3">
                             {/* Payment Dialog */}
-                            {invoice.status === 'unpaid' && (
+                            {isAdmin && invoice.status === 'unpaid' && (
                                 <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
                                     <DialogTrigger asChild>
                                         <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -312,7 +313,7 @@ export default function Show({ invoice }: Props) {
                             )}
 
                             {/* Void Invoice Dialog */}
-                            {invoice.status === 'unpaid' && (
+                            {isAdmin && invoice.status === 'unpaid' && (
                                 <Dialog open={isVoidOpen} onOpenChange={setIsVoidOpen}>
                                     <DialogTrigger asChild>
                                         <Button variant="outline" className="gap-2 text-orange-600 border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20">
@@ -356,7 +357,7 @@ export default function Show({ invoice }: Props) {
                             )}
 
                             {/* Delete Invoice Dialog */}
-                            {!hasTransactions && (invoice.status === 'unpaid' || invoice.status === 'void') && (
+                            {isAdmin && !hasTransactions && (invoice.status === 'unpaid' || invoice.status === 'void') && (
                                 <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                                     <DialogTrigger asChild>
                                         <Button variant="outline" className="gap-2 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20">
@@ -493,14 +494,14 @@ export default function Show({ invoice }: Props) {
                                         <TableHead>Date</TableHead>
                                         <TableHead>Method</TableHead>
                                         <TableHead>Recorded By</TableHead>
-                                        <TableHead>Proof</TableHead>
+                                        {isAdmin && <TableHead>Proof</TableHead>}
                                         <TableHead className="text-right">Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {invoice.transactions.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                            <TableCell colSpan={isAdmin ? 5 : 4} className="h-24 text-center text-muted-foreground">
                                                 No payments found
                                             </TableCell>
                                         </TableRow>
@@ -518,21 +519,23 @@ export default function Show({ invoice }: Props) {
                                                 <TableCell className="text-muted-foreground text-sm">
                                                     {t.admin?.name || 'System'}
                                                 </TableCell>
-                                                <TableCell>
-                                                    {t.proof_url ? (
-                                                        <a
-                                                            href={t.proof_url}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
-                                                        >
-                                                            <ExternalLink className="w-3 h-3" />
-                                                            View
-                                                        </a>
-                                                    ) : (
-                                                        <span className="text-muted-foreground text-sm">-</span>
-                                                    )}
-                                                </TableCell>
+                                                {isAdmin && (
+                                                    <TableCell>
+                                                        {t.proof_url ? (
+                                                            <a
+                                                                href={t.proof_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
+                                                            >
+                                                                <ExternalLink className="w-3 h-3" />
+                                                                View
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-sm">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                )}
                                                 <TableCell className="text-right font-medium">
                                                     {formatCurrency(t.amount)}
                                                 </TableCell>

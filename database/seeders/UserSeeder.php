@@ -20,6 +20,7 @@ class UserSeeder extends Seeder
                 'name' => 'Admin Skynet',
                 'password' => Hash::make('skynet123'),
                 'email_verified_at' => now(),
+                'role' => 'superadmin',
             ]
         );
 
@@ -30,6 +31,7 @@ class UserSeeder extends Seeder
                 'name' => 'Aisyah',
                 'password' => Hash::make('skynet123'),
                 'email_verified_at' => now(),
+                'role' => 'admin',
             ]
         );
 
@@ -40,6 +42,7 @@ class UserSeeder extends Seeder
                 'name' => 'Hawwin',
                 'password' => Hash::make('skynet123'),
                 'email_verified_at' => now(),
+                'role' => 'admin',
             ]
         );
 
@@ -50,6 +53,7 @@ class UserSeeder extends Seeder
                 'name' => 'NOC Skynet',
                 'password' => Hash::make('skynet123'),
                 'email_verified_at' => now(),
+                'role' => 'admin',
             ]
         );
     }

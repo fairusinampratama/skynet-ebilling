@@ -8,6 +8,7 @@ use App\Http\Controllers\PackageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -57,39 +58,54 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
+
+    Route::middleware('superadmin')->group(function () {
+        Route::resource('users', UserManagementController::class)->except(['show']);
+    });
     
     // =====================================================
     // Customer Management
     // =====================================================
-    Route::resource('customers', CustomerController::class);
-    Route::post('/customers/{customer}/isolate', [CustomerController::class, 'isolate'])->name('customers.isolate');
-    Route::post('/customers/{customer}/reconnect', [CustomerController::class, 'reconnect'])->name('customers.reconnect');
+    Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::middleware('admin')->group(function () {
+        Route::get('/customers/create', [CustomerController::class, 'create'])->name('customers.create');
+        Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+        Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
+        Route::match(['put', 'patch'], '/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+        Route::post('/customers/{customer}/isolate', [CustomerController::class, 'isolate'])->name('customers.isolate');
+        Route::post('/customers/{customer}/reconnect', [CustomerController::class, 'reconnect'])->name('customers.reconnect');
+    });
+    Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
     
     // =====================================================
     // Package Management
     // =====================================================
-    Route::resource('customers', CustomerController::class);
-    Route::resource('packages', PackageController::class);
-    Route::resource('areas', \App\Http\Controllers\AreaController::class);
-    Route::resource('routers', \App\Http\Controllers\RouterController::class);
-    Route::post('/routers/{router}/sync-online', [\App\Http\Controllers\RouterController::class, 'syncOnlineStatus'])
-        ->name('routers.sync-online');
+    Route::middleware('global-admin')->group(function () {
+        Route::resource('packages', PackageController::class);
+        Route::resource('areas', \App\Http\Controllers\AreaController::class);
+        Route::resource('routers', \App\Http\Controllers\RouterController::class);
+        Route::post('/routers/{router}/sync-online', [\App\Http\Controllers\RouterController::class, 'syncOnlineStatus'])
+            ->name('routers.sync-online');
+    });
     
     // =====================================================
     // Invoice Management
     // =====================================================
     Route::get('/invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index');
-    Route::get('/invoices/create', [InvoiceController::class, 'create'])
-        ->name('invoices.create');
-    Route::post('/invoices', [InvoiceController::class, 'store'])
-        ->name('invoices.store');
+    Route::middleware('admin')->group(function () {
+        Route::get('/invoices/create', [InvoiceController::class, 'create'])
+            ->name('invoices.create');
+        Route::post('/invoices', [InvoiceController::class, 'store'])
+            ->name('invoices.store');
+        Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void'])
+            ->name('invoices.void');
+        Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])
+            ->name('invoices.destroy');
+    });
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])
         ->name('invoices.show');
-    Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void'])
-        ->name('invoices.void');
-    Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy'])
-        ->name('invoices.destroy');
     Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'download'])
         ->name('invoices.download');
     Route::get('/customers/{customer}/invoices', [InvoiceController::class, 'customerInvoices'])
@@ -98,12 +114,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =====================================================
     // Payment Entry
     // =====================================================
-    Route::get('/invoices/{invoice}/pay', [PaymentController::class, 'create'])
-        ->name('invoices.pay');
-    Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])
-        ->name('payments.store');
-    Route::post('/payments/bulk-import', [PaymentController::class, 'bulkImport'])
-        ->name('payments.bulk-import');
+    Route::middleware('admin')->group(function () {
+        Route::get('/invoices/{invoice}/pay', [PaymentController::class, 'create'])
+            ->name('invoices.pay');
+        Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])
+            ->name('payments.store');
+        Route::post('/payments/bulk-import', [PaymentController::class, 'bulkImport'])
+            ->name('payments.bulk-import');
+    });
 
     
     // =====================================================
@@ -123,16 +141,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Broadcast & Campaigns
     // =====================================================
     Route::get('/broadcasts', [\App\Http\Controllers\WaCampaignController::class, 'index'])->name('broadcasts.index');
-    Route::get('/broadcasts/create', [\App\Http\Controllers\WaCampaignController::class, 'create'])->name('broadcasts.create');
-    Route::post('/broadcasts', [\App\Http\Controllers\WaCampaignController::class, 'store'])->name('broadcasts.store');
+    Route::middleware('admin')->group(function () {
+        Route::get('/broadcasts/create', [\App\Http\Controllers\WaCampaignController::class, 'create'])->name('broadcasts.create');
+        Route::post('/broadcasts', [\App\Http\Controllers\WaCampaignController::class, 'store'])->name('broadcasts.store');
+        Route::post('/broadcasts/{campaign}/retry', [\App\Http\Controllers\WaCampaignController::class, 'retryFailed'])->name('broadcasts.retry');
+    });
     Route::get('/broadcasts/{campaign}', [\App\Http\Controllers\WaCampaignController::class, 'show'])->name('broadcasts.show');
-    Route::post('/broadcasts/{campaign}/retry', [\App\Http\Controllers\WaCampaignController::class, 'retryFailed'])->name('broadcasts.retry');
 
     // =====================================================
     // Settings System
     // =====================================================
-    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
-    Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::middleware('global-admin')->group(function () {
+        Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+        Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+    });
 });
 
 // Auth Routes (Login, Register, etc.)

@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
@@ -20,6 +20,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/Components/ui/dialog";
+import { PageProps } from '@/types';
 
 // Types
 interface Transaction {
@@ -51,7 +52,7 @@ interface Customer {
     code: string;
     address: string;
     phone: string;
-    nik: string;
+    nik?: string;
     pppoe_user: string;
     status: 'pending_installation' | 'active' | 'suspended' | 'isolated' | 'offboarding' | 'terminated';
     geo_lat: string;
@@ -68,6 +69,8 @@ interface Props {
 }
 
 export default function Show({ customer }: Props) {
+    const { auth } = usePage<PageProps>().props;
+    const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
     const { delete: destroy } = useForm();
     const [loading, setLoading] = useState(false);
 
@@ -155,6 +158,7 @@ export default function Show({ customer }: Props) {
                             </p>
                         </div>
                     </div>
+                    {isAdmin && (
                     <div className="flex items-center gap-4">
 
 
@@ -187,6 +191,7 @@ export default function Show({ customer }: Props) {
                             </DialogContent>
                         </Dialog>
                     </div>
+                    )}
                 </div>
             }
         >
@@ -218,10 +223,12 @@ export default function Show({ customer }: Props) {
                                         <span className="text-muted-foreground">Full Name</span>
                                         <span className="col-span-2 font-medium">{customer.name}</span>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <span className="text-muted-foreground">NIK</span>
-                                        <span className="col-span-2 font-mono">{customer.nik || '-'}</span>
-                                    </div>
+                                    {isAdmin && (
+                                        <div className="grid grid-cols-3 gap-1">
+                                            <span className="text-muted-foreground">NIK</span>
+                                            <span className="col-span-2 font-mono">{customer.nik || '-'}</span>
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Phone</span>
                                         <span className="col-span-2 font-mono">{customer.phone || '-'}</span>
@@ -257,6 +264,7 @@ export default function Show({ customer }: Props) {
                                         </div>
                                     </div>
 
+                                    {isAdmin && (
                                     <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50 mt-4">
                                         <div>
                                             <h4 className="font-medium">Service Status</h4>
@@ -271,6 +279,7 @@ export default function Show({ customer }: Props) {
                                             {customer.status === 'active' ? 'Suspend Service' : 'Activate Service'}
                                         </Button>
                                     </div>
+                                    )}
                                     <div className="grid grid-cols-3 gap-1">
                                         <span className="text-muted-foreground">Package</span>
                                         <span className="col-span-2 font-medium">{customer.package.name}</span>
@@ -328,6 +337,7 @@ export default function Show({ customer }: Props) {
                             </Card>
 
                             {/* KTP Photo Card */}
+                            {isAdmin && (
                             <Card className="bg-card/50 backdrop-blur border-border">
                                 <CardHeader>
                                     <CardTitle className="text-base flex items-center gap-2">
@@ -358,6 +368,7 @@ export default function Show({ customer }: Props) {
                                     )}
                                 </CardContent>
                             </Card>
+                            )}
                         </div>
                     </TabsContent>
 
@@ -468,17 +479,19 @@ export default function Show({ customer }: Props) {
                 </Tabs>
             </div>
 
-            <ConfirmDialog
-                open={confirmOpen}
-                onOpenChange={setConfirmOpen}
-                title={confirmAction === 'block' ? "Suspend Customer Service" : "Activate Customer Service"}
-                description={confirmAction === 'block'
-                    ? "Are you sure you want to suspend this customer? Their status will be updated to ISOLATED."
-                    : "Are you sure you want to activate this customer? Their status will be updated to ACTIVE."}
-                confirmText={confirmAction === 'block' ? "Suspend" : "Activate"}
-                variant={confirmAction === 'block' ? "destructive" : "default"}
-                onConfirm={confirmToggle}
-            />
+            {isAdmin && (
+                <ConfirmDialog
+                    open={confirmOpen}
+                    onOpenChange={setConfirmOpen}
+                    title={confirmAction === 'block' ? "Suspend Customer Service" : "Activate Customer Service"}
+                    description={confirmAction === 'block'
+                        ? "Are you sure you want to suspend this customer? Their status will be updated to ISOLATED."
+                        : "Are you sure you want to activate this customer? Their status will be updated to ACTIVE."}
+                    confirmText={confirmAction === 'block' ? "Suspend" : "Activate"}
+                    variant={confirmAction === 'block' ? "destructive" : "default"}
+                    onConfirm={confirmToggle}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }

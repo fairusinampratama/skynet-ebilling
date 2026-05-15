@@ -32,14 +32,27 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => fn () => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'role' => $request->user()->role,
+                    'scope' => $request->user()->isSuperAdmin()
+                        ? 'superadmin'
+                        : ($request->user()->hasAreaScope() ? 'scoped_admin' : 'global_admin'),
+                    'area_ids' => $request->user()->hasAreaScope()
+                        ? $request->user()->accessibleAreaIds()->all()
+                        : [],
+                ] : null,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
             'settings' => [
-                'payment_channels' => \App\Models\Setting::get('payment_channels', []),
+                'payment_channels' => fn () => $request->user()?->isGlobalAdmin()
+                    ? \App\Models\Setting::get('payment_channels', [])
+                    : [],
             ],
         ];
     }
