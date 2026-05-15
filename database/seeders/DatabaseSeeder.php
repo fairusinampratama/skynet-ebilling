@@ -24,7 +24,10 @@ class DatabaseSeeder extends Seeder
             AreaSeeder::class,              // Operational Areas
             ImportPackagesSeeder::class,    // Internet Packages
             LegacyDataSeeder::class,        // Import Production Customers & Invoices
-            TestBillingSeeder::class,       // Add Specific Test Scenarios (H-5, Due, Overdue)
         ]);
+
+        if (env('SEED_TEST_BILLING_SCENARIOS', false)) {
+            $this->call(TestBillingSeeder::class);
+        }
     }
 }
