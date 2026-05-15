@@ -7,7 +7,9 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Package;
 use Carbon\Carbon;
+use Generator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -209,62 +211,165 @@ class LegacySyncService
 
     public function syncInvoices(): int
     {
-        $response = Http::timeout(60)->get("{$this->baseUrl}/api/v1/invoices");
-        if (!$response->successful()) {
-            throw new \Exception("Failed to fetch invoices: " . $response->body());
+        $tmpDir = storage_path('app/legacy-sync');
+        File::ensureDirectoryExists($tmpDir);
+
+        $tmpFile = tempnam($tmpDir, 'invoices-');
+        if ($tmpFile === false) {
+            throw new \RuntimeException('Failed to create temporary file for invoice sync.');
         }
 
-        $invoices = $response->json();
-        $customerIdsByCode = Customer::withTrashed()->pluck('id', 'code');
-        $rows = [];
-        $count = 0;
-        $now = now();
+        try {
+            $response = Http::sink($tmpFile)
+                ->timeout(180)
+                ->get("{$this->baseUrl}/api/v1/invoices");
 
-        foreach ($invoices as $data) {
-            $customerId = $customerIdsByCode->get((string) $data['customer_id']);
-            if (!$customerId) {
-                // If customer is missing locally, we cannot assign the invoice.
-                Log::warning("Skipping invoice sync for missing customer: {$data['customer_id']}");
-                continue;
+            if (!$response->successful()) {
+                $body = File::exists($tmpFile) ? File::get($tmpFile) : '';
+
+                throw new \Exception("Failed to fetch invoices: " . $body);
             }
 
-            $periodDate = Carbon::parse($data['period']);
-            $dueDate = $data['due_date'] ? Carbon::parse($data['due_date']) : $periodDate->copy()->addDays(20);
+            $customerIdsByCode = Customer::withTrashed()->pluck('id', 'code');
+            $rows = [];
+            $count = 0;
+            $now = now();
 
-            $rows[] = [
-                'customer_id' => $customerId,
-                'period' => $periodDate->toDateString(),
-                'legacy_id' => isset($data['id']) ? (string) $data['id'] : null,
-                'uuid' => $data['uuid'] ?? (string) Str::uuid(),
-                'code' => $data['code'] ?? 'INV-' . $periodDate->format('Ym') . '-' . $data['customer_id'],
-                'amount' => $data['amount'],
-                'status' => $data['status'],
-                'due_date' => $dueDate->toDateString(),
-                'generated_at' => ! empty($data['generated_at']) ? Carbon::parse($data['generated_at']) : $now,
-                'last_synced_at' => ! empty($data['last_synced_at']) ? Carbon::parse($data['last_synced_at']) : $now,
-                'payment_link' => $data['payment_link'],
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-            $count++;
+            foreach ($this->streamJsonArrayFile($tmpFile) as $data) {
+                $customerId = $customerIdsByCode->get((string) $data['customer_id']);
+                if (!$customerId) {
+                    // If customer is missing locally, we cannot assign the invoice.
+                    Log::warning("Skipping invoice sync for missing customer: {$data['customer_id']}");
+                    continue;
+                }
+
+                $periodDate = Carbon::parse($data['period']);
+                $dueDate = $data['due_date'] ? Carbon::parse($data['due_date']) : $periodDate->copy()->addDays(20);
+
+                $rows[] = [
+                    'customer_id' => $customerId,
+                    'period' => $periodDate->toDateString(),
+                    'legacy_id' => isset($data['id']) ? (string) $data['id'] : null,
+                    'uuid' => $data['uuid'] ?? (string) Str::uuid(),
+                    'code' => $data['code'] ?? 'INV-' . $periodDate->format('Ym') . '-' . $data['customer_id'],
+                    'amount' => $data['amount'],
+                    'status' => $data['status'],
+                    'due_date' => $dueDate->toDateString(),
+                    'generated_at' => ! empty($data['generated_at']) ? Carbon::parse($data['generated_at']) : $now,
+                    'last_synced_at' => ! empty($data['last_synced_at']) ? Carbon::parse($data['last_synced_at']) : $now,
+                    'payment_link' => $data['payment_link'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+                $count++;
+
+                if (count($rows) >= 1000) {
+                    $this->upsertInvoiceRows($rows);
+                    $rows = [];
+                }
+            }
+
+            $this->upsertInvoiceRows($rows);
+
+            return $count;
+        } finally {
+            File::delete($tmpFile);
+        }
+    }
+
+    private function upsertInvoiceRows(array $rows): void
+    {
+        if ($rows === []) {
+            return;
         }
 
-        foreach (array_chunk($rows, 1000) as $chunk) {
-            DB::table('invoices')->upsert($chunk, ['customer_id', 'period'], [
-                'legacy_id',
-                'uuid',
-                'code',
-                'amount',
-                'status',
-                'due_date',
-                'generated_at',
-                'last_synced_at',
-                'payment_link',
-                'updated_at',
-            ]);
+        DB::table('invoices')->upsert($rows, ['customer_id', 'period'], [
+            'legacy_id',
+            'uuid',
+            'code',
+            'amount',
+            'status',
+            'due_date',
+            'generated_at',
+            'last_synced_at',
+            'payment_link',
+            'updated_at',
+        ]);
+    }
+
+    /**
+     * Stream a top-level JSON array of objects without decoding the whole file.
+     */
+    private function streamJsonArrayFile(string $path): Generator
+    {
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            throw new \RuntimeException("Failed to open streamed JSON file: {$path}");
         }
 
-        return $count;
+        $buffer = '';
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+
+        try {
+            while (! feof($handle)) {
+                $chunk = fread($handle, 8192);
+                if ($chunk === false) {
+                    throw new \RuntimeException("Failed to read streamed JSON file: {$path}");
+                }
+
+                $length = strlen($chunk);
+                for ($i = 0; $i < $length; $i++) {
+                    $char = $chunk[$i];
+
+                    if ($depth > 0) {
+                        $buffer .= $char;
+                    }
+
+                    if ($inString) {
+                        if ($escaped) {
+                            $escaped = false;
+                        } elseif ($char === '\\') {
+                            $escaped = true;
+                        } elseif ($char === '"') {
+                            $inString = false;
+                        }
+
+                        continue;
+                    }
+
+                    if ($char === '"') {
+                        $inString = true;
+                        continue;
+                    }
+
+                    if ($char === '{') {
+                        if ($depth === 0) {
+                            $buffer = '{';
+                        }
+
+                        $depth++;
+                        continue;
+                    }
+
+                    if ($char === '}') {
+                        $depth--;
+
+                        if ($depth === 0) {
+                            $decoded = json_decode($buffer, true, flags: JSON_THROW_ON_ERROR);
+                            if (is_array($decoded)) {
+                                yield $decoded;
+                            }
+
+                            $buffer = '';
+                        }
+                    }
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
     }
 
     private function syncAreasFromCustomers(): int
