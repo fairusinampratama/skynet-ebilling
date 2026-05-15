@@ -33,7 +33,7 @@ export default function Authenticated({
     children,
     breadcrumbs,
 }: PropsWithChildren<{ header?: ReactNode; breadcrumbs?: BreadcrumbItem[] }>) {
-    const user = usePage().props.auth.user;
+    const user = usePage<PageProps>().props.auth.user;
     const { flash } = usePage<PageProps>().props; // Clean typescript inference
     const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
 
@@ -84,7 +84,15 @@ export default function Authenticated({
                         <div className="mt-8 overflow-y-auto max-h-[calc(100vh-200px)]">
                             <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-4 px-2">Navigation</p>
                             <nav className="grid gap-1">
-                                {require('@/Components/AppSidebar').navItems.map((item: any) => {
+                                {require('@/Components/AppSidebar').navItems
+                                    .filter((item: any) => {
+                                        if (item.route === 'users.index') return user.role === 'superadmin';
+                                        if (['routers.index', 'packages.index', 'areas.index', 'settings.index'].includes(item.route)) {
+                                            return user.role === 'superadmin' || user.scope === 'global_admin';
+                                        }
+                                        return true;
+                                    })
+                                    .map((item: any) => {
                                     const baseRoute = item.route.split('.')[0];
                                     const isActive = route().current(`${baseRoute}.*`) || route().current(item.route);
 

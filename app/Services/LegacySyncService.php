@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Package;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -15,7 +16,7 @@ class LegacySyncService
 {
     protected string $baseUrl;
 
-    public function __construct()
+    public function __construct(private LegacyAreaResolver $areaResolver)
     {
         $this->baseUrl = config('services.legacy_scraper.url', 'http://scraping-ebilling.103.156.128.102.sslip.io');
     }
@@ -38,23 +39,24 @@ class LegacySyncService
     public function syncAreas(): int
     {
         $response = Http::timeout(30)->get("{$this->baseUrl}/api/v1/areas");
-        if (!$response->successful()) {
-            throw new \Exception("Failed to fetch areas: " . $response->body());
+        if (! $response->successful()) {
+            return $this->syncAreasFromCustomers();
         }
 
-        $areas = $response->json();
-        $count = 0;
+        return collect($response->json())
+            ->pluck('name')
+            ->filter()
+            ->map(fn (string $name) => $this->areaResolver->normalizeAreaName($name))
+            ->filter(fn (string $name) => $this->areaResolver->isApprovedArea($name))
+            ->unique()
+            ->sum(function (string $name) {
+                Area::updateOrCreate(
+                    ['name' => $name],
+                    ['code' => Str::slug($name)]
+                );
 
-        foreach ($areas as $data) {
-            $normalizedName = $this->normalizeAreaName($data['name']);
-            Area::updateOrCreate(
-                ['name' => $normalizedName],
-                ['code' => Str::slug($normalizedName)]
-            );
-            $count++;
-        }
-
-        return $count;
+                return 1;
+            });
     }
 
     public function syncPackages(): int
@@ -68,7 +70,7 @@ class LegacySyncService
         $count = 0;
 
         foreach ($packages as $data) {
-            $code = 'PKG-' . strtoupper(substr(md5($data['name'] . time() . uniqid()), 0, 8));
+            $code = 'PKG-' . strtoupper(substr(md5($data['name']), 0, 8));
             Package::updateOrCreate(
                 ['name' => $data['name']],
                 [
@@ -90,64 +92,61 @@ class LegacySyncService
         }
 
         $customers = $response->json();
-        $count = 0;
+        $packagesByName = Package::pluck('id', 'name');
+        $areasByName = Area::pluck('id', 'name');
+        $fallbackPkg = Package::firstOrCreate(
+            ['name' => 'Legacy/Unknown Package'],
+            [
+                'code' => 'PKG-UNKNOWN',
+                'price' => 0,
+            ]
+        );
+        $seenPppoeUsers = [];
+        $existingPppoeUsers = Customer::withTrashed()->pluck('code', 'pppoe_user');
+        $rows = [];
+        $now = now();
 
         foreach ($customers as $data) {
             $packageId = null;
             if (!empty($data['package'])) {
-                $pkg = Package::where('name', $data['package']['name'])->first();
-                $packageId = $pkg?->id;
+                $packageId = $packagesByName->get($data['package']['name']);
             }
 
-            // Fallback for deleted/orphaned customers
             if (!$packageId) {
-                $fallbackPkg = Package::firstOrCreate(
-                    ['name' => 'Legacy/Unknown Package'],
-                    [
-                        'code' => 'PKG-UNKNOWN',
-                        'price' => 0,
-                    ]
-                );
                 $packageId = $fallbackPkg->id;
             }
 
             $areaId = null;
-            if (!empty($data['area'])) {
-                $normalizedDataAreaName = $this->normalizeAreaName($data['area']['name']);
-                $area = Area::where('name', $normalizedDataAreaName)->first();
-                $areaId = $area?->id;
+            $resolvedArea = $this->areaResolver->resolve($data);
+            if ($resolvedArea['area']) {
+                $areaId = $areasByName->get($resolvedArea['area']);
+                if (! $areaId) {
+                    $area = Area::firstOrCreate(
+                        ['name' => $resolvedArea['area']],
+                        ['code' => Str::slug($resolvedArea['area'])]
+                    );
+                    $areaId = $area->id;
+                    $areasByName->put($resolvedArea['area'], $areaId);
+                }
             } else {
-                // Infer area from package string OR address
-                $packageStr = !empty($data['package']) ? $data['package']['name'] : '';
-                $addressStr = $data['address'] ?? '';
-                
-                $inferredAreaName = $this->inferAreaFromText($packageStr . ' ' . $addressStr);
-                $normalizedInferred = $this->normalizeAreaName($inferredAreaName);
-                
-                $inferredArea = Area::firstOrCreate(
-                    ['name' => $normalizedInferred],
-                    ['code' => Str::slug($normalizedInferred)]
-                );
-                $areaId = $inferredArea->id;
+                Log::warning('Legacy customer has no approved area mapping', [
+                    'customer_id' => $data['id'] ?? null,
+                    'customer_name' => $data['name'] ?? null,
+                ]);
             }
 
             $joinDate = !empty($data['join_date']) ? Carbon::parse($data['join_date']) : null;
 
-            $pppoeUser = !empty($data['pppoe_user']) ? $data['pppoe_user'] : ($data['id'] . '_USR_' . Str::random(5));
-            
-            // Deduplicate if missing or colliding
+            $pppoeUser = !empty($data['pppoe_user']) ? $data['pppoe_user'] : ($data['id'] . '_USR');
             $attempts = 0;
-            while ($attempts < 5) {
-                $exists = \Illuminate\Support\Facades\DB::table('customers')
-                    ->where('pppoe_user', $pppoeUser)
-                    ->where('code', '!=', $data['id'])
-                    ->exists();
-                
-                if (!$exists) break;
-                
-                $pppoeUser = $pppoeUser . '_' . Str::random(3);
+            while (
+                (isset($seenPppoeUsers[$pppoeUser]) && $seenPppoeUsers[$pppoeUser] !== $data['id'])
+                || ($existingPppoeUsers->has($pppoeUser) && $existingPppoeUsers->get($pppoeUser) !== $data['id'])
+            ) {
                 $attempts++;
+                $pppoeUser = $data['id'] . '_USR_' . ($attempts + 1);
             }
+            $seenPppoeUsers[$pppoeUser] = $data['id'];
 
             $phone = !empty($data['phone']) ? $data['phone'] : '';
             $address = !empty($data['address']) ? $data['address'] : '-';
@@ -160,40 +159,52 @@ class LegacySyncService
                 $statusRaw = 'active';
             }
 
-            $customer = Customer::withTrashed()->updateOrCreate(
-                ['code' => $data['id']], // The ID from legacy system
-                [
-                    'name' => $data['name'],
-                    'nik' => !empty($data['nik']) ? $data['nik'] : null,
-                    'address' => $address,
-                    'phone' => $phone,
-                    'geo_lat' => $data['geo_lat'],
-                    'geo_long' => $data['geo_long'],
-                    'pppoe_user' => $pppoeUser,
-                    'package_id' => $packageId,
-                    'area_id' => $areaId,
-                    'status' => $statusRaw,
-                    'join_date' => $joinDate,
-                    'due_day' => $data['due_day'] ?? 20,
-                    'ktp_photo_url' => $data['ktp_photo_url'],
-                    'is_online' => $data['is_online'] ?? false,
-                ]
-            );
-            
-            if (strtolower($data['status'] ?? '') === 'deleted') {
-                if (!$customer->trashed()) {
-                    $customer->delete();
-                }
-            } else {
-                if ($customer->trashed()) {
-                    $customer->restore();
-                }
-            }
-            
-            $count++;
+            $rows[] = [
+                'code' => $data['id'],
+                'legacy_id' => $data['id'],
+                'name' => $data['name'],
+                'nik' => !empty($data['nik']) ? $data['nik'] : null,
+                'address' => $address,
+                'phone' => $phone,
+                'geo_lat' => $data['geo_lat'],
+                'geo_long' => $data['geo_long'],
+                'pppoe_user' => $pppoeUser,
+                'package_id' => $packageId,
+                'area_id' => $areaId,
+                'status' => $statusRaw,
+                'join_date' => $joinDate?->toDateString(),
+                'due_day' => $data['due_day'] ?? 20,
+                'ktp_photo_url' => $data['ktp_photo_url'],
+                'is_online' => $data['is_online'] ?? false,
+                'deleted_at' => strtolower($data['status'] ?? '') === 'deleted' ? $now : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
 
-        return $count;
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('customers')->upsert($chunk, ['code'], [
+                'legacy_id',
+                'name',
+                'nik',
+                'address',
+                'phone',
+                'geo_lat',
+                'geo_long',
+                'pppoe_user',
+                'package_id',
+                'area_id',
+                'status',
+                'join_date',
+                'due_day',
+                'ktp_photo_url',
+                'is_online',
+                'deleted_at',
+                'updated_at',
+            ]);
+        }
+
+        return count($rows);
     }
 
     public function syncInvoices(): int
@@ -204,11 +215,14 @@ class LegacySyncService
         }
 
         $invoices = $response->json();
+        $customerIdsByCode = Customer::withTrashed()->pluck('id', 'code');
+        $rows = [];
         $count = 0;
+        $now = now();
 
         foreach ($invoices as $data) {
-            $customer = Customer::withTrashed()->where('code', $data['customer_id'])->first();
-            if (!$customer) {
+            $customerId = $customerIdsByCode->get((string) $data['customer_id']);
+            if (!$customerId) {
                 // If customer is missing locally, we cannot assign the invoice.
                 Log::warning("Skipping invoice sync for missing customer: {$data['customer_id']}");
                 continue;
@@ -217,64 +231,60 @@ class LegacySyncService
             $periodDate = Carbon::parse($data['period']);
             $dueDate = $data['due_date'] ? Carbon::parse($data['due_date']) : $periodDate->copy()->addDays(20);
 
-            Invoice::updateOrCreate(
-                [
-                    'customer_id' => $customer->id,
-                    'period' => $periodDate->format('Y-m-d')
-                ],
-                [
-                    'code' => $data['code'] ?? 'INV-' . $periodDate->format('Ym') . '-' . $customer->code,
-                    'amount' => $data['amount'],
-                    'status' => $data['status'],
-                    'due_date' => $dueDate,
-                    'generated_at' => $data['generated_at'] ? Carbon::parse($data['generated_at']) : now(),
-                    'payment_link' => $data['payment_link'],
-                ]
-            );
+            $rows[] = [
+                'customer_id' => $customerId,
+                'period' => $periodDate->toDateString(),
+                'legacy_id' => isset($data['id']) ? (string) $data['id'] : null,
+                'uuid' => $data['uuid'] ?? (string) Str::uuid(),
+                'code' => $data['code'] ?? 'INV-' . $periodDate->format('Ym') . '-' . $data['customer_id'],
+                'amount' => $data['amount'],
+                'status' => $data['status'],
+                'due_date' => $dueDate->toDateString(),
+                'generated_at' => ! empty($data['generated_at']) ? Carbon::parse($data['generated_at']) : $now,
+                'last_synced_at' => ! empty($data['last_synced_at']) ? Carbon::parse($data['last_synced_at']) : $now,
+                'payment_link' => $data['payment_link'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
             $count++;
+        }
+
+        foreach (array_chunk($rows, 1000) as $chunk) {
+            DB::table('invoices')->upsert($chunk, ['customer_id', 'period'], [
+                'legacy_id',
+                'uuid',
+                'code',
+                'amount',
+                'status',
+                'due_date',
+                'generated_at',
+                'last_synced_at',
+                'payment_link',
+                'updated_at',
+            ]);
         }
 
         return $count;
     }
 
-    private function inferAreaFromText(string $text): string
+    private function syncAreasFromCustomers(): int
     {
-        $name = strtoupper($text);
-        
-        if (str_contains($name, 'KRIAN')) return 'SKYNET-KRIAN';
-        if (str_contains($name, 'WAJAK')) return 'SKYNET-WAJAK';
-        if (str_contains($name, 'BUMIAYU')) return 'SKYNET-BUMIAYU';
-        if (str_contains($name, 'KENDIT')) return 'SKYNET-KENDIT';
-        if (str_contains($name, 'PASURUAN')) return 'SKYNET-PASURUAN';
-        if (str_contains($name, 'MALANG')) return 'SKYNET-MALANG';
-        if (str_contains($name, 'BLITAR')) return 'SKYNET-BLITAR';
-        if (str_contains($name, 'MARTOPURO')) return 'SKYNET-MARTOPURO';
-        if (str_contains($name, 'COMBORAN')) return 'SKYNET-COMBORAN';
-        if (str_contains($name, 'PURWOSARI') || str_contains($name, 'PUROWOSARI')) return 'SKYNET-PURWOSARI';
-        if (str_contains($name, 'PAKIS')) return 'SKYNET-PAKIS';
-        if (str_contains($name, 'SRIGADING')) return 'SKYNET-SRIGADING';
-        if (str_contains($name, 'ARJOSARI')) return 'SKYNET-ARJOSARI';
-        if (str_contains($name, 'KASIN')) return 'SKYNET-KASIN';
-        if (str_contains($name, 'BANTARAN')) return 'SKYNET-BANTARAN';
-        if (str_contains($name, 'LAWANG')) return 'SKYNET-LAWANG';
-        if (str_contains($name, 'SUKOREJO')) return 'SKYNET-SUKOREJO';
-        if (str_contains($name, 'KARANGPLOSO')) return 'SKYNET-KARANGPLOSO';
-        if (str_contains($name, 'SENTUL')) return 'SKYNET-BUKIT-SENTUL';
-        if (str_contains($name, 'KUNCI')) return 'SKYNET-KUNCI';
-        if (str_contains($name, 'RANDUAGUNG')) return 'SKYNET-RANDUAGUNG';
-        if (str_contains($name, 'KERTOSARI')) return 'SKYNET-KERTOSARI';
-        
-        return 'SKYNET-GENERAL';
-    }
-
-    private function normalizeAreaName(string $name): string
-    {
-        $name = strtoupper(trim($name));
-        $name = preg_replace('/\s*-\s*/', '-', $name);
-        $name = str_replace('SKYNET ', 'SKYNET-', $name);
-        if (!str_starts_with($name, 'SKYNET-') && !str_starts_with($name, 'SUBNET-')) {
-            $name = 'SKYNET-' . $name;
+        $response = Http::timeout(60)->get("{$this->baseUrl}/api/v1/customers");
+        if (! $response->successful()) {
+            throw new \Exception("Failed to fetch areas and customer fallback: " . $response->body());
         }
-        return preg_replace('/\s+/', ' ', $name);
+
+        return collect($response->json())
+            ->map(fn (array $customer) => $this->areaResolver->resolve($customer)['area'])
+            ->filter()
+            ->unique()
+            ->sum(function (string $name) {
+                Area::updateOrCreate(
+                    ['name' => $name],
+                    ['code' => Str::slug($name)]
+                );
+
+                return 1;
+            });
     }
 }

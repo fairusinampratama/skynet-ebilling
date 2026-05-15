@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
-import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut, Send, LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Package, Server, Settings, MapPin, BarChart3, MoreVertical, LogOut, Send, LucideIcon, ShieldCheck } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,6 +9,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
+import { PageProps } from '@/types';
 
 export interface NavItem {
     name: string;
@@ -26,9 +27,25 @@ export const navItems: NavItem[] = [
     { name: 'Areas', route: 'areas.index', icon: MapPin },
     { name: 'Broadcasts', route: 'broadcasts.index', icon: Send },
     { name: 'Settings', route: 'settings.index', icon: Settings },
+    { name: 'Users', route: 'users.index', icon: ShieldCheck },
 ];
 
 export function AppSidebar() {
+    const user = usePage<PageProps>().props.auth.user;
+    const isSuperAdmin = user.role === 'superadmin';
+    const isGlobalAdmin = user.scope === 'global_admin' || isSuperAdmin;
+    const roleLabel = user.scope === 'superadmin' ? 'Superadmin' : user.scope === 'global_admin' ? 'Global Admin' : 'Scoped Admin';
+    const visibleNavItems = navItems.filter((item) => {
+        if (item.route === 'users.index') {
+            return isSuperAdmin;
+        }
+
+        if (['routers.index', 'packages.index', 'areas.index', 'settings.index'].includes(item.route)) {
+            return isGlobalAdmin;
+        }
+
+        return true;
+    });
 
     return (
         <aside className="hidden w-64 flex-col border-r border-border bg-card text-card-foreground md:flex shadow-sm z-30">
@@ -40,7 +57,7 @@ export function AppSidebar() {
             </div>
             <div className="flex-1 overflow-auto py-4 bg-card">
                 <nav className="grid items-start px-4 text-sm font-medium space-y-1">
-                    {navItems.map((item) => {
+                    {visibleNavItems.map((item) => {
                         // Check active state
                         const baseRoute = item.route.split('.')[0];
                         const isActive = route().current(`${baseRoute}.*`) || route().current(item.route);
@@ -75,8 +92,8 @@ export function AppSidebar() {
                                 U
                             </div>
                             <div className="flex-1 overflow-hidden">
-                                <p className="truncate text-sm font-medium">Admin</p>
-                                <p className="truncate text-xs text-muted-foreground">admin@skynet.id</p>
+                                <p className="truncate text-sm font-medium">{user.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
                             </div>
                             <MoreVertical className="h-4 w-4 text-muted-foreground" />
                         </button>

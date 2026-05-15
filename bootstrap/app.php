@@ -18,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'global-admin' => \App\Http\Middleware\EnsureGlobalAdmin::class,
+            'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+        ]);
+
         $middleware->validateCsrfTokens(except: [
             'callback/tripay',
         ]);

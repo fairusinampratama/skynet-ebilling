@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Customer;
 use App\Models\Setting;
+use App\Support\AreaScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 use Inertia\Inertia;
@@ -38,6 +39,7 @@ class InvoiceController extends Controller
             // Default sort: Unpaid first, then newest
             ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
             ->latest('period');
+        AreaScope::applyToInvoices($query, $request->user());
 
         $limit = $request->input('limit', 20);
         $invoices = $query->paginate($limit)->withQueryString();
@@ -57,6 +59,8 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice)
     {
+        AreaScope::authorizeInvoice($invoice, request()->user());
+
         $invoice->load([
             'customer' => function($q) { $q->withTrashed()->with('package'); },
             'transactions.admin'
@@ -72,6 +76,8 @@ class InvoiceController extends Controller
      */
     public function customerInvoices(Customer $customer)
     {
+        AreaScope::authorizeCustomer($customer, request()->user());
+
         $invoices = $customer->invoices()
                             ->with('transactions')
                             ->orderBy('period', 'desc')
@@ -92,14 +98,16 @@ class InvoiceController extends Controller
             ->whereHas('package')
             ->with('package:id,name,price')
             ->select('id', 'name', 'code', 'package_id', 'due_day', 'area_id')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+        AreaScope::applyToCustomers($customers, request()->user());
+        $customers = $customers->get();
 
-        $areas = \App\Models\Area::select('id', 'name', 'code')->orderBy('name')->get();
+        $areasQuery = \App\Models\Area::select('id', 'name', 'code')->orderBy('name');
+        AreaScope::applyToAreas($areasQuery, request()->user());
 
         return Inertia::render('Invoices/Create', [
             'customers' => $customers,
-            'areas' => $areas,
+            'areas' => $areasQuery->get(),
         ]);
     }
 
@@ -114,6 +122,8 @@ class InvoiceController extends Controller
             'amount' => 'required|numeric|min:0',
             'due_date' => 'required|date',
         ]);
+        $customer = Customer::findOrFail($validated['customer_id']);
+        AreaScope::authorizeCustomer($customer, $request->user());
 
         // Convert period to 1st of month for consistency
         $period = \Carbon\Carbon::parse($validated['period'])->startOfMonth();
@@ -147,6 +157,8 @@ class InvoiceController extends Controller
      */
     public function void(Request $request, Invoice $invoice)
     {
+        AreaScope::authorizeInvoice($invoice, $request->user());
+
         if ($invoice->status !== 'unpaid') {
             return back()->with('error', 'Only unpaid invoices can be voided.');
         }
@@ -167,6 +179,8 @@ class InvoiceController extends Controller
      */
     public function destroy(Invoice $invoice)
     {
+        AreaScope::authorizeInvoice($invoice, request()->user());
+
         if ($invoice->transactions()->count() > 0) {
             return back()->with('error', 'Cannot delete an invoice with recorded payments. Void it instead.');
         }
@@ -182,6 +196,8 @@ class InvoiceController extends Controller
      */
     public function download(Invoice $invoice)
     {
+        AreaScope::authorizeInvoice($invoice, request()->user());
+
         $invoice->load([
             'customer' => function($q) { $q->withTrashed()->with('package'); },
             'transactions'

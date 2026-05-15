@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\Transaction;
+use App\Support\AreaScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 use App\Jobs\ReconnectCustomerJob;
@@ -17,6 +19,8 @@ class PaymentController extends Controller
      */
     public function create(Invoice $invoice)
     {
+        AreaScope::authorizeInvoice($invoice, request()->user());
+
         $invoice->load('customer.package');
 
         return Inertia::render('Payments/Create', [
@@ -29,6 +33,8 @@ class PaymentController extends Controller
      */
     public function store(Request $request, Invoice $invoice)
     {
+        AreaScope::authorizeInvoice($invoice, $request->user());
+
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0',
             'method' => 'required|in:cash,transfer,payment_gateway',
@@ -45,6 +51,7 @@ class PaymentController extends Controller
         // Create transaction
         $transaction = Transaction::create([
             'invoice_id' => $invoice->id,
+            'reference' => 'MANUAL-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6)),
             'admin_id' => auth()->id(),
             'amount' => $validated['amount'],
             'method' => $validated['method'],

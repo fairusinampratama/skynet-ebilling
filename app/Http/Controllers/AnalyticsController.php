@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Package;
 use App\Models\Transaction;
+use App\Support\AreaScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -28,24 +29,25 @@ class AnalyticsController extends Controller
     {
         $months = $request->input('months', 60);
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
 
-        $cacheKey = "analytics.revenue_trend.{$months}";
+        $cacheKey = "analytics.revenue_trend.{$months}." . $this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember($cacheKey, 3600, function () use ($months) {
-            return Invoice::selectRaw("
+        $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
+            $query = Invoice::selectRaw("
                     DATE_FORMAT(period, '%Y-%m') as month,
                     SUM(amount) as total_invoiced,
                     SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) as total_collected,
                     SUM(CASE WHEN status = 'unpaid' THEN amount ELSE 0 END) as outstanding
                 ")
-                ->where('period', '>=', now()->subMonths($months)->startOfMonth())
-                ->groupBy('month')
-                ->orderBy('month')
-                ->get();
+                ->where('period', '>=', now()->subMonths($months)->startOfMonth());
+            AreaScope::applyToInvoices($query, $user);
+
+            return $query->groupBy('month')->orderBy('month')->get();
         });
 
         return response()->json($data);
@@ -57,21 +59,25 @@ class AnalyticsController extends Controller
     public function mrr(Request $request)
     {
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
+        $cacheKey = 'analytics.mrr.' . $this->cacheScopeKey($user);
 
         if ($refresh) {
-            Cache::forget('analytics.mrr');
+            Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember('analytics.mrr', 3600, function () {
+        $data = Cache::remember($cacheKey, 3600, function () use ($user) {
             // Current MRR
-            $currentMrr = Customer::whereIn('status', ['active', 'isolated'])
-                ->join('packages', 'customers.package_id', '=', 'packages.id')
-                ->sum('packages.price');
+            $currentMrrQuery = Customer::whereIn('status', ['active', 'isolated'])
+                ->join('packages', 'customers.package_id', '=', 'packages.id');
+            AreaScope::applyToCustomers($currentMrrQuery, $user);
+            $currentMrr = $currentMrrQuery->sum('packages.price');
 
             // Last month MRR for comparison
             $lastMonthPeriod = now()->subMonth()->startOfMonth()->format('Y-m-d');
-            $lastMonthMrr = Invoice::where('period', $lastMonthPeriod)
-                ->sum('amount');
+            $lastMonthMrrQuery = Invoice::where('period', $lastMonthPeriod);
+            AreaScope::applyToInvoices($lastMonthMrrQuery, $user);
+            $lastMonthMrr = $lastMonthMrrQuery->sum('amount');
 
             // Calculate growth
             $growth = 0;
@@ -80,14 +86,13 @@ class AnalyticsController extends Controller
             }
 
             // 6-month trend
-            $trend = Invoice::selectRaw("
+            $trendQuery = Invoice::selectRaw("
                     DATE_FORMAT(period, '%Y-%m') as month,
                     SUM(amount) as mrr
                 ")
-                ->where('period', '>=', now()->subMonths(6)->startOfMonth())
-                ->groupBy('month')
-                ->orderBy('month')
-                ->get();
+                ->where('period', '>=', now()->subMonths(6)->startOfMonth());
+            AreaScope::applyToInvoices($trendQuery, $user);
+            $trend = $trendQuery->groupBy('month')->orderBy('month')->get();
 
             return [
                 'current_mrr' => $currentMrr,
@@ -105,33 +110,35 @@ class AnalyticsController extends Controller
     public function collectionRate(Request $request)
     {
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
+        $cacheKey = 'analytics.collection_rate.' . $this->cacheScopeKey($user);
 
         if ($refresh) {
-            Cache::forget('analytics.collection_rate');
+            Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember('analytics.collection_rate', 3600, function () {
+        $data = Cache::remember($cacheKey, 3600, function () use ($user) {
             $currentPeriod = now()->startOfMonth()->format('Y-m-d');
 
-            $stats = Invoice::selectRaw("
+            $statsQuery = Invoice::selectRaw("
                     status,
                     COUNT(*) as count,
                     SUM(amount) as total_amount
                 ")
-                ->where('period', $currentPeriod)
-                ->groupBy('status')
-                ->get()
-                ->keyBy('status');
+                ->where('period', $currentPeriod);
+            AreaScope::applyToInvoices($statsQuery, $user);
+            $stats = $statsQuery->groupBy('status')->get()->keyBy('status');
 
             $totalCount = $stats->sum('count');
             $totalAmount = $stats->sum('total_amount');
 
             // Calculate average days to payment
-            $avgDaysToPayment = Transaction::join('invoices', 'transactions.invoice_id', '=', 'invoices.id')
+            $avgDaysQuery = Transaction::join('invoices', 'transactions.invoice_id', '=', 'invoices.id')
                 ->whereMonth('transactions.paid_at', now()->month)
                 ->whereYear('transactions.paid_at', now()->year)
-                ->selectRaw('AVG(DATEDIFF(transactions.paid_at, invoices.generated_at)) as avg_days')
-                ->value('avg_days');
+                ->selectRaw('AVG(DATEDIFF(transactions.paid_at, invoices.generated_at)) as avg_days');
+            AreaScope::applyToTransactions($avgDaysQuery, $user);
+            $avgDaysToPayment = $avgDaysQuery->value('avg_days');
 
             return [
                 'by_status' => $stats,
@@ -152,15 +159,16 @@ class AnalyticsController extends Controller
     {
         $months = $request->input('months', 3);
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
 
-        $cacheKey = "analytics.revenue_by_area.{$months}";
+        $cacheKey = "analytics.revenue_by_area.{$months}." . $this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember($cacheKey, 3600, function () use ($months) {
-            return DB::table('areas')
+        $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
+            $query = DB::table('areas')
                 ->leftJoin('customers', 'customers.area_id', '=', 'areas.id')
                 ->leftJoin('invoices', 'invoices.customer_id', '=', 'customers.id')
                 ->where('invoices.period', '>=', now()->subMonths($months)->startOfMonth())
@@ -175,10 +183,14 @@ class AnalyticsController extends Controller
                         2
                     ) as collection_rate
                 ")
-                ->groupBy('areas.id', 'areas.name')
-                ->orderByDesc('total_billed')
-                ->limit(10)
-                ->get();
+                ->groupBy('areas.id', 'areas.name');
+
+            if ($user->hasAreaScope()) {
+                $areaIds = $user->accessibleAreaIds()->all();
+                empty($areaIds) ? $query->whereRaw('1 = 0') : $query->whereIn('areas.id', $areaIds);
+            }
+
+            return $query->orderByDesc('total_billed')->limit(10)->get();
         });
 
         return response()->json($data);
@@ -191,15 +203,16 @@ class AnalyticsController extends Controller
     {
         $months = $request->input('months', 3);
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
 
-        $cacheKey = "analytics.package_performance.{$months}";
+        $cacheKey = "analytics.package_performance.{$months}." . $this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember($cacheKey, 3600, function () use ($months) {
-            return Package::leftJoin('customers', 'customers.package_id', '=', 'packages.id')
+        $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
+            $query = Package::leftJoin('customers', 'customers.package_id', '=', 'packages.id')
                 ->leftJoin('invoices', function ($join) use ($months) {
                     $join->on('invoices.customer_id', '=', 'customers.id')
                         ->where('invoices.period', '>=', now()->subMonths($months)->startOfMonth());
@@ -210,8 +223,10 @@ class AnalyticsController extends Controller
                     packages.price,
                     COUNT(DISTINCT customers.id) as active_customers,
                     COALESCE(SUM(invoices.amount), 0) as total_revenue
-                ")
-                ->groupBy('packages.id', 'packages.name', 'packages.price')
+                ");
+            AreaScope::applyToCustomers($query, $user);
+
+            return $query->groupBy('packages.id', 'packages.name', 'packages.price')
                 ->orderByDesc('total_revenue')
                 ->get();
         });
@@ -226,22 +241,24 @@ class AnalyticsController extends Controller
     {
         $months = $request->input('months', 6);
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
 
-        $cacheKey = "analytics.payment_methods.{$months}";
+        $cacheKey = "analytics.payment_methods.{$months}." . $this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember($cacheKey, 3600, function () use ($months) {
-            return Transaction::selectRaw("
+        $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
+            $query = Transaction::selectRaw("
                     method,
                     COUNT(*) as transaction_count,
                     SUM(amount) as total_amount
                 ")
-                ->where('paid_at', '>=', now()->subMonths($months))
-                ->groupBy('method')
-                ->get();
+                ->where('paid_at', '>=', now()->subMonths($months));
+            AreaScope::applyToTransactions($query, $user);
+
+            return $query->groupBy('method')->get();
         });
 
         return response()->json($data);
@@ -253,13 +270,15 @@ class AnalyticsController extends Controller
     public function outstandingAging(Request $request)
     {
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
+        $cacheKey = 'analytics.outstanding_aging.' . $this->cacheScopeKey($user);
 
         if ($refresh) {
-            Cache::forget('analytics.outstanding_aging');
+            Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember('analytics.outstanding_aging', 3600, function () {
-            return Invoice::selectRaw("
+        $data = Cache::remember($cacheKey, 3600, function () use ($user) {
+            $query = Invoice::selectRaw("
                     CASE 
                         WHEN DATEDIFF(NOW(), due_date) <= 30 THEN '0-30 days'
                         WHEN DATEDIFF(NOW(), due_date) <= 60 THEN '30-60 days'
@@ -270,8 +289,10 @@ class AnalyticsController extends Controller
                     SUM(amount) as total_amount
                 ")
                 ->where('status', 'unpaid')
-                ->where('due_date', '<', now())
-                ->groupBy('age_bucket')
+                ->where('due_date', '<', now());
+            AreaScope::applyToInvoices($query, $user);
+
+            return $query->groupBy('age_bucket')
                 ->orderByRaw("FIELD(age_bucket, '0-30 days', '30-60 days', '60-90 days', '90+ days')")
                 ->get();
         });
@@ -286,34 +307,32 @@ class AnalyticsController extends Controller
     {
         $months = $request->input('months', 60);
         $refresh = $request->boolean('refresh', false);
+        $user = $request->user();
 
-        $cacheKey = "analytics.customer_growth.{$months}";
+        $cacheKey = "analytics.customer_growth.{$months}." . $this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
-        $data = Cache::remember($cacheKey, 3600, function () use ($months) {
+        $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
             // New customers by month
-            $newCustomers = Customer::selectRaw("
+            $newCustomersQuery = Customer::selectRaw("
                     DATE_FORMAT(join_date, '%Y-%m') as month,
                     COUNT(*) as new_customers
                 ")
-                ->where('join_date', '>=', now()->subMonths($months)->startOfMonth())
-                ->groupBy('month')
-                ->orderBy('month')
-                ->get()
-                ->keyBy('month');
+                ->where('join_date', '>=', now()->subMonths($months)->startOfMonth());
+            AreaScope::applyToCustomers($newCustomersQuery, $user);
+            $newCustomers = $newCustomersQuery->groupBy('month')->orderBy('month')->get()->keyBy('month');
 
             // Active/Isolated count by month (current snapshot)
-            $statusCounts = Customer::selectRaw("
+            $statusCountsQuery = Customer::selectRaw("
                     status,
                     COUNT(*) as count
                 ")
-                ->whereIn('status', ['active', 'isolated', 'terminated'])
-                ->groupBy('status')
-                ->get()
-                ->keyBy('status');
+                ->whereIn('status', ['active', 'isolated', 'terminated']);
+            AreaScope::applyToCustomers($statusCountsQuery, $user);
+            $statusCounts = $statusCountsQuery->groupBy('status')->get()->keyBy('status');
 
             return [
                 'new_customers_trend' => $newCustomers,
@@ -322,5 +341,20 @@ class AnalyticsController extends Controller
         });
 
         return response()->json($data);
+    }
+
+    private function cacheScopeKey($user): string
+    {
+        if ($user->isSuperAdmin()) {
+            return 'superadmin';
+        }
+
+        if ($user->isGlobalAdmin()) {
+            return 'admin.global';
+        }
+
+        $areaIds = $user->accessibleAreaIds()->sort()->values()->implode('-');
+
+        return 'admin.scoped.' . ($areaIds ?: 'none');
     }
 }

@@ -6,6 +6,7 @@ use App\Models\WaCampaign;
 use App\Models\Area;
 use App\Jobs\ProcessWaCampaign;
 use App\Jobs\SendWaCampaignMessage;
+use App\Support\AreaScope;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,7 +14,10 @@ class WaCampaignController extends Controller
 {
     public function index()
     {
-        $campaigns = WaCampaign::with('targetArea')->latest()->paginate(10);
+        $query = WaCampaign::with('targetArea')->latest();
+        AreaScope::applyToCampaigns($query, request()->user());
+        $campaigns = $query->paginate(10);
+
         return Inertia::render('Broadcasts/Index', [
             'campaigns' => $campaigns
         ]);
@@ -21,8 +25,11 @@ class WaCampaignController extends Controller
 
     public function create()
     {
+        $areasQuery = Area::query();
+        AreaScope::applyToAreas($areasQuery, request()->user());
+
         return Inertia::render('Broadcasts/Create', [
-            'areas' => Area::all()
+            'areas' => $areasQuery->get()
         ]);
     }
 
@@ -34,6 +41,9 @@ class WaCampaignController extends Controller
             'target_area_id' => 'nullable|exists:areas,id',
             'message_template' => 'required|string',
         ]);
+        if ($request->user()->hasAreaScope()) {
+            AreaScope::authorizeAreaId(isset($validated['target_area_id']) ? (int) $validated['target_area_id'] : null, $request->user());
+        }
 
         $campaign = WaCampaign::create($validated);
 
@@ -45,9 +55,17 @@ class WaCampaignController extends Controller
 
     public function show(WaCampaign $campaign)
     {
+        AreaScope::authorizeCampaign($campaign, request()->user());
+
         $campaign->load('targetArea');
         $recipients = $campaign->recipients()
             ->with('customer')
+            ->when(request()->user()->hasAreaScope(), function ($query) {
+                $areaIds = request()->user()->accessibleAreaIds()->all();
+                empty($areaIds)
+                    ? $query->whereRaw('1 = 0')
+                    : $query->whereHas('customer', fn ($customer) => $customer->whereIn('area_id', $areaIds));
+            })
             ->orderBy('id', 'desc')
             ->paginate(20);
 
@@ -59,6 +77,8 @@ class WaCampaignController extends Controller
 
     public function retryFailed(WaCampaign $campaign)
     {
+        AreaScope::authorizeCampaign($campaign, request()->user());
+
         $failedRecipients = $campaign->recipients()->where('status', 'failed')->get();
 
         if ($failedRecipients->isEmpty()) {

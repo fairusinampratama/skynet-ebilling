@@ -39,6 +39,7 @@ class Customer extends Model
 
     protected $fillable = [
         'code',
+        'legacy_id',
         'name',
         'address',
         'phone',
