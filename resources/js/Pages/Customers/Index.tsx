@@ -5,7 +5,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
-import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
+import { Download, MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 import { PageProps } from '@/types';
 
@@ -71,6 +71,7 @@ interface Props {
         area_id?: string;
         sort?: string;
         direction?: 'asc' | 'desc';
+        limit?: string;
     };
 }
 
@@ -198,6 +199,18 @@ export default function Index({ customers, packages = [], areas = [], filters = 
         }
     };
 
+    const exportUrl = () => {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value) {
+                params.set(key, String(value));
+            }
+        });
+
+        const query = params.toString();
+        return query ? `${route('customers.export')}?${query}` : route('customers.export');
+    };
+
     const filterConfigs: FilterConfig[] = [
         {
             key: 'package_id',
@@ -228,13 +241,21 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                     <h2 className="text-xl font-semibold leading-tight text-foreground">
                         Customers
                     </h2>
-                    {isAdmin && (
-                        <Link href={route('customers.create')}>
-                            <Button className="bg-foreground text-background hover:bg-foreground/90">
-                                Add Customer
+                    <div className="flex items-center gap-2">
+                        <a href={exportUrl()}>
+                            <Button variant="outline" className="gap-2">
+                                <Download className="h-4 w-4" />
+                                Export XLSX
                             </Button>
-                        </Link>
-                    )}
+                        </a>
+                        {isAdmin && (
+                            <Link href={route('customers.create')}>
+                                <Button className="bg-foreground text-background hover:bg-foreground/90">
+                                    Add Customer
+                                </Button>
+                            </Link>
+                        )}
+                    </div>
                 </div>
             }
         >
