@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Customer;
 use App\Models\Setting;
+use App\Models\Transaction;
 use App\Support\AreaScope;
+use App\Support\SimpleXlsxWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 use Inertia\Inertia;
@@ -18,28 +20,11 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Invoice::query()
-            ->with(['customer' => function($q) {
+        $query = $this->invoiceIndexQuery($request, [
+            'customer' => function($q) {
                 $q->select('id', 'name', 'code')->withTrashed();
-            }])
-            ->when($request->search, function ($q, $search) {
-                $q->where(function ($sub) use ($search) {
-                    $sub->where('code', 'like', "%{$search}%")
-                        ->orWhereHas('customer', function ($c) use ($search) {
-                            $c->where('name', 'like', "%{$search}%")
-                              ->orWhere('code', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->when($request->status, function ($q, $status) {
-                if ($status !== 'all') {
-                    $q->where('status', $status);
-                }
-            })
-            // Default sort: Unpaid first, then newest
-            ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
-            ->latest('period');
-        AreaScope::applyToInvoices($query, $request->user());
+            }
+        ]);
 
         $limit = $request->input('limit', 20);
         $invoices = $query->paginate($limit)->withQueryString();
@@ -52,6 +37,65 @@ class InvoiceController extends Controller
                 'limit' => $limit,
             ],
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $query = $this->invoiceIndexQuery($request, [
+            'customer' => function($q) {
+                $q->withTrashed()->with(['package:id,name,rate_limit']);
+            },
+            'transactions.admin',
+        ]);
+
+        $rowNumber = 1;
+        $rows = $query->lazy(1000)->map(function (Invoice $invoice) use (&$rowNumber) {
+            $paidTransactions = $invoice->transactions
+                ->whereIn('status', ['verified', 'paid']);
+            $latestPayment = $paidTransactions->sortByDesc('paid_at')->first();
+            $paidAmount = $paidTransactions->sum('amount');
+            if ((float) $paidAmount <= 0 && $invoice->status === 'paid') {
+                $paidAmount = $invoice->amount;
+            }
+
+            return [
+                $rowNumber++,
+                $invoice->customer?->code ?? '',
+                $invoice->customer?->nik ?? '',
+                $invoice->customer?->name ?? '',
+                $invoice->customer?->address ?? '',
+                $invoice->customer?->phone ?? '',
+                $invoice->customer?->package?->name ?? '',
+                $invoice->customer?->package?->rate_limit ?? '',
+                $invoice->amount,
+                $paidAmount,
+                $invoice->period?->format('F Y') ?? '',
+                $this->paymentStatusLabel($invoice->status),
+                $this->paymentMethodLabel($latestPayment),
+                $latestPayment?->paid_at?->toDateTimeString() ?? '',
+                $latestPayment?->admin ? 'Diinput oleh ' . $latestPayment->admin->name : '',
+            ];
+        });
+
+        $path = SimpleXlsxWriter::create('invoices-export.xlsx', [
+            'No',
+            'ID Pelanggan',
+            'No KTP',
+            'Nama Pelanggan',
+            'Alamat',
+            'Tlp',
+            'Nama Langganan',
+            'Keterangan Langganan',
+            'Nominal Harus Dibayar',
+            'Nominal Pembayaran',
+            'Bulan',
+            'Status Pembayaran',
+            'Metode',
+            'Waktu Entry',
+            'Keterangan',
+        ], $rows);
+
+        return response()->download($path, 'invoices-' . now()->format('Ymd-His') . '.xlsx')->deleteFileAfterSend();
     }
 
     /**
@@ -215,5 +259,50 @@ class InvoiceController extends Controller
         $pdf = Pdf::loadView('invoices.pdf', compact('invoice', 'company', 'manual_accounts'));
         
         return $pdf->stream("Invoice-{$invoice->code}.pdf");
+    }
+
+    private function paymentStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'paid' => 'Lunas',
+            'unpaid' => 'Belum Lunas',
+            'void' => 'Batal',
+            default => ucfirst($status),
+        };
+    }
+
+    private function paymentMethodLabel(?Transaction $transaction): string
+    {
+        if (! $transaction) {
+            return '';
+        }
+
+        return $transaction->method ?: $transaction->channel;
+    }
+
+    private function invoiceIndexQuery(Request $request, array $with)
+    {
+        $query = Invoice::query()
+            ->with($with)
+            ->when($request->search, function ($q, $search) {
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('code', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($c) use ($search) {
+                            $c->where('name', 'like', "%{$search}%")
+                              ->orWhere('code', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($request->status, function ($q, $status) {
+                if ($status !== 'all') {
+                    $q->where('status', $status);
+                }
+            })
+            // Default sort: Unpaid first, then newest
+            ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
+            ->latest('period');
+        AreaScope::applyToInvoices($query, $request->user());
+
+        return $query;
     }
 }

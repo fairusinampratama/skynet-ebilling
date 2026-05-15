@@ -8,6 +8,7 @@ use App\Models\Area;
 use App\Models\Router;
 use App\Services\MikrotikService;
 use App\Support\AreaScope;
+use App\Support\SimpleXlsxWriter;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -18,45 +19,7 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Customer::with([
-            'package',
-            'area',
-            'invoices' => function($q) {
-                $q->where('status', 'unpaid')->orderBy('due_date', 'asc')->limit(1);
-            }
-        ]);
-        AreaScope::applyToCustomers($query, $request->user());
-
-        // Search functionality
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('pppoe_user', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
-
-        // Status filter
-        if ($request->has('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        // Package filter
-        if ($request->has('package_id') && $request->package_id) {
-            $query->where('package_id', $request->package_id);
-        }
-
-        // Area filter
-        if ($request->has('area_id') && $request->area_id) {
-            $query->where('area_id', $request->area_id);
-        }
-
-        // Sorting
-        $sortField = $request->get('sort', 'join_date');
-        $sortDirection = $request->get('direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
+        $query = $this->customerIndexQuery($request);
 
         // Pagination
         $limit = $request->input('limit', 20);
@@ -71,6 +34,64 @@ class CustomerController extends Controller
             'packages' => Package::all(), // For filter dropdown
             'areas' => $areasQuery->get(),
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $query = $this->customerIndexQuery($request)
+            ->with(['package:id,name,price,rate_limit', 'area:id,name'])
+            ->select([
+                'id',
+                'code',
+                'nik',
+                'name',
+                'phone',
+                'address',
+                'pppoe_user',
+                'package_id',
+                'area_id',
+                'status',
+                'join_date',
+                'due_day',
+                'created_at',
+            ]);
+
+        $rowNumber = 1;
+        $rows = $query->lazy(1000)->map(function (Customer $customer) use (&$rowNumber) {
+            return [
+            $rowNumber++,
+            $customer->code,
+            $customer->nik ?? '',
+            $customer->name,
+            $customer->address,
+            $customer->phone,
+            $customer->area?->name ?? '',
+            $customer->package?->name ?? '',
+            $customer->package?->rate_limit ?? '',
+            $customer->package?->price ?? '',
+            $customer->status,
+            $customer->join_date?->toDateString() ?? '',
+            $customer->due_day,
+            ];
+        });
+
+        $path = SimpleXlsxWriter::create('customers-export.xlsx', [
+            'No',
+            'ID Pelanggan',
+            'No KTP',
+            'Nama Pelanggan',
+            'Alamat',
+            'Tlp',
+            'Area',
+            'Nama Langganan',
+            'Keterangan Langganan',
+            'Harga Langganan',
+            'Status Pelanggan',
+            'Tanggal Bergabung',
+            'Jatuh Tempo',
+        ], $rows);
+
+        return response()->download($path, 'customers-' . now()->format('Ymd-His') . '.xlsx')->deleteFileAfterSend();
     }
 
     /**
@@ -267,5 +288,56 @@ class CustomerController extends Controller
 
         $customer->update(['status' => 'active']);
         return back()->with('success', 'Customer status set to ACTIVE (Manual).');
+    }
+
+    private function customerIndexQuery(Request $request)
+    {
+        $query = Customer::with([
+            'package',
+            'area',
+            'invoices' => function($q) {
+                $q->where('status', 'unpaid')->orderBy('due_date', 'asc')->limit(1);
+            }
+        ]);
+        AreaScope::applyToCustomers($query, $request->user());
+
+        // Search functionality
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('pppoe_user', 'like', "%{$search}%")
+                  ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        // Status filter
+        if ($request->has('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        // Package filter
+        if ($request->has('package_id') && $request->package_id) {
+            $query->where('package_id', $request->package_id);
+        }
+
+        // Area filter
+        if ($request->has('area_id') && $request->area_id) {
+            $query->where('area_id', $request->area_id);
+        }
+
+        // Sorting
+        $sortField = $request->get('sort', 'join_date');
+        $sortDirection = $request->get('direction', 'desc');
+        if (! in_array($sortField, ['code', 'name', 'status', 'join_date', 'created_at'], true)) {
+            $sortField = 'join_date';
+        }
+        if (! in_array($sortDirection, ['asc', 'desc'], true)) {
+            $sortDirection = 'desc';
+        }
+        $query->orderBy($sortField, $sortDirection);
+
+        return $query;
     }
 }

@@ -27,6 +27,14 @@ class SyncLegacyData extends Command
             $customers = $syncService->syncCustomers();
             $this->info("✅ Customers Synced: {$customers}");
 
+            $deletedEmptyAreas = $syncService->cleanupEmptyAreas();
+            if ($deletedEmptyAreas === []) {
+                $this->info("✅ No empty areas deleted");
+            } else {
+                $this->info("✅ Empty Areas Deleted: " . count($deletedEmptyAreas));
+                $this->line("Deleted: " . implode(', ', $deletedEmptyAreas));
+            }
+
             $this->info("Fetching Invoice data... (This may take a moment)");
             $invoices = $syncService->syncInvoices();
             $this->info("✅ Invoices Synced: {$invoices}");

@@ -67,6 +67,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Customer Management
     // =====================================================
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::get('/customers/export', [CustomerController::class, 'export'])->name('customers.export');
     Route::middleware('admin')->group(function () {
         Route::get('/customers/create', [CustomerController::class, 'create'])->name('customers.create');
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
@@ -94,6 +95,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // =====================================================
     Route::get('/invoices', [InvoiceController::class, 'index'])
         ->name('invoices.index');
+    Route::get('/invoices/export', [InvoiceController::class, 'export'])
+        ->name('invoices.export');
     Route::middleware('admin')->group(function () {
         Route::get('/invoices/create', [InvoiceController::class, 'create'])
             ->name('invoices.create');

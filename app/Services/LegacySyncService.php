@@ -31,9 +31,10 @@ class LegacySyncService
         $stats = [
             'areas' => $this->syncAreas(),
             'packages' => $this->syncPackages(),
-            'customers' => $this->syncCustomers(),
-            'invoices' => $this->syncInvoices(),
         ];
+        $stats['customers'] = $this->syncCustomers();
+        $stats['deleted_empty_areas'] = count($this->cleanupEmptyAreas());
+        $stats['invoices'] = $this->syncInvoices();
 
         return $stats;
     }
@@ -207,6 +208,39 @@ class LegacySyncService
         }
 
         return count($rows);
+    }
+
+    /**
+     * Delete areas that remain unused after the latest customer sync.
+     *
+     * @return array<int, string>
+     */
+    public function cleanupEmptyAreas(): array
+    {
+        $areas = Area::query()
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('customers')
+                    ->whereColumn('customers.area_id', 'areas.id');
+            })
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('area_user')
+                    ->whereColumn('area_user.area_id', 'areas.id');
+            })
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('wa_campaigns')
+                    ->whereColumn('wa_campaigns.target_area_id', 'areas.id');
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        foreach ($areas as $area) {
+            $area->delete();
+        }
+
+        return $areas->pluck('name')->all();
     }
 
     public function syncInvoices(): int
