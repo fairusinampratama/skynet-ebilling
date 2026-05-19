@@ -53,4 +53,9 @@ class Router extends Model
     {
         return $this->hasMany(RouterProfile::class);
     }
+
+    public function stagedCustomers()
+    {
+        return $this->hasMany(RouterStagedCustomer::class);
+    }
 }

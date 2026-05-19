@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Router;
 use App\Models\Customer;
+use App\Models\RouterStagedCustomer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -268,6 +269,9 @@ class RouterSyncService
             'not_found_ebilling' => 0,
             'unmatched_mikrotik' => 0,
             'orphaned' => 0,
+            'staged_router_only' => 0,
+            'staged_matched' => 0,
+            'staged_gone' => 0,
             'synced_package' => 0,
             'synced_status' => 0,
             'errors' => [],
@@ -297,18 +301,29 @@ class RouterSyncService
 
             if (!$customer) {
                 $stats['unmatched_mikrotik']++;
+                if (!$dryRun) {
+                    $this->stageRouterOnlySecret($router, $secret);
+                    $stats['staged_router_only']++;
+                }
                 continue;
             }
 
             if (!$dryRun) {
                 $isOnline = array_key_exists($pppoeUsername, $activeUsernames) ? true : null;
                 $syncRows[] = $this->customerSyncRow($router, $customer, $secret, $stats, $isOnline);
+                if ($this->markStagedSecretMatched($router, $pppoeUsername, $customer)) {
+                    $stats['staged_matched']++;
+                }
             }
             $stats['mapped']++;
         }
 
         if (!$dryRun && !empty($syncRows)) {
             $this->updateCustomerSyncRows($syncRows);
+        }
+
+        if (!$dryRun) {
+            $stats['staged_gone'] = $this->markStagedSecretsGone($router, $secretUsernames);
         }
 
         $stats['not_found_ebilling'] = $this->markAssignedEbillingCustomersMissingFromRouter($router, $secretUsernames, $dryRun);
@@ -319,10 +334,68 @@ class RouterSyncService
             'mapped' => $stats['mapped'],
             'unmatched_mikrotik' => $stats['unmatched_mikrotik'],
             'not_found_ebilling' => $stats['not_found_ebilling'],
+            'staged_router_only' => $stats['staged_router_only'],
+            'staged_gone' => $stats['staged_gone'],
             'synced_status' => $stats['synced_status'],
         ]);
 
         return $stats;
+    }
+
+    protected function stageRouterOnlySecret(Router $router, array $secret): void
+    {
+        $username = (string) ($secret['name'] ?? '');
+        if ($username === '') {
+            return;
+        }
+
+        $now = now();
+
+        $staged = RouterStagedCustomer::firstOrNew([
+            'router_id' => $router->id,
+            'pppoe_user' => $username,
+        ]);
+
+        if (!$staged->exists) {
+            $staged->first_seen_at = $now;
+        }
+
+        $payload = $secret;
+        unset($payload['password']);
+
+        $staged->fill([
+            'matched_customer_id' => null,
+            'profile' => $secret['profile'] ?? null,
+            'comment' => $secret['comment'] ?? null,
+            'disabled' => filter_var($secret['disabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'status' => 'unmatched',
+            'raw_payload' => $payload,
+            'last_seen_at' => $now,
+        ])->save();
+    }
+
+    protected function markStagedSecretMatched(Router $router, string $username, Customer $customer): bool
+    {
+        return RouterStagedCustomer::where('router_id', $router->id)
+            ->where('pppoe_user', $username)
+            ->where('status', '!=', 'matched')
+            ->update([
+                'matched_customer_id' => $customer->id,
+                'status' => 'matched',
+                'last_seen_at' => now(),
+            ]) > 0;
+    }
+
+    protected function markStagedSecretsGone(Router $router, array $secretUsernames): int
+    {
+        $query = RouterStagedCustomer::where('router_id', $router->id)
+            ->where('status', 'unmatched');
+
+        if (!empty($secretUsernames)) {
+            $query->whereNotIn('pppoe_user', $secretUsernames);
+        }
+
+        return $query->update(['status' => 'gone']);
     }
 
     protected function secretUsernames(array $secrets): array

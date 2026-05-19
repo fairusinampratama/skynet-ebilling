@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\Router;
+use App\Models\RouterStagedCustomer;
 use App\Services\MikrotikService;
 use App\Services\RouterSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,6 +32,13 @@ class EbillingOnlyRouterSyncTest extends TestCase
         $this->assertSame(0, $result['mapped']);
         $this->assertSame(1, $result['unmatched_mikrotik']);
         $this->assertSame(1, $result['orphaned']);
+        $this->assertSame(1, $result['staged_router_only']);
+        $this->assertDatabaseHas('router_staged_customers', [
+            'router_id' => $router->id,
+            'pppoe_user' => 'router.only',
+            'profile' => '10MB',
+            'status' => 'unmatched',
+        ]);
     }
 
     public function test_sync_links_existing_ebilling_customer_by_exact_pppoe_and_preserves_billing_fields(): void
@@ -109,6 +117,79 @@ class EbillingOnlyRouterSyncTest extends TestCase
         $importedCustomer = Customer::first();
         $this->assertNull($importedCustomer->router_id);
         $this->assertSame('unknown', $importedCustomer->mikrotik_sync_status);
+        $this->assertDatabaseHas('router_staged_customers', [
+            'router_id' => $router->id,
+            'pppoe_user' => 'same-user',
+            'status' => 'unmatched',
+        ]);
+    }
+
+    public function test_existing_staged_router_secret_is_marked_matched_after_customer_is_created(): void
+    {
+        $router = $this->router();
+        $package = $this->package('PKG-STAGED-MATCH');
+        RouterStagedCustomer::create([
+            'router_id' => $router->id,
+            'pppoe_user' => 'later.customer',
+            'profile' => '10MB',
+            'status' => 'unmatched',
+            'first_seen_at' => now()->subDay(),
+            'last_seen_at' => now()->subDay(),
+        ]);
+        $customer = Customer::create([
+            'code' => 'CUST-STAGED',
+            'name' => 'Later Customer',
+            'phone' => '080000000099',
+            'address' => 'Matched Address',
+            'pppoe_user' => 'later.customer',
+            'package_id' => $package->id,
+            'status' => 'active',
+        ]);
+
+        $mikrotik = Mockery::mock(MikrotikService::class);
+        $mikrotik->shouldReceive('connect')->once();
+        $mikrotik->shouldReceive('disconnect')->once();
+        $mikrotik->shouldReceive('getPPPSecrets')->once()->andReturn([
+            ['name' => 'later.customer', 'profile' => '20MB'],
+        ]);
+
+        $result = (new RouterSyncService($mikrotik))->syncCustomers($router);
+
+        $this->assertSame(1, $result['mapped']);
+        $this->assertSame(1, $result['staged_matched']);
+        $this->assertDatabaseHas('router_staged_customers', [
+            'router_id' => $router->id,
+            'pppoe_user' => 'later.customer',
+            'matched_customer_id' => $customer->id,
+            'status' => 'matched',
+        ]);
+    }
+
+    public function test_staged_router_secret_missing_from_later_scan_is_marked_gone(): void
+    {
+        $router = $this->router();
+        RouterStagedCustomer::create([
+            'router_id' => $router->id,
+            'pppoe_user' => 'gone.user',
+            'profile' => '10MB',
+            'status' => 'unmatched',
+            'first_seen_at' => now()->subDay(),
+            'last_seen_at' => now()->subDay(),
+        ]);
+
+        $mikrotik = Mockery::mock(MikrotikService::class);
+        $mikrotik->shouldReceive('connect')->once();
+        $mikrotik->shouldReceive('disconnect')->once();
+        $mikrotik->shouldReceive('getPPPSecrets')->once()->andReturn([]);
+
+        $result = (new RouterSyncService($mikrotik))->syncCustomers($router);
+
+        $this->assertSame(1, $result['staged_gone']);
+        $this->assertDatabaseHas('router_staged_customers', [
+            'router_id' => $router->id,
+            'pppoe_user' => 'gone.user',
+            'status' => 'gone',
+        ]);
     }
 
     public function test_assigned_ebilling_customer_missing_from_router_is_marked_missing_without_changing_router_fields(): void
