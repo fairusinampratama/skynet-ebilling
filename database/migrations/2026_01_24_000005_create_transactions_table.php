@@ -18,7 +18,7 @@ return new class extends Migration
                 $table->foreignId('invoice_id')->constrained('invoices')->cascadeOnDelete();
                 $table->foreignId('admin_id')->nullable()->constrained('users')->nullOnDelete();
                 $table->decimal('amount', 10, 2);
-                $table->enum('channel', ['whatsapp', 'manual', 'tripay'])->default('manual');
+                $table->enum('channel', ['whatsapp', 'manual'])->default('manual');
                 $table->enum('method', ['cash', 'transfer', 'qris', 'other'])->nullable();
                 $table->enum('status', ['pending', 'verified', 'rejected', 'paid', 'failed'])->default('verified');
                 $table->string('proof_url')->nullable();

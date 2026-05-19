@@ -35,11 +35,6 @@ Route::get('/', function () {
 // =====================================================
 Route::get('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class, 'show'])->name('public.invoice.show');
 
-// Tripay Webhook (Public)
-Route::post('/api/payments/callback', [\App\Http\Controllers\TripayCallbackController::class, 'handle'])
-    ->name('payments.callback');
-
-
 // Authenticated Routes
 Route::middleware(['auth', 'verified'])->group(function () {
     
