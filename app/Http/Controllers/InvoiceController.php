@@ -138,7 +138,8 @@ class InvoiceController extends Controller
      */
     public function create()
     {
-        $customers = Customer::whereIn('status', ['active', 'isolated'])
+        $customers = Customer::ebilling()
+            ->whereIn('status', ['active', 'isolated'])
             ->whereHas('package')
             ->with('package:id,name,price')
             ->select('id', 'name', 'code', 'package_id', 'due_day', 'area_id')

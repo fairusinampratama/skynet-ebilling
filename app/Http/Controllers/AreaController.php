@@ -88,7 +88,7 @@ class AreaController extends Controller
      */
     public function destroy(Area $area)
     {
-        if ($area->customers()->exists()) {
+        if ($area->customers()->ebilling()->exists()) {
             return back()->with('error', 'Cannot delete area with associated customers.');
         }
 

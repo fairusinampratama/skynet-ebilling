@@ -38,8 +38,8 @@ class ScanRouters extends Command
                 $stats = $syncService->syncCustomers($router);
                 
                 $this->table(
-                    ['Mapped', 'Orphaned', 'Packages Updated'],
-                    [[$stats['mapped'], $stats['orphaned'], $stats['synced_package']]]
+                    ['Mapped', 'Unmatched MikroTik', 'eBilling Not Found'],
+                    [[$stats['mapped'], $stats['unmatched_mikrotik'], $stats['not_found_ebilling']]]
                 );
 
             } catch (\Exception $e) {

@@ -70,6 +70,7 @@ interface DataTableProps<T> {
     actions?: ReactNode; // Slot for "Add Button" etc.
     loading?: boolean;
     onRowClick?: (item: T) => void;
+    mobileCard?: (item: T) => ReactNode;
     routeName: string; // Base route name for router.get() e.g. "customers.index"
     routeParams?: any; // Parameters required for the route e.g. { id: 1 }
 }
@@ -84,6 +85,7 @@ export default function DataTable<T extends { id: number | string }>({
     filterConfigs = [],
     actions,
     onRowClick,
+    mobileCard,
     routeName,
     routeParams
 }: DataTableProps<T>) {
@@ -201,7 +203,31 @@ export default function DataTable<T extends { id: number | string }>({
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border border-border overflow-hidden">
+                    {mobileCard && (
+                        <div className="space-y-3 md:hidden">
+                            {data.data.length === 0 ? (
+                                <div className="flex h-48 flex-col items-center justify-center rounded-md border border-border text-center text-muted-foreground">
+                                    <p className="text-lg font-medium">No results found</p>
+                                    <p className="text-sm">Try adjusting your search or filters</p>
+                                    <Button variant="link" onClick={handleReset} className="mt-2">
+                                        Clear all filters
+                                    </Button>
+                                </div>
+                            ) : (
+                                data.data.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className={onRowClick ? 'cursor-pointer' : ''}
+                                        onClick={() => onRowClick && onRowClick(item)}
+                                    >
+                                        {mobileCard(item)}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    <div className={`rounded-md border border-border overflow-hidden ${mobileCard ? 'hidden md:block' : ''}`}>
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow className="border-border hover:bg-muted/50">

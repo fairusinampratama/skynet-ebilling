@@ -68,7 +68,8 @@ class AnalyticsController extends Controller
 
         $data = Cache::remember($cacheKey, 3600, function () use ($user) {
             // Current MRR
-            $currentMrrQuery = Customer::whereIn('status', ['active', 'isolated'])
+            $currentMrrQuery = Customer::ebilling()
+                ->whereIn('status', ['active', 'isolated'])
                 ->join('packages', 'customers.package_id', '=', 'packages.id');
             AreaScope::applyToCustomers($currentMrrQuery, $user);
             $currentMrr = $currentMrrQuery->sum('packages.price');
@@ -317,7 +318,7 @@ class AnalyticsController extends Controller
 
         $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
             // New customers by month
-            $newCustomersQuery = Customer::selectRaw("
+            $newCustomersQuery = Customer::ebilling()->selectRaw("
                     DATE_FORMAT(join_date, '%Y-%m') as month,
                     COUNT(*) as new_customers
                 ")
@@ -326,7 +327,7 @@ class AnalyticsController extends Controller
             $newCustomers = $newCustomersQuery->groupBy('month')->orderBy('month')->get()->keyBy('month');
 
             // Active/Isolated count by month (current snapshot)
-            $statusCountsQuery = Customer::selectRaw("
+            $statusCountsQuery = Customer::ebilling()->selectRaw("
                     status,
                     COUNT(*) as count
                 ")

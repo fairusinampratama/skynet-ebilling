@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Router;
+use App\Models\Customer;
 use RouterOS\Client;
 use RouterOS\Config;
 use RouterOS\Query;
@@ -49,14 +50,87 @@ class MikrotikService
         return $this;
     }
 
+    public function isolateCustomerNow(Customer $customer, int $timeout = 10): void
+    {
+        if (!$customer->router || !$customer->pppoe_user) {
+            throw new \InvalidArgumentException('Customer must have a router and PPPoE username.');
+        }
+
+        try {
+            $this->connect($customer->router, ['timeout' => $timeout, 'attempts' => 1]);
+
+            if (!$this->isolateUser($customer->pppoe_user)) {
+                throw new \RuntimeException("PPPoE user '{$customer->pppoe_user}' not found on router '{$customer->router->name}'");
+            }
+
+            $customer->update([
+                'status' => 'isolated',
+                'mikrotik_profile' => $this->isolationProfileName(),
+                'mikrotik_sync_status' => 'synced',
+                'mikrotik_synced_at' => now(),
+                'mikrotik_sync_checked_at' => now(),
+            ]);
+
+            activity()
+                ->causedBy(auth()->user() ?? null)
+                ->performedOn($customer)
+                ->withProperties([
+                    'router' => $customer->router->name,
+                    'pppoe_user' => $customer->pppoe_user,
+                    'mode' => 'realtime',
+                ])
+                ->log('customer_isolated');
+        } finally {
+            $this->disconnect();
+        }
+    }
+
+    public function reconnectCustomerNow(Customer $customer, int $timeout = 10): void
+    {
+        if (!$customer->router || !$customer->pppoe_user) {
+            throw new \InvalidArgumentException('Customer must have a router and PPPoE username.');
+        }
+
+        try {
+            $this->connect($customer->router, ['timeout' => $timeout, 'attempts' => 1]);
+
+            $fallbackProfile = $customer->package?->mikrotik_profile
+                ?: $customer->mikrotik_profile
+                ?: 'default';
+            $restoredProfile = $this->reconnectProfileName($customer, $fallbackProfile);
+
+            if (!$this->reconnectUser($customer->pppoe_user, $fallbackProfile)) {
+                throw new \RuntimeException("PPPoE user '{$customer->pppoe_user}' not found on router '{$customer->router->name}'");
+            }
+
+            $customer->update([
+                'status' => 'active',
+                'mikrotik_profile' => $restoredProfile,
+                'mikrotik_sync_status' => 'synced',
+                'mikrotik_synced_at' => now(),
+                'mikrotik_sync_checked_at' => now(),
+            ]);
+
+            activity()
+                ->causedBy(auth()->user() ?? null)
+                ->performedOn($customer)
+                ->withProperties([
+                    'router' => $customer->router->name,
+                    'pppoe_user' => $customer->pppoe_user,
+                    'mode' => 'realtime',
+                ])
+                ->log('customer_reconnected');
+        } finally {
+            $this->disconnect();
+        }
+    }
+
     /**
      * Get all PPPoE secrets from router
      */
     public function getPPPSecrets(): array
     {
-        if (!$this->client) {
-            throw new \Exception('Not connected to router. Call connect() first.');
-        }
+        $this->ensureConnected();
 
         try {
             $query = new Query('/ppp/secret/print');
@@ -76,17 +150,10 @@ class MikrotikService
      */
     public function getPPPSecret(string $username): ?array
     {
-        if (!$this->client) {
-            throw new \Exception('Not connected to router. Call connect() first.');
-        }
+        $this->ensureConnected();
 
         try {
-            $query = (new Query('/ppp/secret/print'))
-                ->where('name', $username);
-            
-            $secrets = $this->client->query($query)->read();
-
-            return $secrets[0] ?? null;
+            return $this->findPPPSecret($username);
         } catch (\Exception $e) {
             Log::error("Failed to get PPP secret for {$username}: {$e->getMessage()}");
             throw $e;
@@ -98,9 +165,7 @@ class MikrotikService
      */
     public function getProfiles(): array
     {
-        if (!$this->client) {
-            throw new \Exception('Not connected to router. Call connect() first.');
-        }
+        $this->ensureConnected();
 
         try {
             $query = new Query('/ppp/profile/print');
@@ -120,9 +185,7 @@ class MikrotikService
      */
     public function getActiveConnections(): array
     {
-        if (!$this->client) {
-            throw new \Exception('Not connected to router. Call connect() first.');
-        }
+        $this->ensureConnected();
 
         try {
             $query = new Query('/ppp/active/print');
@@ -143,57 +206,37 @@ class MikrotikService
      */
     public function isolateUser(string $username): bool
     {
-        if (!$this->client) {
-            throw new \Exception('Not connected to router. Call connect() first.');
-        }
-
-        // Hardcoded isolation profile (case-insensitive)
-        $isolationProfile = 'isolirebilling';
+        $this->ensureConnected();
+        $isolationProfile = $this->isolationProfileName();
 
         try {
             // Get all available profiles to find case-insensitive match
-            $allProfiles = $this->getProfiles();
-            $matchedProfile = null;
-            
-            foreach ($allProfiles as $profile) {
-                if (strcasecmp($profile['name'], $isolationProfile) === 0) {
-                    $matchedProfile = $profile['name'];
-                    break;
-                }
-            }
+            $matchedProfile = $this->matchProfileName($isolationProfile);
             
             if (!$matchedProfile) {
-                throw new \Exception("Isolation profile 'isolirebilling' not found on router {$this->router->name}");
+                throw new \Exception("Isolation profile '{$isolationProfile}' not found on router {$this->router->name}");
             }
 
             // Find the PPP secret
-            $query = (new Query('/ppp/secret/print'))
-                ->where('name', $username);
-            
-            $secrets = $this->client->query($query)->read();
+            $secret = $this->findPPPSecret($username);
 
-            if (empty($secrets)) {
+            if (!$secret) {
                 Log::warning("PPP secret not found for user: {$username} on {$this->router->name}");
                 return false;
             }
 
-            $secret = $secrets[0];
             $currentProfile = $secret['profile'] ?? 'default';
 
             // Save previous profile if not already isolated
             if (strcasecmp($currentProfile, $isolationProfile) !== 0) {
-                $customer = \App\Models\Customer::where('pppoe_user', $username)->first();
+                $customer = Customer::ebilling()->where('pppoe_user', $username)->first();
                 if ($customer) {
                     $customer->update(['previous_profile' => $currentProfile]);
                 }
             }
 
             // Change profile to isolation profile (using the exact case from router)
-            $query = (new Query('/ppp/secret/set'))
-                ->equal('.id', $secret['.id'])
-                ->equal('profile', $matchedProfile);
-
-            $this->client->query($query)->read();
+            $this->setPPPSecretProfile($secret, $matchedProfile);
 
             // Kick active session if any
             $this->kickUser($username);
@@ -213,43 +256,32 @@ class MikrotikService
      */
     public function reconnectUser(string $username, string $profile = 'default'): bool
     {
-        if (!$this->client) {
-            throw new \Exception('Not connected to router. Call connect() first.');
-        }
+        $this->ensureConnected();
 
         try {
             // Find the PPP secret
-            $query = (new Query('/ppp/secret/print'))
-                ->where('name', $username);
-            
-            $secrets = $this->client->query($query)->read();
+            $secret = $this->findPPPSecret($username);
 
-            if (empty($secrets)) {
+            if (!$secret) {
                 Log::warning("PPP secret not found for user: {$username} on {$this->router->name}");
                 return false;
             }
 
-            $secret = $secrets[0];
+            $customer = Customer::ebilling()->with('package')->where('pppoe_user', $username)->first();
+            $targetProfile = $customer
+                ? $this->reconnectProfileName($customer, $profile)
+                : $profile;
 
-            // Determine target profile
-            $targetProfile = $profile; // Default fallback
-
-            // Check database for previous profile
-            $customer = \App\Models\Customer::where('pppoe_user', $username)->first();
             if ($customer && !empty($customer->previous_profile)) {
-                $targetProfile = $customer->previous_profile;
                 Log::info("Restoring {$username} to previous profile: {$targetProfile}");
-                
-                // Clear the saved profile
-                $customer->update(['previous_profile' => null]);
             }
 
             // Restore profile
-            $query = (new Query('/ppp/secret/set'))
-                ->equal('.id', $secret['.id'])
-                ->equal('profile', $targetProfile);
+            $this->setPPPSecretProfile($secret, $targetProfile);
 
-            $this->client->query($query)->read();
+            if ($customer && !empty($customer->previous_profile)) {
+                $customer->update(['previous_profile' => null]);
+            }
 
             // Kick active session to force new profile
             $this->kickUser($username);
@@ -287,6 +319,58 @@ class MikrotikService
         } catch (\Exception $e) {
             Log::warning("Could not kick user {$username}: {$e->getMessage()}");
         }
+    }
+
+    protected function ensureConnected(): void
+    {
+        if (!$this->client) {
+            throw new \Exception('Not connected to router. Call connect() first.');
+        }
+    }
+
+    protected function isolationProfileName(): string
+    {
+        $configuredProfile = trim((string) ($this->router?->isolation_profile ?? ''));
+
+        return $configuredProfile !== '' ? $configuredProfile : 'isolirebilling';
+    }
+
+    protected function reconnectProfileName(Customer $customer, string $fallbackProfile = 'default'): string
+    {
+        return $customer->previous_profile
+            ?: $customer->package?->mikrotik_profile
+            ?: $customer->mikrotik_profile
+            ?: $fallbackProfile;
+    }
+
+    protected function matchProfileName(string $profileName): ?string
+    {
+        foreach ($this->getProfiles() as $profile) {
+            if (isset($profile['name']) && strcasecmp($profile['name'], $profileName) === 0) {
+                return $profile['name'];
+            }
+        }
+
+        return null;
+    }
+
+    protected function findPPPSecret(string $username): ?array
+    {
+        $query = (new Query('/ppp/secret/print'))
+            ->where('name', $username);
+
+        $secrets = $this->client->query($query)->read();
+
+        return $secrets[0] ?? null;
+    }
+
+    protected function setPPPSecretProfile(array $secret, string $profile): void
+    {
+        $query = (new Query('/ppp/secret/set'))
+            ->equal('.id', $secret['.id'])
+            ->equal('profile', $profile);
+
+        $this->client->query($query)->read();
     }
 
     /**
@@ -370,16 +454,19 @@ class MikrotikService
         if (!empty($activeUsernames)) {
             // 1. Set is_online = true for active users
             \App\Models\Customer::where('router_id', $this->router->id)
+                ->ebilling()
                 ->whereIn('pppoe_user', $activeUsernames)
                 ->update(['is_online' => true]);
 
             // 2. Set is_online = false for inactive users
             \App\Models\Customer::where('router_id', $this->router->id)
+                ->ebilling()
                 ->whereNotIn('pppoe_user', $activeUsernames)
                 ->update(['is_online' => false]);
         } else {
             // No active users -> Set all on this router to offline
             \App\Models\Customer::where('router_id', $this->router->id)
+                ->ebilling()
                 ->update(['is_online' => false]);
         }
         

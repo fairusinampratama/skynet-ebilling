@@ -1,14 +1,11 @@
-import { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { EditAction, DeleteAction } from '@/Components/TableActions';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
-import { Download, MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
+import { Download } from "lucide-react";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 import { PageProps } from '@/types';
-
 
 
 const getStatusBadge = (status: string) => {
@@ -22,8 +19,40 @@ const getStatusBadge = (status: string) => {
 
     return (
         <Badge variant="outline" className={`${className} capitalize border`}>
-            {status.replace('_', ' ')}
+            {status.replaceAll('_', ' ')}
         </Badge>
+    );
+};
+
+const getMikrotikSyncDot = (customer: Customer) => {
+    const status = customer.mikrotik_sync_status || 'unknown';
+    const variants: Record<string, string> = {
+        synced: 'bg-emerald-500 ring-emerald-500/20',
+        missing: 'bg-red-500 ring-red-500/20',
+        unknown: 'bg-zinc-400 ring-zinc-400/20',
+    };
+    const labels: Record<string, string> = {
+        synced: 'Synced',
+        missing: 'Missing',
+        unknown: 'Not checked',
+    };
+    const label = labels[status] || status.charAt(0).toUpperCase() + status.slice(1);
+    const checkedAt = customer.mikrotik_sync_checked_at
+        ? new Date(customer.mikrotik_sync_checked_at).toLocaleString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+        })
+        : 'Not checked';
+    const routerName = customer.router?.name || 'No router';
+
+    return (
+        <span
+            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-4 ${variants[status] || variants.unknown}`}
+            title={`MikroTik: ${label} | ${routerName} | ${checkedAt}`}
+            aria-label={`MikroTik ${label}`}
+        />
     );
 };
 
@@ -39,6 +68,11 @@ interface Area {
     name: string;
 }
 
+interface Router {
+    id: number;
+    name: string;
+}
+
 interface Customer {
     id: number;
     code: string;
@@ -46,9 +80,13 @@ interface Customer {
     address: string;
     pppoe_user: string;
     status: 'pending_installation' | 'active' | 'isolated' | 'terminated';
+    mikrotik_sync_status: 'unknown' | 'synced' | 'missing';
+    mikrotik_synced_at?: string | null;
+    mikrotik_sync_checked_at?: string | null;
     // is_online removed
     package: Package;
     area?: Area;
+    router?: Router | null;
     join_date: string;
     created_at: string;
     invoices?: Array<{
@@ -69,6 +107,7 @@ interface Props {
         status?: string;
         package_id?: string;
         area_id?: string;
+        mikrotik_sync?: string;
         sort?: string;
         direction?: 'asc' | 'desc';
         limit?: string;
@@ -96,6 +135,7 @@ export default function Index({ customers, packages = [], areas = [], filters = 
             cell: (customer) => (
                 <div className="flex flex-col">
                     <div className="flex items-center gap-2">
+                        {getMikrotikSyncDot(customer)}
                         <span className="font-medium text-foreground">{customer.name}</span>
                     </div>
                     <span className="text-xs text-muted-foreground truncate max-w-[200px]">
@@ -230,6 +270,15 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                 { label: 'Active', value: 'active' },
                 { label: 'Isolated', value: 'isolated' },
                 { label: 'Terminated', value: 'terminated' },
+            ]
+        },
+        {
+            key: 'mikrotik_sync',
+            placeholder: 'All MikroTik',
+            options: [
+                { label: 'Synced', value: 'synced' },
+                { label: 'Missing', value: 'missing' },
+                { label: 'Not checked', value: 'unknown' },
             ]
         }
     ];

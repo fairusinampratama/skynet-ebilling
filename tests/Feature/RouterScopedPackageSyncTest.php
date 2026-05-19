@@ -15,7 +15,7 @@ class RouterScopedPackageSyncTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_prioritizes_router_scoped_package_over_global_or_other_scoped()
+    public function test_router_scan_preserves_ebilling_package_even_when_router_profile_matches_other_package()
     {
         // 1. Setup Routers
         $routerA = Router::create([
@@ -98,24 +98,18 @@ class RouterScopedPackageSyncTest extends TestCase
         // 6. Assertions
         $customer->refresh();
 
-        $this->assertEquals(
-            $pkgScopeA->id,
-            $customer->package_id,
-            "Customer on Router A should be mapped to Router A specific package."
-        );
-        
         $this->assertNotEquals(
             $pkgScopeB->id,
             $customer->package_id,
             "Customer on Router A should NOT be mapped to Router B package."
         );
 
-        $this->assertNotEquals(
+        $this->assertEquals(
             $pkgGlobal->id,
             $customer->package_id,
-            "Customer on Router A should NOT be mapped to Global package when a specific one exists."
+            "Customer package should remain the eBilling package."
         );
-        
-        echo "\n✅ TEST PASSED: Router A customer correctly mapped to Scoped Package A.\n";
+
+        $this->assertEquals('10MB', $customer->mikrotik_profile);
     }
 }

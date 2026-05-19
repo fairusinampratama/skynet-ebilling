@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ReconnectCustomerJob;
 use App\Models\Invoice;
 use App\Models\Transaction;
 use App\Services\TripayService;
@@ -72,8 +73,6 @@ class TripayCallbackController extends Controller
             if ($invoice->status !== 'paid') {
                 $invoice->update(['status' => 'paid']);
                 
-                // Reconnect Customer logic here
-                // We can dispatch a job: ReconnectCustomerJob::dispatch($invoice->customer);
                 $this->reconnectCustomer($invoice->customer);
                 
                 Log::info("Invoice #{$invoice->code} marked as PAID via Tripay.");
@@ -89,15 +88,9 @@ class TripayCallbackController extends Controller
 
     private function reconnectCustomer($customer)
     {
-        // Simple direct call or dispatch job
-        // Assuming we have a Reconnect logic in CustomerController or a Service.
-        // For now, let's just log it. Ideally we call the same logic as "Reconnect" button.
-        // $customer->update(['status' => 'active']);
-        // RouterController::reconnect...
-        
-        // Dispatch job if exists
-        // \App\Jobs\ReconnectCustomerJob::dispatch($customer);
-        
-        Log::info("Should reconnect customer: {$customer->name}");
+        if ($customer && $customer->status === 'isolated') {
+            ReconnectCustomerJob::dispatch($customer);
+            Log::info("Queued reconnection for customer: {$customer->name}");
+        }
     }
 }

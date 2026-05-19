@@ -149,7 +149,8 @@ class SyncFromStagingDb extends Command
             $wasDeleted = ($row['status'] ?? '') === 'deleted';
 
             // Ensure pppoe_user is not empty and unique
-            $pppoeUser = ! empty($row['pppoe_user']) ? $row['pppoe_user'] : ($code . '_PPPOE');
+            $scrapedPppoeUser = $row['pppoe_username'] ?? $row['pppoe_user'] ?? null;
+            $pppoeUser = ! empty($scrapedPppoeUser) ? $scrapedPppoeUser : ($code . '_PPPOE');
 
             try {
                 Customer::updateOrCreate(

@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Router;
 use App\Models\Customer;
-use App\Models\Package;
 use Illuminate\Support\Facades\Log;
 
 class RouterSyncService
@@ -76,36 +75,13 @@ class RouterSyncService
      */
     public function syncCustomers(Router $router, bool $dryRun = false): array
     {
-        $stats = [
-            'total_secrets' => 0,
-            'mapped' => 0,
-            'orphaned' => 0,
-            'synced_package' => 0,
-            'synced_status' => 0,
-            'errors' => []
-        ];
+        $stats = $this->initialScanStats();
 
         try {
             $this->mikrotik->connect($router); // Standard timeout for heavy scan
             
             $secrets = $this->mikrotik->getPPPSecrets();
-            $stats['total_secrets'] = count($secrets);
-
-            foreach ($secrets as $secret) {
-                $pppoeUsername = $secret['name'] ?? null;
-                if (!$pppoeUsername) continue;
-
-                $customer = Customer::where('pppoe_user', $pppoeUsername)->first();
-
-                if ($customer) {
-                    if (!$dryRun) {
-                        $this->processCustomerSync($router, $customer, $secret, $stats);
-                    }
-                    $stats['mapped']++;
-                } else {
-                    $stats['orphaned']++;
-                }
-            }
+            $stats = $this->syncSecretsToEbillingCustomers($router, $secrets, $stats, $dryRun);
             
             // Update scan results
             if (!$dryRun) {
@@ -161,81 +137,10 @@ class RouterSyncService
             $onlineCount = count($activeConnections);
             $this->mikrotik->syncCustomerOnlineStatus($activeConnections);
 
-            // 2. Customer Scan Logic (Reuse internal logic if possible, but for purity we inline nicely)
-            $scanStats = [
-                'total_secrets' => 0,
-                'mapped' => 0,
-                'orphaned' => 0,
-                'synced_package' => 0,
-                'synced_status' => 0,
-            ];
-
+            // 2. eBilling-first customer scan: link existing customers only.
+            $scanStats = $this->initialScanStats();
             $secrets = $this->mikrotik->getPPPSecrets();
-            $scanStats['total_secrets'] = count($secrets);
-
-            foreach ($secrets as $secret) {
-                $pppoeUsername = $secret['name'] ?? null;
-                if (!$pppoeUsername) continue;
-
-                $customer = Customer::where('pppoe_user', $pppoeUsername)->first();
-                if ($customer) {
-                    $this->processCustomerSync($router, $customer, $secret, $scanStats);
-                    $scanStats['mapped']++;
-                } else {
-                    // Auto-Import Missing Customer
-                    
-                    // 1. Determine Package ID (Required by DB)
-                    $profileName = $secret['profile'] ?? 'default';
-                    $package = null;
-                    
-                    // Try to find matching package
-                    if ($profileName) {
-                        $package = Package::where('mikrotik_profile', $profileName)
-                             ->where('router_id', $router->id)
-                             ->first();
-                             
-                        if (!$package) {
-                            $package = Package::where('name', $profileName)
-                                ->where('router_id', $router->id)
-                                ->first();
-                        }
-                    }
-                    
-                    // If no package found, Create one (Sync Detected)
-                    if (!$package) {
-                         $package = Package::create([
-                            'name' => $profileName ?: 'Imported',
-                            'code' => 'PKG-' . strtoupper(substr(md5(($profileName ?: 'IMP') . time() . uniqid()), 0, 8)),
-                            'router_id' => $router->id,
-                            'mikrotik_profile' => $profileName,
-                            'price' => 0,
-                            'rate_limit' => 'Sync Detected',
-                        ]);
-                        Log::info("Auto-created package during import for {$router->name}: {$profileName}");
-                    }
-
-                    // 2. Create Customer
-                    $newCustomer = Customer::create([
-                        'name' => $secret['name'], // Default to username
-                        'code' => 'IMP-' . strtoupper(substr(md5($secret['name'] . time()), 0, 6)), // Temp Code
-                        'pppoe_user' => $pppoeUsername,
-                        'pppoe_password' => $secret['password'] ?? 'imported',
-                        'router_id' => $router->id,
-                        'package_id' => $package->id, // Now we have a valid ID!
-                        'status' => 'active', // Assume active if on router
-                        'phone' => '', // Unknown
-                        'address' => $secret['comment'] ?? 'Imported from Router',
-                        'join_date' => now(),
-                    ]);
-
-                    Log::info("Auto-imported customer from router {$router->name}: {$pppoeUsername}");
-                    
-                    // Now sync status using standard logic
-                    $this->processCustomerSync($router, $newCustomer, $secret, $scanStats);
-                    $scanStats['mapped']++;
-                    $scanStats['orphaned']--; // It was orphaned, now adopted!
-                }
-            }
+            $scanStats = $this->syncSecretsToEbillingCustomers($router, $secrets, $scanStats, false, $activeConnections);
             $result['scan'] = $scanStats;
 
             // 3. Update Router Stats
@@ -349,47 +254,112 @@ class RouterSyncService
         return null;
     }
 
-    protected function processCustomerSync(Router $router, Customer $customer, array $secret, array &$stats)
+    protected function initialScanStats(): array
     {
-        $updates = ['router_id' => $router->id];
+        return [
+            'total_secrets' => 0,
+            'mapped' => 0,
+            'not_found_ebilling' => 0,
+            'unmatched_mikrotik' => 0,
+            'orphaned' => 0,
+            'synced_package' => 0,
+            'synced_status' => 0,
+            'errors' => [],
+        ];
+    }
+
+    protected function syncSecretsToEbillingCustomers(
+        Router $router,
+        array $secrets,
+        array $stats,
+        bool $dryRun = false,
+        array $activeConnections = []
+    ): array {
+        $stats['total_secrets'] = count($secrets);
+        $secretUsernames = $this->secretUsernames($secrets);
+        $activeUsernames = array_flip($this->secretUsernames($activeConnections));
+
+        foreach ($secrets as $secret) {
+            $pppoeUsername = $secret['name'] ?? null;
+            if (!$pppoeUsername) {
+                continue;
+            }
+
+            $customer = $this->findEbillingCustomerByPppoe($pppoeUsername);
+
+            if (!$customer) {
+                $stats['unmatched_mikrotik']++;
+                continue;
+            }
+
+            if (!$dryRun) {
+                $isOnline = array_key_exists($pppoeUsername, $activeUsernames) ? true : null;
+                $this->processCustomerSync($router, $customer, $secret, $stats, $isOnline);
+            }
+            $stats['mapped']++;
+        }
+
+        $stats['not_found_ebilling'] = $this->markAssignedEbillingCustomersMissingFromRouter($router, $secretUsernames, $dryRun);
+        $stats['orphaned'] = $stats['unmatched_mikrotik'];
+
+        return $stats;
+    }
+
+    protected function secretUsernames(array $secrets): array
+    {
+        return collect($secrets)
+            ->pluck('name')
+            ->filter(fn ($username) => is_string($username) && $username !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function findEbillingCustomerByPppoe(string $pppoeUsername): ?Customer
+    {
+        return Customer::ebilling()
+            ->where('pppoe_user', $pppoeUsername)
+            ->get()
+            ->first(fn (Customer $customer) => $customer->pppoe_user === $pppoeUsername);
+    }
+
+    protected function markAssignedEbillingCustomersMissingFromRouter(Router $router, array $secretUsernames, bool $dryRun = false): int
+    {
+        $query = Customer::ebilling()
+            ->where('router_id', $router->id)
+            ->whereNotNull('pppoe_user')
+            ->where('pppoe_user', '!=', '');
+
+        if (!empty($secretUsernames)) {
+            $query->whereNotIn('pppoe_user', $secretUsernames);
+        }
+
+        $count = (clone $query)->count();
+
+        if (! $dryRun && $count > 0) {
+            $query->update([
+                'mikrotik_sync_status' => 'missing',
+                'mikrotik_synced_at' => null,
+                'mikrotik_sync_checked_at' => now(),
+            ]);
+        }
+
+        return $count;
+    }
+
+    protected function processCustomerSync(Router $router, Customer $customer, array $secret, array &$stats, ?bool $isOnline = null): void
+    {
         $profileName = $secret['profile'] ?? null;
+        $updates = [
+            'router_id' => $router->id,
+            'mikrotik_profile' => $profileName,
+            'mikrotik_sync_status' => 'synced',
+            'mikrotik_synced_at' => now(),
+            'mikrotik_sync_checked_at' => now(),
+        ];
 
-        // Auto-Sync Package
-        // Auto-Sync Package
-        if ($profileName && $profileName !== $router->isolation_profile) {
-            // Priority 1: Exact Match (Profile Key + Router ID)
-            $package = Package::where('mikrotik_profile', $profileName)
-                        ->where('router_id', $router->id)
-                        ->first();
-
-            // Priority 2: Name Match (Profile Name = Package Name + Router ID)
-            if (!$package) {
-                $package = Package::where('name', $profileName)
-                            ->where('router_id', $router->id)
-                            ->whereNull('mikrotik_profile')
-                            ->first();
-
-                // Priority 3: Auto-Create (Safety Net)
-                // If the router has a profile "10MB" but we have no package for it, create it.
-                // This ensures we never lose sync. Admin can rename/price it later.
-                if (!$package) {
-                    $package = Package::create([
-                        'name' => $profileName,
-                        'code' => 'PKG-' . strtoupper(substr(md5($profileName . time() . uniqid()), 0, 8)),
-                        'router_id' => $router->id,
-                        'mikrotik_profile' => $profileName,
-                        'price' => 0, // Defaults to 0, flagged for review
-                        'rate_limit' => 'Sync Detected',
-                    ]);
-                    Log::info("Auto-created package for Router {$router->name}: {$profileName}");
-                }
-            }
-
-            if ($package && $customer->package_id !== $package->id) {
-                // Determine sync state if we want to be fancy, but simple assignment is best
-                $updates['package_id'] = $package->id;
-                $stats['synced_package']++;
-            }
+        if ($isOnline !== null) {
+            $updates['is_online'] = $isOnline;
         }
 
         // Auto-Sync Status (Isolation Logic)

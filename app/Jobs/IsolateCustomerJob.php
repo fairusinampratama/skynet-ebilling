@@ -32,6 +32,8 @@ class IsolateCustomerJob implements ShouldQueue
      */
     public function handle(MikrotikService $mikrotik): void
     {
+        $this->customer->refresh();
+
         // Check if customer has a router assigned
         if (!$this->customer->router_id || !$this->customer->router) {
             Log::warning("Customer {$this->customer->name} has no router assigned. Skipping isolation.");
@@ -39,6 +41,16 @@ class IsolateCustomerJob implements ShouldQueue
                 ->causedBy(auth()->user() ?? null)
                 ->performedOn($this->customer)
                 ->withProperties(['reason' => 'no_router_assigned'])
+                ->log('isolation_skipped');
+            return;
+        }
+
+        if (!$this->customer->pppoe_user) {
+            Log::warning("Customer {$this->customer->name} has no PPPoE username. Skipping isolation.");
+            activity()
+                ->causedBy(auth()->user() ?? null)
+                ->performedOn($this->customer)
+                ->withProperties(['reason' => 'no_pppoe_user'])
                 ->log('isolation_skipped');
             return;
         }
@@ -56,7 +68,13 @@ class IsolateCustomerJob implements ShouldQueue
 
             if ($success) {
                 // Update customer status
-                $this->customer->update(['status' => 'isolated']);
+                $this->customer->update([
+                    'status' => 'isolated',
+                    'mikrotik_profile' => $router->isolation_profile ?: 'isolirebilling',
+                    'mikrotik_sync_status' => 'synced',
+                    'mikrotik_synced_at' => now(),
+                    'mikrotik_sync_checked_at' => now(),
+                ]);
 
                 // Log the action
                 activity()
@@ -88,10 +106,8 @@ class IsolateCustomerJob implements ShouldQueue
                 throw new Exception($errorMsg);
             }
 
-            $mikrotik->disconnect();
-
         } catch (Exception $e) {
-            $isConfigError = str_contains($e->getMessage(), 'does not have an isolation profile configured');
+            $isConfigError = str_contains($e->getMessage(), 'Isolation profile');
             
             Log::error("Failed to isolate customer {$this->customer->name}: " . $e->getMessage());
             
@@ -112,6 +128,8 @@ class IsolateCustomerJob implements ShouldQueue
             } else {
                 $this->fail($e);
             }
+        } finally {
+            $mikrotik->disconnect();
         }
     }
 }
