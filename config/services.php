@@ -35,13 +35,6 @@ return [
         ],
     ],
 
-    'tripay' => [
-        'api_key'       => env('TRIPAY_API_KEY'),
-        'private_key'   => env('TRIPAY_PRIVATE_KEY'),
-        'merchant_code' => env('TRIPAY_MERCHANT_CODE'),
-        'base_url'      => env('TRIPAY_BASE_URL', 'https://tripay.co.id/api-sandbox'),
-    ],
-
     'legacy_scraper' => [
         'url' => env('LEGACY_SCRAPER_URL', 'http://scraping-ebilling.103.156.128.102.sslip.io'),
     ],

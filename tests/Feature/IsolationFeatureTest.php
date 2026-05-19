@@ -8,10 +8,8 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Package;
 use App\Models\Router;
-use App\Models\Transaction;
 use App\Models\User;
 use App\Services\MikrotikService;
-use App\Services\TripayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Mockery;
@@ -185,39 +183,6 @@ class IsolationFeatureTest extends TestCase
 
         Bus::assertDispatched(ReconnectCustomerJob::class, fn ($job) => $job->customer->is($customer));
         $this->assertSame('paid', $invoice->refresh()->status);
-    }
-
-    public function test_tripay_paid_callback_dispatches_reconnect_for_isolated_customer(): void
-    {
-        Bus::fake();
-        $customer = $this->customer([
-            'router_id' => $this->router()->id,
-            'status' => 'isolated',
-        ]);
-        $invoice = $this->invoice($customer, ['amount' => 100000, 'status' => 'unpaid']);
-
-        Transaction::create([
-            'reference' => 'TRIPAY-REF-1',
-            'invoice_id' => $invoice->id,
-            'amount' => 100000,
-            'channel' => 'tripay',
-            'method' => 'qris',
-            'status' => 'pending',
-        ]);
-
-        $tripay = Mockery::mock(TripayService::class);
-        $tripay->shouldReceive('verifyCallback')->once()->andReturnTrue();
-        $this->app->instance(TripayService::class, $tripay);
-
-        $this->postJson(route('payments.callback'), [
-            'merchant_ref' => "INV-{$invoice->id}-123",
-            'reference' => 'TRIPAY-REF-1',
-            'status' => 'PAID',
-            'payment_method' => 'QRIS',
-            'total_amount' => 100000,
-        ])->assertOk();
-
-        Bus::assertDispatched(ReconnectCustomerJob::class, fn ($job) => $job->customer->is($customer));
     }
 
     public function test_isolation_job_saves_previous_profile_and_uses_router_isolation_profile(): void
