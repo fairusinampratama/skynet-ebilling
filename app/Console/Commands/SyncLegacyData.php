@@ -26,6 +26,8 @@ class SyncLegacyData extends Command
             $this->info("Fetching Customer data... (This may take a moment)");
             $customers = $syncService->syncCustomers();
             $this->info("✅ Customers Synced: {$customers}");
+            $this->line('Area resolution: ' . $this->formatAreaResolutionStats($syncService->lastCustomerAreaResolutionStats()));
+            $this->line('Network classification: ' . $this->formatAreaResolutionStats($syncService->lastCustomerNetworkSyncStats()));
 
             $deletedEmptyAreas = $syncService->cleanupEmptyAreas();
             if ($deletedEmptyAreas === []) {
@@ -47,5 +49,16 @@ class SyncLegacyData extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * @param array<string, int> $stats
+     */
+    private function formatAreaResolutionStats(array $stats): string
+    {
+        return collect($stats)
+            ->filter(fn (int $count) => $count > 0)
+            ->map(fn (int $count, string $reason) => "{$reason}={$count}")
+            ->implode(', ');
     }
 }

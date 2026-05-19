@@ -15,7 +15,7 @@ class PackageProfileSyncTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_syncs_package_based_on_mikrotik_profile_mapping()
+    public function test_mikrotik_profile_does_not_overwrite_ebilling_package()
     {
         try {
             // 1. Setup Dummy Data
@@ -36,6 +36,7 @@ class PackageProfileSyncTest extends TestCase
         // Name is "Marketing Name", mikrotik_profile is "Technical Name"
         $goldPackage = Package::create([
             'name' => 'Paket Sultan 100M',
+            'code' => 'PKG-GOLD-' . uniqid(),
             'mikrotik_profile' => 'GOLD_PROFILE', 
             'price' => 500000,
             'bandwidth_label' => '100 Mbps',
@@ -44,6 +45,7 @@ class PackageProfileSyncTest extends TestCase
         // Other Package (Should NOT be picked)
         $silverPackage = Package::create([
             'name' => 'Paket Rakyat', 
+            'code' => 'PKG-SILVER-' . uniqid(),
             'mikrotik_profile' => 'SILVER_PROFILE',
             'price' => 100000,
             'bandwidth_label' => '10 Mbps',
@@ -51,7 +53,9 @@ class PackageProfileSyncTest extends TestCase
 
         // Customer (Initially has no package or wrong package)
         $customer = Customer::create([
+            'code' => 'CUST-' . uniqid(),
             'name' => 'John Doe',
+            'phone' => '080000000001',
             'pppoe_user' => 'john.doe',
             'status' => 'active',
             'package_id' => $silverPackage->id, // Currently on Silver
@@ -76,22 +80,15 @@ class PackageProfileSyncTest extends TestCase
         $service = new RouterSyncService($mikrotikMock);
         $result = $service->syncCustomers($router);
 
-        // 4. Assertions
-        // Reload customer to get latest DB state
         $customer->refresh();
 
         $this->assertEquals(
-            $goldPackage->id, 
-            $customer->package_id, 
-            "Customer Package ID should update to Gold Package because profile mapped to GOLD_PROFILE"
-        );
-        
-        $this->assertNotEquals(
             $silverPackage->id,
-            $customer->package_id,
-            "Customer should no longer be on Silver Package"
+            $customer->package_id, 
+            "Customer package must remain owned by eBilling, not MikroTik profile sync"
         );
 
-        echo "\n\n✅ TEST PASSED: 'GOLD_PROFILE' on Router mapped correctly to 'Paket Sultan 100M' in DB.\n";
+        $this->assertEquals('GOLD_PROFILE', $customer->mikrotik_profile);
+        $this->assertEquals(0, $result['synced_package']);
     }
 }

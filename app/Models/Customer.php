@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -52,6 +53,10 @@ class Customer extends Model
         'area_id',
         'router_id',
         'mikrotik_profile',
+        'previous_profile',
+        'mikrotik_sync_status',
+        'mikrotik_synced_at',
+        'mikrotik_sync_checked_at',
         'status',
         'join_date',
         'due_day',
@@ -76,7 +81,24 @@ class Customer extends Model
         'geo_long' => 'decimal:8',
         'join_date' => 'date',
         'is_online' => 'boolean',
+        'mikrotik_synced_at' => 'datetime',
+        'mikrotik_sync_checked_at' => 'datetime',
     ];
+
+    public function scopeEbilling(Builder $query): Builder
+    {
+        $codeColumn = $query->getModel()->qualifyColumn('code');
+
+        return $query->where(function (Builder $query) use ($codeColumn) {
+            $query->whereNull($codeColumn)
+                ->orWhere($codeColumn, 'not like', 'IMP-%');
+        });
+    }
+
+    public function scopeImportedFromMikrotik(Builder $query): Builder
+    {
+        return $query->where($query->getModel()->qualifyColumn('code'), 'like', 'IMP-%');
+    }
 
     public function package(): BelongsTo
     {
@@ -110,6 +132,8 @@ class Customer extends Model
             return null;
         }
 
+        $value = $this->normalizeKtpPhotoValue($value);
+
         // Filter out incomplete legacy URLs (e.g., just the directory path ending in /)
         if (str_ends_with($value, '/')) {
             return null;
@@ -120,6 +144,20 @@ class Customer extends Model
         }
 
         return asset('storage/' . $value);
+    }
+
+    private function normalizeKtpPhotoValue(string $value): string
+    {
+        $value = trim($value);
+        $lastHttpsPosition = strripos($value, 'https://');
+        $lastHttpPosition = strripos($value, 'http://');
+        $lastUrlPosition = max($lastHttpsPosition === false ? -1 : $lastHttpsPosition, $lastHttpPosition === false ? -1 : $lastHttpPosition);
+
+        if ($lastUrlPosition > 0) {
+            return substr($value, $lastUrlPosition);
+        }
+
+        return $value;
     }
 
     /**

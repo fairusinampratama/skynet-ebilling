@@ -20,7 +20,7 @@ class DashboardController extends Controller
         $currentPeriod = now()->startOfMonth()->format('Y-m-d');
 
         // Projected Revenue (Sum of all active customer packages)
-        $projectedCustomers = Customer::where('status', 'active')->with('package');
+        $projectedCustomers = Customer::ebilling()->where('status', 'active')->with('package');
         AreaScope::applyToCustomers($projectedCustomers, $user);
         $projectedRevenue = $projectedCustomers->get()->sum(function($customer) {
             return $customer->package->price ?? 0;
@@ -46,7 +46,7 @@ class DashboardController extends Controller
         $overdueCount = $overdueQuery->count();
 
         // Active Customer Count
-        $activeCustomersQuery = Customer::where('status', 'active');
+        $activeCustomersQuery = Customer::ebilling()->where('status', 'active');
         AreaScope::applyToCustomers($activeCustomersQuery, $user);
         $activeCustomers = $activeCustomersQuery->count();
 
@@ -66,7 +66,8 @@ class DashboardController extends Controller
         AreaScope::applyToInvoices($customersWithInvoiceQuery, $user);
         $customersWithInvoice = $customersWithInvoiceQuery->pluck('customer_id');
 
-        $customersWithoutInvoiceQuery = Customer::whereIn('status', ['active', 'isolated'])
+        $customersWithoutInvoiceQuery = Customer::ebilling()
+            ->whereIn('status', ['active', 'isolated'])
             ->whereHas('package')
             ->whereNotIn('id', $customersWithInvoice);
         AreaScope::applyToCustomers($customersWithoutInvoiceQuery, $user);

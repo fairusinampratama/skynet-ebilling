@@ -44,6 +44,51 @@ class LegacyAreaResolverTest extends TestCase
         $this->assertSame('SKYNET-LAWANG', $resolver->resolve(['id' => 'BMS001'])['area']);
     }
 
+    public function test_transaction_only_stub_evidence_maps_to_real_areas(): void
+    {
+        $resolver = new LegacyAreaResolver();
+
+        $this->assertSame('SKYNET-NONGKOJAJAR', $resolver->resolve(['id_pelanggan' => 'NKJ009'])['area']);
+        $this->assertSame('SKYNET-BEDALI', $resolver->resolve(['id_pelanggan' => 'SRV1227', 'alamat' => 'PERUM BDL INDAH'])['area']);
+        $this->assertSame('SKYNET-KRIAN', $resolver->resolve(['id_pelanggan' => '2402212924', 'alamat' => 'Jl. Sidorono gg pedukuhan'])['area']);
+    }
+
+    public function test_api_area_object_wins_over_conflicting_fallback_evidence(): void
+    {
+        $result = (new LegacyAreaResolver())->resolve([
+            'id' => 'RDG001',
+            'area' => ['name' => 'SUBNET-WAJAK'],
+            'package' => ['name' => 'Paket Randuagung'],
+            'address' => 'Randuagung',
+        ]);
+
+        $this->assertSame('SUBNET-WAJAK', $result['area']);
+        $this->assertSame('api_area', $result['reason']);
+        $this->assertSame('SUBNET-WAJAK', $result['source_value']);
+    }
+
+    public function test_blank_api_area_falls_back_to_prefix_mapping(): void
+    {
+        $result = (new LegacyAreaResolver())->resolve([
+            'id' => 'RDG001',
+            'area' => ['name' => ''],
+        ]);
+
+        $this->assertSame('SKYNET-RANDUAGUNG', $result['area']);
+        $this->assertSame('prefix', $result['reason']);
+    }
+
+    public function test_invalid_api_area_does_not_block_valid_fallback_mapping(): void
+    {
+        $result = (new LegacyAreaResolver())->resolve([
+            'id' => 'BDL001',
+            'area' => ['name' => 'SKYNET-GENERAL'],
+        ]);
+
+        $this->assertSame('SKYNET-BEDALI', $result['area']);
+        $this->assertSame('prefix', $result['reason']);
+    }
+
     public function test_package_keyword_maps_to_wajak(): void
     {
         $result = (new LegacyAreaResolver())->resolve([

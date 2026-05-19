@@ -30,7 +30,7 @@ class CustomerController extends Controller
 
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
-            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'sort', 'direction', 'limit']),
+            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'sort', 'direction', 'limit']),
             'packages' => Package::all(), // For filter dropdown
             'areas' => $areasQuery->get(),
         ]);
@@ -39,7 +39,7 @@ class CustomerController extends Controller
     public function export(Request $request)
     {
         $query = $this->customerIndexQuery($request)
-            ->with(['package:id,name,price,rate_limit', 'area:id,name'])
+            ->with(['package:id,name,price,rate_limit', 'area:id,name', 'router:id,name'])
             ->select([
                 'id',
                 'code',
@@ -50,7 +50,11 @@ class CustomerController extends Controller
                 'pppoe_user',
                 'package_id',
                 'area_id',
+                'router_id',
                 'status',
+                'mikrotik_sync_status',
+                'mikrotik_synced_at',
+                'mikrotik_sync_checked_at',
                 'join_date',
                 'due_day',
                 'created_at',
@@ -70,6 +74,10 @@ class CustomerController extends Controller
             $customer->package?->rate_limit ?? '',
             $customer->package?->price ?? '',
             $customer->status,
+            $customer->router?->name ?? '',
+            $customer->mikrotik_sync_status ?? 'unknown',
+            $customer->mikrotik_synced_at?->toDateTimeString() ?? '',
+            $customer->mikrotik_sync_checked_at?->toDateTimeString() ?? '',
             $customer->join_date?->toDateString() ?? '',
             $customer->due_day,
             ];
@@ -87,6 +95,10 @@ class CustomerController extends Controller
             'Keterangan Langganan',
             'Harga Langganan',
             'Status Pelanggan',
+            'Router',
+            'MikroTik Sync',
+            'MikroTik Synced At',
+            'MikroTik Checked At',
             'Tanggal Bergabung',
             'Jatuh Tempo',
         ], $rows);
@@ -249,52 +261,61 @@ class CustomerController extends Controller
     /**
      * Isolate the customer (block internet via Mikrotik)
      */
-    public function isolate(Customer $customer)
+    public function isolate(Customer $customer, MikrotikService $mikrotik)
     {
         AreaScope::authorizeCustomer($customer, request()->user());
 
         if ($customer->router_id && $customer->pppoe_user) {
             try {
-                $mikrotik = new MikrotikService($customer->router);
-                $mikrotik->isolateCustomer($customer);
-                $customer->update(['status' => 'isolated']);
+                $mikrotik->isolateCustomerNow($customer, 10);
+
                 return back()->with('success', "Customer {$customer->name} isolated on router.");
-            } catch (\Exception $e) {
-                return back()->with('error', "Mikrotik Error: " . $e->getMessage());
+            } catch (\Throwable $e) {
+                return back()->with('error', "Mikrotik Error: {$e->getMessage()}");
             }
         }
 
-        $customer->update(['status' => 'isolated']);
-        return back()->with('success', 'Customer status set to ISOLATED (Manual).');
+        activity()
+            ->causedBy(request()->user())
+            ->performedOn($customer)
+            ->withProperties(['reason' => 'missing_router_or_pppoe'])
+            ->log('manual_isolation_blocked');
+
+        return back()->with('error', 'Cannot isolate customer: router and PPPoE username are required for MikroTik enforcement.');
     }
 
     /**
      * Reconnect the customer (restore internet via Mikrotik)
      */
-    public function reconnect(Customer $customer)
+    public function reconnect(Customer $customer, MikrotikService $mikrotik)
     {
         AreaScope::authorizeCustomer($customer, request()->user());
 
         if ($customer->router_id && $customer->pppoe_user) {
             try {
-                $mikrotik = new MikrotikService($customer->router);
-                $mikrotik->reconnectCustomer($customer);
-                $customer->update(['status' => 'active']);
+                $mikrotik->reconnectCustomerNow($customer, 10);
+
                 return back()->with('success', "Customer {$customer->name} reconnected on router.");
-            } catch (\Exception $e) {
-                return back()->with('error', "Mikrotik Error: " . $e->getMessage());
+            } catch (\Throwable $e) {
+                return back()->with('error', "Mikrotik Error: {$e->getMessage()}");
             }
         }
 
-        $customer->update(['status' => 'active']);
-        return back()->with('success', 'Customer status set to ACTIVE (Manual).');
+        activity()
+            ->causedBy(request()->user())
+            ->performedOn($customer)
+            ->withProperties(['reason' => 'missing_router_or_pppoe'])
+            ->log('manual_reconnection_blocked');
+
+        return back()->with('error', 'Cannot reconnect customer: router and PPPoE username are required for MikroTik enforcement.');
     }
 
     private function customerIndexQuery(Request $request)
     {
-        $query = Customer::with([
+        $query = Customer::ebilling()->with([
             'package',
             'area',
+            'router:id,name',
             'invoices' => function($q) {
                 $q->where('status', 'unpaid')->orderBy('due_date', 'asc')->limit(1);
             }
@@ -325,6 +346,14 @@ class CustomerController extends Controller
         // Area filter
         if ($request->has('area_id') && $request->area_id) {
             $query->where('area_id', $request->area_id);
+        }
+
+        // MikroTik sync filter. This is based on the latest persisted router scan only.
+        if ($request->has('mikrotik_sync') && $request->mikrotik_sync !== 'all') {
+            $status = $request->mikrotik_sync;
+            if (in_array($status, ['unknown', 'synced', 'missing'], true)) {
+                $query->where('mikrotik_sync_status', $status);
+            }
         }
 
         // Sorting

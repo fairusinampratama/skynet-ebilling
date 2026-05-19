@@ -33,6 +33,7 @@ class LegacyAreaResolver
         'MRGS' => 'SKYNET-MERGOSONO',
         'MRL' => 'SKYNET-MULYOARJO',
         'MTPR' => 'SKYNET-MARTOPURO',
+        'NKJ' => 'SKYNET-NONGKOJAJAR',
         'NKJJ' => 'SKYNET-NONGKOJAJAR',
         'PLSN' => 'SKYNET-PLAOSAN',
         'PRD' => 'SKYNET-PURWODADI',
@@ -67,6 +68,7 @@ class LegacyAreaResolver
     private array $keywordMap = [
         'BEDALI INDAH' => 'SKYNET-BEDALI',
         'BEDALIINDAH' => 'SKYNET-BEDALI',
+        'BDL INDAH' => 'SKYNET-BEDALI',
         'BEDALI' => 'SKYNET-BEDALI',
         'CAKRUAN' => 'SKYNET-JAMBUWER',
         'GLAGAHARUM' => 'SKYNET-JAMBUWER',
@@ -77,6 +79,7 @@ class LegacyAreaResolver
         'REKESAN' => 'SKYNET-JAMBUWER',
         'SIDOMULYO' => 'SKYNET-JAMBUWER',
         'SIDOREJO' => 'SKYNET-JAMBUWER',
+        'SIDORONO' => 'SKYNET-KRIAN',
         'ARJOSARI' => 'SKYNET-ARJOSARI',
         'KRIAN' => 'SKYNET-KRIAN',
         'WAJAK' => 'SKYNET-WAJAK',

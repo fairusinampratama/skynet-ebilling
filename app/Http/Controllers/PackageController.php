@@ -101,7 +101,7 @@ class PackageController extends Controller
     public function destroy(Package $package)
     {
         // Prevent deletion if package has customers
-        if ($package->customers()->count() > 0) {
+        if ($package->customers()->ebilling()->count() > 0) {
             return back()->with('error', 'Cannot delete package with active customers.');
         }
 

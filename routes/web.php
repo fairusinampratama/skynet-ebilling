@@ -85,6 +85,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('global-admin')->group(function () {
         Route::resource('packages', PackageController::class);
         Route::resource('areas', \App\Http\Controllers\AreaController::class);
+        Route::post('/routers/{router}/test', [\App\Http\Controllers\RouterController::class, 'testConnection'])
+            ->name('routers.test');
+        Route::post('/routers/{router}/scan', [\App\Http\Controllers\RouterController::class, 'scanRouter'])
+            ->name('routers.scan');
+        Route::post('/routers/{router}/sync', [\App\Http\Controllers\RouterController::class, 'sync'])
+            ->name('routers.sync');
+        Route::get('/api/routers/{router}/customers', [\App\Http\Controllers\RouterController::class, 'customers'])
+            ->name('api.routers.customers');
+        Route::get('/api/routers/{router}/profiles', [\App\Http\Controllers\RouterController::class, 'getProfiles'])
+            ->name('api.routers.profiles');
+        Route::get('/api/routers/{router}/live-stats', [\App\Http\Controllers\RouterController::class, 'liveStats'])
+            ->name('api.routers.live-stats');
         Route::resource('routers', \App\Http\Controllers\RouterController::class);
         Route::post('/routers/{router}/sync-online', [\App\Http\Controllers\RouterController::class, 'syncOnlineStatus'])
             ->name('routers.sync-online');

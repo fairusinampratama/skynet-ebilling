@@ -23,6 +23,7 @@ class Router extends Model
         'board_name',
         'last_health_check_at',
         'total_pppoe_count',
+        'isolation_profile',
     ];
 
     protected $casts = [

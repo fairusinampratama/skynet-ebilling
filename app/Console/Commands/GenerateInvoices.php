@@ -48,7 +48,8 @@ class GenerateInvoices extends Command
 
         // Fetch eligible customers (Active or Suspended)
         // Suspended users still get billed until offboarded/churned
-        $customers = Customer::whereIn('status', ['active', 'isolated'])
+        $customers = Customer::ebilling()
+            ->whereIn('status', ['active', 'isolated'])
             ->whereHas('package') // Ensure they have a package
             ->with('package')
             ->chunk(100, function ($chunk) use ($period, $isDryRun) {

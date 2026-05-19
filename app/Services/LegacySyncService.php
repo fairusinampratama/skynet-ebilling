@@ -6,6 +6,7 @@ use App\Models\Area;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Package;
+use App\Models\Router;
 use Carbon\Carbon;
 use Generator;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,16 @@ use Illuminate\Support\Str;
 class LegacySyncService
 {
     protected string $baseUrl;
+
+    /**
+     * @var array<string, int>
+     */
+    private array $lastCustomerAreaResolutionStats = [];
+
+    /**
+     * @var array<string, int>
+     */
+    private array $lastCustomerNetworkSyncStats = [];
 
     public function __construct(private LegacyAreaResolver $areaResolver)
     {
@@ -105,11 +116,24 @@ class LegacySyncService
             ]
         );
         $seenPppoeUsers = [];
-        $existingPppoeUsers = Customer::withTrashed()->pluck('code', 'pppoe_user');
+        $existingPppoeByCode = Customer::withTrashed()
+            ->whereNotNull('pppoe_user')
+            ->pluck('pppoe_user', 'code');
+        $existingPppoeOwners = Customer::withTrashed()
+            ->whereNotNull('pppoe_user')
+            ->get(['id', 'code', 'pppoe_user', 'deleted_at'])
+            ->keyBy('pppoe_user');
+        $routersByScraperName = $this->routersByScraperName();
         $rows = [];
         $now = now();
+        $areaResolutionStats = $this->emptyAreaResolutionStats();
+        $networkSyncStats = $this->emptyNetworkSyncStats();
 
         foreach ($customers as $data) {
+            $customerCode = (string) ($data['code'] ?? $data['id']);
+            $source = strtolower((string) ($data['source'] ?? 'unknown'));
+            $networkSyncStats["source_{$source}"] = ($networkSyncStats["source_{$source}"] ?? 0) + 1;
+
             $packageId = null;
             if (!empty($data['package'])) {
                 $packageId = $packagesByName->get($data['package']['name']);
@@ -121,6 +145,7 @@ class LegacySyncService
 
             $areaId = null;
             $resolvedArea = $this->areaResolver->resolve($data);
+            $areaResolutionStats[$resolvedArea['reason']] = ($areaResolutionStats[$resolvedArea['reason']] ?? 0) + 1;
             if ($resolvedArea['area']) {
                 $areaId = $areasByName->get($resolvedArea['area']);
                 if (! $areaId) {
@@ -140,16 +165,27 @@ class LegacySyncService
 
             $joinDate = !empty($data['join_date']) ? Carbon::parse($data['join_date']) : null;
 
-            $pppoeUser = !empty($data['pppoe_user']) ? $data['pppoe_user'] : ($data['id'] . '_USR');
+            $scrapedPppoeUser = $data['pppoe_username'] ?? $data['pppoe_user'] ?? null;
+            $pppoeUser = $this->resolvePppoeUser(
+                customerCode: $customerCode,
+                scrapedPppoeUser: $scrapedPppoeUser,
+                existingPppoeByCode: $existingPppoeByCode,
+                existingPppoeOwners: $existingPppoeOwners,
+                stats: $networkSyncStats
+            );
             $attempts = 0;
             while (
-                (isset($seenPppoeUsers[$pppoeUser]) && $seenPppoeUsers[$pppoeUser] !== $data['id'])
-                || ($existingPppoeUsers->has($pppoeUser) && $existingPppoeUsers->get($pppoeUser) !== $data['id'])
+                isset($seenPppoeUsers[$pppoeUser])
+                && $seenPppoeUsers[$pppoeUser] !== $customerCode
             ) {
                 $attempts++;
-                $pppoeUser = $data['id'] . '_USR_' . ($attempts + 1);
+                $pppoeUser = $customerCode . '_USR_' . ($attempts + 1);
             }
-            $seenPppoeUsers[$pppoeUser] = $data['id'];
+            $seenPppoeUsers[$pppoeUser] = $customerCode;
+
+            $isMikrotikSyncable = (bool) ($data['is_mikrotik_syncable'] ?? false);
+            $networkSyncStats[$isMikrotikSyncable ? 'mikrotik_syncable' : 'not_mikrotik_syncable']++;
+            $routerId = $this->resolveRouterId($data, $routersByScraperName, $networkSyncStats);
 
             $phone = !empty($data['phone']) ? $data['phone'] : '';
             $address = !empty($data['address']) ? $data['address'] : '-';
@@ -163,8 +199,8 @@ class LegacySyncService
             }
 
             $rows[] = [
-                'code' => $data['id'],
-                'legacy_id' => $data['id'],
+                'code' => $customerCode,
+                'legacy_id' => $customerCode,
                 'name' => $data['name'],
                 'nik' => !empty($data['nik']) ? $data['nik'] : null,
                 'address' => $address,
@@ -174,6 +210,7 @@ class LegacySyncService
                 'pppoe_user' => $pppoeUser,
                 'package_id' => $packageId,
                 'area_id' => $areaId,
+                'router_id' => $routerId,
                 'status' => $statusRaw,
                 'join_date' => $joinDate?->toDateString(),
                 'due_day' => $data['due_day'] ?? 20,
@@ -197,6 +234,7 @@ class LegacySyncService
                 'pppoe_user',
                 'package_id',
                 'area_id',
+                'router_id',
                 'status',
                 'join_date',
                 'due_day',
@@ -207,7 +245,177 @@ class LegacySyncService
             ]);
         }
 
+        $this->lastCustomerAreaResolutionStats = $areaResolutionStats;
+        $this->lastCustomerNetworkSyncStats = $networkSyncStats;
+
+        $fallbackCount = collect($areaResolutionStats)
+            ->except(['api_area'])
+            ->sum();
+
+        if ($fallbackCount > 0) {
+            Log::info('Legacy customer sync used fallback area mapping for some rows.', [
+                'area_resolution' => $areaResolutionStats,
+            ]);
+        }
+
+        Log::info('Legacy customer sync network classification summary.', [
+            'network_sync' => $networkSyncStats,
+        ]);
+
         return count($rows);
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function lastCustomerAreaResolutionStats(): array
+    {
+        return $this->lastCustomerAreaResolutionStats;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function lastCustomerNetworkSyncStats(): array
+    {
+        return $this->lastCustomerNetworkSyncStats;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function emptyAreaResolutionStats(): array
+    {
+        return [
+            'api_area' => 0,
+            'legacy_location' => 0,
+            'prefix' => 0,
+            'package_keyword' => 0,
+            'address_keyword' => 0,
+            'unmapped' => 0,
+        ];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function emptyNetworkSyncStats(): array
+    {
+        return [
+            'source_warga' => 0,
+            'source_stale' => 0,
+            'mikrotik_syncable' => 0,
+            'not_mikrotik_syncable' => 0,
+            'pppoe_from_scraper' => 0,
+            'pppoe_preserved_existing' => 0,
+            'pppoe_placeholder' => 0,
+            'pppoe_conflict' => 0,
+            'released_deleted_imp_conflicts' => 0,
+            'router_mapped' => 0,
+            'router_unmapped' => 0,
+            'router_blank' => 0,
+        ];
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<string, string> $existingPppoeByCode
+     * @param \Illuminate\Support\Collection<string, Customer> $existingPppoeOwners
+     * @param array<string, int> $stats
+     */
+    private function resolvePppoeUser(
+        string $customerCode,
+        mixed $scrapedPppoeUser,
+        $existingPppoeByCode,
+        $existingPppoeOwners,
+        array &$stats
+    ): string {
+        $scrapedPppoeUser = trim((string) $scrapedPppoeUser);
+
+        if ($scrapedPppoeUser !== '') {
+            $owner = $existingPppoeOwners->get($scrapedPppoeUser);
+
+            if ($owner && $owner->code !== $customerCode) {
+                if ($owner->trashed() && str_starts_with((string) $owner->code, 'IMP-')) {
+                    DB::table('customers')
+                        ->where('id', $owner->id)
+                        ->update(['pppoe_user' => $this->releasedImportedPppoeValue($owner)]);
+                    $existingPppoeOwners->forget($scrapedPppoeUser);
+                    $stats['released_deleted_imp_conflicts']++;
+                } else {
+                    $stats['pppoe_conflict']++;
+                    return $existingPppoeByCode->get($customerCode) ?: $customerCode . '_USR';
+                }
+            }
+
+            $stats['pppoe_from_scraper']++;
+            return $scrapedPppoeUser;
+        }
+
+        $existingPppoeUser = trim((string) ($existingPppoeByCode->get($customerCode) ?? ''));
+        if ($existingPppoeUser !== '') {
+            $stats['pppoe_preserved_existing']++;
+            return $existingPppoeUser;
+        }
+
+        $stats['pppoe_placeholder']++;
+        return $customerCode . '_USR';
+    }
+
+    private function releasedImportedPppoeValue(Customer $customer): string
+    {
+        return 'RELEASED-IMP-' . $customer->id . '-' . substr(md5((string) $customer->pppoe_user), 0, 8);
+    }
+
+    /**
+     * @return array<string, Router>
+     */
+    private function routersByScraperName(): array
+    {
+        $routersByName = Router::all()->keyBy('name');
+        $aliases = config('legacy_sync.router_aliases', []);
+        $mapped = [];
+
+        foreach ($aliases as $scraperName => $localRouterName) {
+            $router = $routersByName->get($localRouterName);
+            if ($router) {
+                $mapped[$scraperName] = $router;
+            }
+        }
+
+        foreach ($routersByName as $routerName => $router) {
+            $mapped[$routerName] = $router;
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, Router> $routersByScraperName
+     * @param array<string, int> $stats
+     */
+    private function resolveRouterId(array $data, array $routersByScraperName, array &$stats): ?int
+    {
+        $routerName = trim((string) (
+            data_get($data, 'router.name')
+            ?? $data['router_name']
+            ?? $data['nama_router']
+            ?? ''
+        ));
+
+        if ($routerName === '') {
+            $stats['router_blank']++;
+            return null;
+        }
+
+        $router = $routersByScraperName[$routerName] ?? null;
+        if (! $router) {
+            $stats['router_unmapped']++;
+            return null;
+        }
+
+        $stats['router_mapped']++;
+        return $router->id;
     }
 
     /**

@@ -93,7 +93,7 @@ class RouterController extends Controller
      */
     public function customers(Request $request, Router $router)
     {
-        $query = $router->customers()->with('package');
+        $query = $router->customers()->ebilling()->with('package');
 
         // Search functionality
         if ($request->filled('search')) {
@@ -137,6 +137,44 @@ class RouterController extends Controller
     }
 
     /**
+     * Get live router stats for the router detail page.
+     */
+    public function liveStats(Router $router)
+    {
+        $cacheKey = "router:{$router->id}:live-stats";
+
+        try {
+            $payload = \Cache::remember($cacheKey, now()->addSeconds(60), function () use ($router) {
+                $mikrotik = new \App\Services\MikrotikService();
+                $mikrotik->connect($router, ['timeout' => 5, 'attempts' => 1]);
+
+                try {
+                    $resourceQuery = new \RouterOS\Query('/system/resource/print');
+                    $resource = $mikrotik->getClient()->query($resourceQuery)->read();
+                    $activeConnections = $mikrotik->getActiveConnections();
+
+                    return [
+                        'data' => [
+                            'active_connections' => $activeConnections,
+                            'total_online' => count($activeConnections),
+                            'system_info' => $resource[0] ?? [],
+                        ],
+                        'last_updated' => now()->toISOString(),
+                    ];
+                } finally {
+                    $mikrotik->disconnect();
+                }
+            });
+
+            return response()->json($payload + ['cached' => true]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 503);
+        }
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Router $router)
@@ -177,7 +215,7 @@ class RouterController extends Controller
     public function destroy(Router $router)
     {
         // Prevent deletion if router has customers
-        if ($router->customers()->count() > 0) {
+        if ($router->customers()->ebilling()->count() > 0) {
             return back()->with('error', 'Cannot delete router with assigned customers.');
         }
 
@@ -202,6 +240,11 @@ class RouterController extends Controller
         }
     }
 
+    public function syncOnlineStatus(Router $router)
+    {
+        return $this->testConnection($router);
+    }
+
     /**
      * Scan this router for customers
      */
@@ -217,8 +260,7 @@ class RouterController extends Controller
             $syncService = app(\App\Services\RouterSyncService::class);
             $stats = $syncService->syncCustomers($router);
             
-            $message = "Scan completed. Mapped: {$stats['mapped']}, Orphans: {$stats['orphaned']}";
-            if ($stats['synced_package'] > 0) $message .= ", Packages Updated: {$stats['synced_package']}";
+            $message = "Scan completed. Mapped: {$stats['mapped']}, Unmatched MikroTik: {$stats['unmatched_mikrotik']}, eBilling not found: {$stats['not_found_ebilling']}";
             
             return back()->with('success', $message);
         } catch (\Exception $e) {
@@ -238,7 +280,7 @@ class RouterController extends Controller
         if ($result['success']) {
             $scan = $result['scan'];
             // Simplify message for toast
-            $msg = "{$router->name}: Synced! Online: {$router->current_online_count}. Scan: {$scan['mapped']} mapped, {$scan['orphaned']} orphans.";
+            $msg = "{$router->name}: Synced! Online: {$router->current_online_count}. Scan: {$scan['mapped']} mapped, {$scan['unmatched_mikrotik']} unmatched MikroTik, {$scan['not_found_ebilling']} eBilling not found.";
             return back()->with('success', $msg);
         } else {
             return back()->with('error', "{$router->name}: Sync Failed - " . $result['error']);

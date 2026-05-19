@@ -42,6 +42,33 @@ until php artisan db:show > /dev/null 2>&1; do
 done
 echo "📡 Database is ready!"
 
+if [ "$SESSION_DRIVER" = "redis" ] || [ "$QUEUE_CONNECTION" = "redis" ] || [ "$CACHE_STORE" = "redis" ]; then
+  echo "⏳ Waiting for Redis connection..."
+  attempt=1
+  max_attempts=60
+  until php -r '
+    $host = getenv("REDIS_HOST") ?: "127.0.0.1";
+    $port = (int) (getenv("REDIS_PORT") ?: 6379);
+    $password = getenv("REDIS_PASSWORD");
+    $redis = new Redis();
+    $redis->connect($host, $port, 1.5);
+    if ($password && $password !== "null") {
+        $redis->auth($password);
+    }
+    $redis->ping();
+  ' > /dev/null 2>&1; do
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "❌ Redis connection failed after $max_attempts attempts."
+      exit 1
+    fi
+
+    echo "  (Still waiting for Redis...)"
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+  echo "📡 Redis is ready!"
+fi
+
 # 1. Run migrations
 echo "📦 Running database migrations..."
 php artisan migrate --force

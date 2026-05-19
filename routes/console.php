@@ -16,13 +16,6 @@ Schedule::command('billing:check-overdue')
 
 
 
-Schedule::command('queue:work --queue=network-enforcement --max-time=3600 --stop-when-empty')
-    ->everyFiveMinutes()
-    ->withoutOverlapping()
-    ->description('Process network enforcement queue');
-
-
-
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
