@@ -91,6 +91,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('routers.scan');
         Route::post('/routers/{router}/sync', [\App\Http\Controllers\RouterController::class, 'sync'])
             ->name('routers.sync');
+        Route::post('/routers/sync-all', [\App\Http\Controllers\RouterController::class, 'syncAll'])
+            ->name('routers.sync-all');
         Route::get('/api/routers/{router}/customers', [\App\Http\Controllers\RouterController::class, 'customers'])
             ->name('api.routers.customers');
         Route::get('/api/routers/{router}/profiles', [\App\Http\Controllers\RouterController::class, 'getProfiles'])

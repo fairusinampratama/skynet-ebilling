@@ -22,6 +22,7 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { formatDistanceToNow } from 'date-fns';
 import RouterCustomersTable from './Partials/RouterCustomersTable';
+import { RouterStatusBadge, SyncStatus } from '@/Components/RouterStatusBadge';
 
 interface Customer {
     id: number;
@@ -76,6 +77,18 @@ interface RouterData {
     last_scanned_at: string | null;
     last_scan_customers_count: number;
     total_pppoe_count: number;
+    sync_status: SyncStatus;
+    sync_started_at: string | null;
+    sync_finished_at: string | null;
+    sync_lock_until: string | null;
+    sync_message: string | null;
+    last_sync_stats: {
+        total_secrets?: number;
+        mapped?: number;
+        unmatched_mikrotik?: number;
+        not_found_ebilling?: number;
+        synced_status?: number;
+    } | null;
     profiles: Array<{
         name: string;
         rate_limit?: string;
@@ -118,12 +131,29 @@ export default function Show({ router: routerData }: Props) {
     );
 
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const isSyncActive = ['queued', 'running'].includes(routerData.sync_status);
+
+    useEffect(() => {
+        if (!isSyncActive) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            router.reload({
+                only: ['router'],
+            });
+        }, 3000);
+
+        return () => window.clearInterval(timer);
+    }, [isSyncActive]);
 
     // Manual Refresh (Overrides Scheduled Sync)
     const handleRefresh = () => {
         setIsRefreshing(true);
         router.post(`/routers/${routerData.id}/sync`, {}, {
             preserveScroll: true,
+            preserveState: true,
+            only: ['router', 'flash'],
             onSuccess: () => {
                 mutate(); // Trigger refresh but don't wait for it
             },
@@ -314,7 +344,7 @@ export default function Show({ router: routerData }: Props) {
                             {/* Last Scan Info - Always Visible */}
                             <Card className="border-border bg-card">
                                 <CardContent className="pt-6">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex items-center gap-3">
                                             <Activity className="h-5 w-5 text-muted-foreground" />
                                             <div>
@@ -325,18 +355,33 @@ export default function Show({ router: routerData }: Props) {
                                                         : 'Never synced'
                                                     }
                                                 </p>
+                                                {routerData.sync_message && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {routerData.sync_message}
+                                                    </p>
+                                                )}
+                                                {routerData.last_sync_stats && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {routerData.last_sync_stats.mapped ?? 0} mapped • {routerData.last_sync_stats.unmatched_mikrotik ?? 0} unmatched MikroTik • {routerData.last_sync_stats.not_found_ebilling ?? 0} eBilling missing
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
-                                        {/* Subtle Refresh Button */}
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleRefresh}
-                                            disabled={isRefreshing}
-                                            title={routerData.is_active ? "Force Manual Sync" : "Sync to Reactivate Router"}
-                                        >
-                                            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                        </Button>
+                                        <div className="flex items-center gap-2 self-start sm:self-center">
+                                            <RouterStatusBadge
+                                                connectionStatus={routerData.connection_status}
+                                                syncStatus={routerData.sync_status || 'idle'}
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={handleRefresh}
+                                                disabled={isRefreshing || isSyncActive}
+                                                title={isSyncActive ? 'Full sync is already running' : routerData.is_active ? "Force Manual Sync" : "Sync to Reactivate Router"}
+                                            >
+                                                <RefreshCw className={`h-4 w-4 ${(isRefreshing || isSyncActive) ? 'animate-spin' : ''}`} />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

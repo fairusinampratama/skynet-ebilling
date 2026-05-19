@@ -1,15 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Server, RefreshCw } from 'lucide-react';
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
-import { toast } from 'sonner';
 import { EditAction, DeleteAction } from '@/Components/TableActions';
 import { ConfirmDialog } from '@/Components/ConfirmDialog';
 import { RouterStatusBadge, SyncStatus } from '@/Components/RouterStatusBadge';
-
-import { PageProps } from '@/types';
 
 interface Router {
     id: number;
@@ -22,11 +19,9 @@ interface Router {
     current_online_count: number;
     total_pppoe_count: number;
     cpu_load: number | null;
-}
-
-interface CommonProps extends PageProps {
-    // Add existing CommonProps that were unique, if any
-    [key: string]: any;
+    sync_status: SyncStatus;
+    sync_message: string | null;
+    sync_lock_until: string | null;
 }
 
 interface Props {
@@ -40,80 +35,35 @@ interface Props {
 }
 
 export default function Index({ routers, filters = {} }: Props) {
-    const { flash } = usePage<PageProps>().props;
     const [isSyncingAll, setIsSyncingAll] = useState(false);
-    const [currentSyncingId, setCurrentSyncingId] = useState<number | null>(null);
-    const [syncedIds, setSyncedIds] = useState<Set<number>>(new Set());
-    const [failedIds, setFailedIds] = useState<Set<number>>(new Set());
 
     const [excludeConfirmOpen, setExcludeConfirmOpen] = useState(false);
     const [routerToDelete, setRouterToDelete] = useState<number | null>(null);
 
-    const handleSyncAll = async () => {
-        // Only sync ACTIVE routers (matching backend behavior)
-        const activeRouters = routers.data.filter(r => r.is_active);
+    const hasActiveSync = routers.data.some((routerItem) => ['queued', 'running'].includes(routerItem.sync_status));
 
-        if (activeRouters.length === 0) {
-            toast.error('No active routers to sync');
+    useEffect(() => {
+        if (!hasActiveSync) {
             return;
         }
 
+        const timer = window.setInterval(() => {
+            router.reload({
+                only: ['routers'],
+            });
+        }, 3000);
+
+        return () => window.clearInterval(timer);
+    }, [hasActiveSync]);
+
+    const handleSyncAll = () => {
         setIsSyncingAll(true);
-        setSyncedIds(new Set());
-        setFailedIds(new Set());
-
-        let succeeded = 0;
-        let failed = 0;
-
-        for (const routerItem of activeRouters) {
-            setCurrentSyncingId(routerItem.id);
-
-            try {
-                await new Promise<void>((resolve) => {
-                    router.post(route('routers.sync', routerItem.id), {}, {
-                        preserveScroll: true,
-                        onSuccess: (page) => {
-                            // Check the flash message from property page.props
-                            // We need to cast page.props to check for specific custom props
-                            const props = page.props as unknown as CommonProps;
-
-                            if (props.flash?.success) {
-                                setSyncedIds(prev => new Set(prev).add(routerItem.id));
-                                succeeded++;
-                            } else {
-                                // If no success flash, assume it failed (e.g. error flash)
-                                setFailedIds(prev => new Set(prev).add(routerItem.id));
-                                failed++;
-                            }
-                            resolve();
-                        },
-                        onError: () => {
-                            setFailedIds(prev => new Set(prev).add(routerItem.id));
-                            failed++;
-                            resolve();
-                        },
-                        onFinish: () => {
-                            // Fallback if needed
-                        }
-                    });
-                });
-            } catch (e) {
-                setFailedIds(prev => new Set(prev).add(routerItem.id));
-                failed++;
-            }
-        }
-
-
-        setCurrentSyncingId(null);
-        setIsSyncingAll(false);
-
-
-
-        // Auto-clear icons after 5 seconds
-        setTimeout(() => {
-            setSyncedIds(new Set());
-            setFailedIds(new Set());
-        }, 5000);
+        router.post(route('routers.sync-all'), {}, {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['routers', 'flash'],
+            onFinish: () => setIsSyncingAll(false),
+        });
     };
 
     const handleDelete = (id: number) => {
@@ -132,11 +82,8 @@ export default function Index({ routers, filters = {} }: Props) {
         }
     };
 
-    const getRouterSyncStatus = (id: number): SyncStatus => {
-        if (currentSyncingId === id) return 'syncing';
-        if (syncedIds.has(id)) return 'success';
-        if (failedIds.has(id)) return 'failed';
-        return 'idle';
+    const getRouterSyncStatus = (routerItem: Router): SyncStatus => {
+        return routerItem.sync_status || 'idle';
     };
 
     const columns: Column<Router>[] = [
@@ -163,7 +110,7 @@ export default function Index({ routers, filters = {} }: Props) {
             cell: (routerData) => (
                 <RouterStatusBadge
                     connectionStatus={routerData.connection_status}
-                    syncStatus={getRouterSyncStatus(routerData.id)}
+                    syncStatus={getRouterSyncStatus(routerData)}
                     cpuLoad={routerData.cpu_load}
                 />
             ),
@@ -238,13 +185,13 @@ export default function Index({ routers, filters = {} }: Props) {
                         <div className="flex items-center gap-2">
                             <Button
                                 onClick={handleSyncAll}
-                                disabled={isSyncingAll}
+                                disabled={isSyncingAll || hasActiveSync}
                                 variant="outline"
                                 size="sm"
                                 className="h-8 gap-2 border-dashed"
                             >
-                                <RefreshCw className={`h-3.5 w-3.5 ${isSyncingAll ? 'animate-spin' : ''}`} />
-                                {isSyncingAll ? 'Syncing...' : 'Sync All'}
+                                <RefreshCw className={`h-3.5 w-3.5 ${(isSyncingAll || hasActiveSync) ? 'animate-spin' : ''}`} />
+                                {isSyncingAll || hasActiveSync ? 'Sync Queued' : 'Sync All'}
                             </Button>
                             <Link href={route('routers.create')}>
                                 <Button size="sm" className="h-8 gap-2">

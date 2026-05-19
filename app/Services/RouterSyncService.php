@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Router;
 use App\Models\Customer;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class RouterSyncService
@@ -110,9 +111,12 @@ class RouterSyncService
 
     public function fullSync(Router $router): array
     {
+        $connected = false;
+
         try {
             // Strict timeout for UX: 2 seconds (aggressive for fast feedback)
             $this->mikrotik->connect($router, ['timeout' => 2, 'attempts' => 1]);
+            $connected = true;
 
             $result = [
                 'health' => [],
@@ -156,8 +160,6 @@ class RouterSyncService
                 'last_scan_customers_count' => $scanStats['mapped'],
             ]);
 
-            $this->mikrotik->disconnect();
-
             return $result;
 
         } catch (\Exception $e) {
@@ -166,6 +168,10 @@ class RouterSyncService
                 'success' => false,
                 'error' => $e->getMessage()
             ];
+        } finally {
+            if ($connected) {
+                $this->mikrotik->disconnect();
+            }
         }
     }
 
@@ -278,6 +284,8 @@ class RouterSyncService
         $stats['total_secrets'] = count($secrets);
         $secretUsernames = $this->secretUsernames($secrets);
         $activeUsernames = array_flip($this->secretUsernames($activeConnections));
+        $customersByPppoe = $this->ebillingCustomersByPppoe();
+        $syncRows = [];
 
         foreach ($secrets as $secret) {
             $pppoeUsername = $secret['name'] ?? null;
@@ -285,7 +293,7 @@ class RouterSyncService
                 continue;
             }
 
-            $customer = $this->findEbillingCustomerByPppoe($pppoeUsername);
+            $customer = $customersByPppoe[$pppoeUsername] ?? null;
 
             if (!$customer) {
                 $stats['unmatched_mikrotik']++;
@@ -294,13 +302,25 @@ class RouterSyncService
 
             if (!$dryRun) {
                 $isOnline = array_key_exists($pppoeUsername, $activeUsernames) ? true : null;
-                $this->processCustomerSync($router, $customer, $secret, $stats, $isOnline);
+                $syncRows[] = $this->customerSyncRow($router, $customer, $secret, $stats, $isOnline);
             }
             $stats['mapped']++;
         }
 
+        if (!$dryRun && !empty($syncRows)) {
+            $this->updateCustomerSyncRows($syncRows);
+        }
+
         $stats['not_found_ebilling'] = $this->markAssignedEbillingCustomersMissingFromRouter($router, $secretUsernames, $dryRun);
         $stats['orphaned'] = $stats['unmatched_mikrotik'];
+
+        Log::info("Completed full customer sync for {$router->name}", [
+            'total_secrets' => $stats['total_secrets'],
+            'mapped' => $stats['mapped'],
+            'unmatched_mikrotik' => $stats['unmatched_mikrotik'],
+            'not_found_ebilling' => $stats['not_found_ebilling'],
+            'synced_status' => $stats['synced_status'],
+        ]);
 
         return $stats;
     }
@@ -315,12 +335,14 @@ class RouterSyncService
             ->all();
     }
 
-    protected function findEbillingCustomerByPppoe(string $pppoeUsername): ?Customer
+    protected function ebillingCustomersByPppoe(): array
     {
         return Customer::ebilling()
-            ->where('pppoe_user', $pppoeUsername)
+            ->whereNotNull('pppoe_user')
+            ->where('pppoe_user', '!=', '')
             ->get()
-            ->first(fn (Customer $customer) => $customer->pppoe_user === $pppoeUsername);
+            ->keyBy('pppoe_user')
+            ->all();
     }
 
     protected function markAssignedEbillingCustomersMissingFromRouter(Router $router, array $secretUsernames, bool $dryRun = false): int
@@ -347,36 +369,49 @@ class RouterSyncService
         return $count;
     }
 
-    protected function processCustomerSync(Router $router, Customer $customer, array $secret, array &$stats, ?bool $isOnline = null): void
+    protected function customerSyncRow(Router $router, Customer $customer, array $secret, array &$stats, ?bool $isOnline = null): array
     {
         $profileName = $secret['profile'] ?? null;
-        $updates = [
+        $now = now();
+        $row = [
+            'id' => $customer->id,
             'router_id' => $router->id,
             'mikrotik_profile' => $profileName,
             'mikrotik_sync_status' => 'synced',
-            'mikrotik_synced_at' => now(),
-            'mikrotik_sync_checked_at' => now(),
+            'mikrotik_synced_at' => $now,
+            'mikrotik_sync_checked_at' => $now,
+            'is_online' => $isOnline ?? $customer->is_online,
+            'status' => $customer->status,
+            'updated_at' => $now,
         ];
-
-        if ($isOnline !== null) {
-            $updates['is_online'] = $isOnline;
-        }
 
         // Auto-Sync Status (Isolation Logic)
         if ($router->isolation_profile) {
             if ($profileName === $router->isolation_profile) {
                 if ($customer->status !== 'isolated') {
-                    $updates['status'] = 'isolated';
+                    $row['status'] = 'isolated';
                     $stats['synced_status']++;
                 }
             } else {
                 if ($customer->status === 'isolated') {
-                    $updates['status'] = 'active';
+                    $row['status'] = 'active';
                     $stats['synced_status']++;
                 }
             }
         }
 
-        $customer->update($updates);
+        return $row;
+    }
+
+    protected function updateCustomerSyncRows(array $rows): void
+    {
+        DB::transaction(function () use ($rows) {
+            foreach ($rows as $row) {
+                $id = $row['id'];
+                unset($row['id']);
+
+                Customer::whereKey($id)->update($row);
+            }
+        });
     }
 }

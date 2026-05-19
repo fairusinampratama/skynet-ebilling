@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RouterStoreRequest;
+use App\Http\Requests\RouterUpdateRequest;
+use App\Jobs\SyncRouterJob;
 use Illuminate\Http\Request;
 
 use App\Models\Router;
@@ -57,16 +60,9 @@ class RouterController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(RouterStoreRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'ip_address' => 'required|ip',
-            'port' => 'required|integer|min:1|max:65535',
-            'username' => 'required|string|max:255',
-            'password' => 'required|string',
-            'is_active' => 'boolean',
-        ]);
+        $validated = $request->validated();
 
         Router::create($validated);
 
@@ -187,16 +183,9 @@ class RouterController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Router $router)
+    public function update(RouterUpdateRequest $request, Router $router)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'ip_address' => 'required|ip',
-            'port' => 'required|integer|min:1|max:65535',
-            'username' => 'required|string|max:255',
-            'password' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
+        $validated = $request->validated();
 
         // Only update password if provided
         if (empty($validated['password'])) {
@@ -274,17 +263,26 @@ class RouterController extends Controller
      */
     public function sync(Router $router)
     {
-        $syncService = app(\App\Services\RouterSyncService::class);
-        $result = $syncService->fullSync($router);
+        $router->refresh();
+        $isLocked = in_array($router->sync_status, ['queued', 'running'], true)
+            && $router->sync_lock_until
+            && $router->sync_lock_until->isFuture();
 
-        if ($result['success']) {
-            $scan = $result['scan'];
-            // Simplify message for toast
-            $msg = "{$router->name}: Synced! Online: {$router->current_online_count}. Scan: {$scan['mapped']} mapped, {$scan['unmatched_mikrotik']} unmatched MikroTik, {$scan['not_found_ebilling']} eBilling not found.";
-            return back()->with('success', $msg);
-        } else {
-            return back()->with('error', "{$router->name}: Sync Failed - " . $result['error']);
+        if ($isLocked) {
+            return back()->with('success', "{$router->name}: Sync is already {$router->sync_status}.");
         }
+
+        $router->update([
+            'sync_status' => 'queued',
+            'sync_started_at' => null,
+            'sync_finished_at' => null,
+            'sync_lock_until' => now()->addMinutes(10),
+            'sync_message' => 'Full sync is queued.',
+        ]);
+
+        SyncRouterJob::dispatch($router->id);
+
+        return back()->with('success', "{$router->name}: Full sync queued.");
     }
 
     /**
@@ -300,19 +298,30 @@ class RouterController extends Controller
             'errors' => []
         ];
 
-        $syncService = app(\App\Services\RouterSyncService::class);
-
         foreach ($routers as $router) {
-            try {
-                $syncService->fullSync($router);
-                $results['synced']++;
-            } catch (\Exception $e) {
+            $isLocked = in_array($router->sync_status, ['queued', 'running'], true)
+                && $router->sync_lock_until
+                && $router->sync_lock_until->isFuture();
+
+            if ($isLocked) {
                 $results['failed']++;
-                $results['errors'][] = "{$router->name}: {$e->getMessage()}";
+                $results['errors'][] = "{$router->name}: already {$router->sync_status}";
+                continue;
             }
+
+            $router->update([
+                'sync_status' => 'queued',
+                'sync_started_at' => null,
+                'sync_finished_at' => null,
+                'sync_lock_until' => now()->addMinutes(10),
+                'sync_message' => 'Full sync is queued.',
+            ]);
+
+            SyncRouterJob::dispatch($router->id);
+            $results['synced']++;
         }
 
-        $message = "Synced {$results['synced']}/{$results['total']} routers";
+        $message = "Queued {$results['synced']}/{$results['total']} routers";
         if ($results['failed'] > 0) {
             $message .= ". {$results['failed']} failed.";
         }

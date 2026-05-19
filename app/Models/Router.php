@@ -24,6 +24,12 @@ class Router extends Model
         'last_health_check_at',
         'total_pppoe_count',
         'isolation_profile',
+        'sync_status',
+        'sync_started_at',
+        'sync_finished_at',
+        'sync_lock_until',
+        'sync_message',
+        'last_sync_stats',
     ];
 
     protected $casts = [
@@ -32,6 +38,10 @@ class Router extends Model
         'connection_status' => 'string',
         'last_scanned_at' => 'datetime',
         'last_health_check_at' => 'datetime',
+        'sync_started_at' => 'datetime',
+        'sync_finished_at' => 'datetime',
+        'sync_lock_until' => 'datetime',
+        'last_sync_stats' => 'array',
     ];
 
     public function customers()

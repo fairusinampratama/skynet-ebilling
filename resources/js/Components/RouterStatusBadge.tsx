@@ -1,7 +1,7 @@
 import { Badge } from '@/Components/ui/badge';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react';
 
-export type SyncStatus = 'idle' | 'syncing' | 'success' | 'failed';
+export type SyncStatus = 'idle' | 'queued' | 'running' | 'syncing' | 'success' | 'failed';
 
 interface RouterStatusBadgeProps {
     connectionStatus: 'unknown' | 'online' | 'offline';
@@ -16,7 +16,16 @@ export function RouterStatusBadge({
 }: RouterStatusBadgeProps) {
 
     // 1. Handle Syncing State
-    if (syncStatus === 'syncing') {
+    if (syncStatus === 'queued') {
+        return (
+            <Badge variant="outline" className="h-6 px-3 text-xs whitespace-nowrap text-blue-500 border-blue-500/20 bg-blue-500/10">
+                <Clock className="mr-1.5 h-3 w-3" />
+                Queued
+            </Badge>
+        );
+    }
+
+    if (syncStatus === 'running' || syncStatus === 'syncing') {
         return (
             <Badge variant="outline" className="h-6 px-3 text-xs whitespace-nowrap text-blue-500 border-blue-500/20 bg-blue-500/10">
                 <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
