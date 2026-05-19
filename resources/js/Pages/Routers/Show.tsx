@@ -74,6 +74,7 @@ interface RouterData {
     connection_status: 'unknown' | 'online' | 'offline';
     created_at: string;
     customers_count: number;
+    staged_unmatched_customers_count?: number;
     last_scanned_at: string | null;
     last_scan_customers_count: number;
     total_pppoe_count: number;
@@ -86,6 +87,8 @@ interface RouterData {
         total_secrets?: number;
         mapped?: number;
         unmatched_mikrotik?: number;
+        staged_router_only?: number;
+        staged_gone?: number;
         not_found_ebilling?: number;
         synced_status?: number;
     } | null;
@@ -362,7 +365,12 @@ export default function Show({ router: routerData }: Props) {
                                                 )}
                                                 {routerData.last_sync_stats && (
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        {routerData.last_sync_stats.mapped ?? 0} mapped • {routerData.last_sync_stats.unmatched_mikrotik ?? 0} unmatched MikroTik • {routerData.last_sync_stats.not_found_ebilling ?? 0} eBilling missing
+                                                        {routerData.last_sync_stats.mapped ?? 0} mapped • {routerData.last_sync_stats.staged_router_only ?? routerData.last_sync_stats.unmatched_mikrotik ?? 0} router-only staged • {routerData.last_sync_stats.not_found_ebilling ?? 0} eBilling missing
+                                                    </p>
+                                                )}
+                                                {(routerData.staged_unmatched_customers_count || 0) > 0 && (
+                                                    <p className="mt-1 text-xs font-medium text-orange-600">
+                                                        {routerData.staged_unmatched_customers_count} router-only PPPoE secret(s) need review.
                                                     </p>
                                                 )}
                                             </div>

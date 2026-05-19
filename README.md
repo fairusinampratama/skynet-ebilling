@@ -16,22 +16,22 @@ Built with a robust Laravel backend and a reactive, fast Inertia.js + React fron
 
 ### 📡 Router & Network Integration
 - **Device Management**: Add and monitor network routers (e.g., Mikrotik).
-- **Status Syncing**: Real-time synchronization of router online/offline statuses.
+- **MikroTik Source of Truth**: Sync PPPoE secrets from routers, mark missing eBilling customers, and stage router-only users for review.
 
 ### 🧾 Automated Invoicing
 - **Lifecycle Management**: Generate, view, void, delete, and download (PDF) customer invoices.
 - **Customer Portal**: Unique public, passwordless URLs for customers to view and pay their invoices securely.
 
 ### 💳 Payment Processing
-- **Automated Gateway**: Full integration with the **Tripay** payment gateway via webhooks for instant payment verification.
-- **Manual & Bulk Processing**: Manual payment entry and bulk payment import capabilities for offline transactions.
+- **Manual Payment Recording**: Admins can record cash, transfer, QRIS, and other offline payments against invoices.
+- **Payment Proofs & Reconnection**: Store proof uploads and reconnect isolated customers automatically after full payment.
 
 ### 📱 WhatsApp Broadcasts & Campaigns
 - **Customer Communication**: Integrated with **Whatspie** for sending automated WhatsApp messages and broadcast campaigns.
 - **Delivery Tracking**: Monitor broadcast status and easily retry failed messages.
 
 ### ⚙️ Extensible Configuration
-- **Settings System**: Easily configure application behavior, payment gateways, and API keys from the UI.
+- **Settings System**: Configure company details, manual payment channels, and communication credentials from the UI.
 
 ---
 

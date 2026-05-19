@@ -83,6 +83,7 @@ interface Customer {
     mikrotik_sync_status: 'unknown' | 'synced' | 'missing';
     mikrotik_synced_at?: string | null;
     mikrotik_sync_checked_at?: string | null;
+    unpaid_periods_count?: number;
     // is_online removed
     package: Package;
     area?: Area;
@@ -108,6 +109,7 @@ interface Props {
         package_id?: string;
         area_id?: string;
         mikrotik_sync?: string;
+        unpaid_periods?: string;
         sort?: string;
         direction?: 'asc' | 'desc';
         limit?: string;
@@ -195,24 +197,31 @@ export default function Index({ customers, packages = [], areas = [], filters = 
         {
             header: "Next Due Date",
             cell: (customer) => (
-                customer.invoices && customer.invoices.length > 0 ? (
-                    <div className={`text-sm flex flex-col ${new Date(customer.invoices[0].due_date) < new Date() && customer.invoices[0].status === 'unpaid'
-                        ? 'text-red-500'
-                        : 'text-muted-foreground'
-                        }`}>
-                        <span className="font-medium">
-                            {new Date(customer.invoices[0].due_date).toLocaleDateString('id-ID', {
-                                day: 'numeric',
-                                month: 'short'
-                            })}
-                        </span>
-                        {new Date(customer.invoices[0].due_date) < new Date() && customer.invoices[0].status === 'unpaid' && (
-                            <span className="text-[10px] font-bold uppercase">Overdue</span>
-                        )}
-                    </div>
-                ) : (
-                    <span className="text-muted-foreground text-xs italic">No Active Bills</span>
-                )
+                <div className="flex flex-col gap-1">
+                    {customer.invoices && customer.invoices.length > 0 ? (
+                        <div className={`text-sm flex flex-col ${new Date(customer.invoices[0].due_date) < new Date() && customer.invoices[0].status === 'unpaid'
+                            ? 'text-red-500'
+                            : 'text-muted-foreground'
+                            }`}>
+                            <span className="font-medium">
+                                {new Date(customer.invoices[0].due_date).toLocaleDateString('id-ID', {
+                                    day: 'numeric',
+                                    month: 'short'
+                                })}
+                            </span>
+                            {new Date(customer.invoices[0].due_date) < new Date() && customer.invoices[0].status === 'unpaid' && (
+                                <span className="text-[10px] font-bold uppercase">Overdue</span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="text-muted-foreground text-xs italic">No Active Bills</span>
+                    )}
+                    {(customer.unpaid_periods_count || 0) >= 3 && (
+                        <Badge variant="outline" className="w-fit border-red-500/20 bg-red-500/10 text-[10px] text-red-500">
+                            {customer.unpaid_periods_count} unpaid
+                        </Badge>
+                    )}
+                </div>
             )
         },
         ...(isAdmin ? [{
@@ -279,6 +288,13 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                 { label: 'Synced', value: 'synced' },
                 { label: 'Missing', value: 'missing' },
                 { label: 'Not checked', value: 'unknown' },
+            ]
+        },
+        {
+            key: 'unpaid_periods',
+            placeholder: 'All Billing',
+            options: [
+                { label: '3+ unpaid periods', value: '3plus' },
             ]
         }
     ];

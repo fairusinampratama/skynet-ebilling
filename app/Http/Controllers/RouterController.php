@@ -76,7 +76,10 @@ class RouterController extends Controller
     public function show(Router $router)
     {
         $router->load(['profiles']);
-        $router->loadCount('customers');
+        $router->loadCount([
+            'customers',
+            'stagedCustomers as staged_unmatched_customers_count' => fn ($query) => $query->where('status', 'unmatched'),
+        ]);
         // Customers will be loaded lazily via API
         
         return Inertia::render('Routers/Show', [
@@ -249,7 +252,7 @@ class RouterController extends Controller
             $syncService = app(\App\Services\RouterSyncService::class);
             $stats = $syncService->syncCustomers($router);
             
-            $message = "Scan completed. Mapped: {$stats['mapped']}, Unmatched MikroTik: {$stats['unmatched_mikrotik']}, eBilling not found: {$stats['not_found_ebilling']}";
+            $message = "Scan completed. Mapped: {$stats['mapped']}, Router-only staged: {$stats['staged_router_only']}, eBilling missing: {$stats['not_found_ebilling']}";
             
             return back()->with('success', $message);
         } catch (\Exception $e) {

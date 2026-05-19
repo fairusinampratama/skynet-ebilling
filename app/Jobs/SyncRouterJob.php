@@ -72,10 +72,10 @@ class SyncRouterJob implements ShouldQueue
     private function successMessage(Router $router, array $scan): string
     {
         return sprintf(
-            '%s: synced. %d mapped, %d unmatched MikroTik, %d eBilling missing.',
+            '%s: synced. %d mapped, %d router-only staged, %d eBilling missing.',
             $router->name,
             $scan['mapped'] ?? 0,
-            $scan['unmatched_mikrotik'] ?? 0,
+            $scan['staged_router_only'] ?? ($scan['unmatched_mikrotik'] ?? 0),
             $scan['not_found_ebilling'] ?? 0,
         );
     }

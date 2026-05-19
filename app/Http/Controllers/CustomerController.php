@@ -32,7 +32,7 @@ class CustomerController extends Controller
 
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
-            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'sort', 'direction', 'limit']),
+            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'unpaid_periods', 'sort', 'direction', 'limit']),
             'packages' => Package::all(), // For filter dropdown
             'areas' => $areasQuery->get(),
         ]);
@@ -60,6 +60,11 @@ class CustomerController extends Controller
                 'join_date',
                 'due_day',
                 'created_at',
+            ])
+            ->withCount([
+                'invoices as unpaid_periods_count' => function ($query) {
+                    $query->where('status', 'unpaid');
+                },
             ]);
 
         $rowNumber = 1;
@@ -82,6 +87,7 @@ class CustomerController extends Controller
             $customer->mikrotik_sync_checked_at?->toDateTimeString() ?? '',
             $customer->join_date?->toDateString() ?? '',
             $customer->due_day,
+            $customer->unpaid_periods_count,
             ];
         });
 
@@ -103,6 +109,7 @@ class CustomerController extends Controller
             'MikroTik Checked At',
             'Tanggal Bergabung',
             'Jatuh Tempo',
+            'Periode Belum Bayar',
         ], $rows);
 
         return response()->download($path, 'customers-' . now()->format('Ymd-His') . '.xlsx')->deleteFileAfterSend();
@@ -295,6 +302,10 @@ class CustomerController extends Controller
             'invoices' => function($q) {
                 $q->where('status', 'unpaid')->orderBy('due_date', 'asc')->limit(1);
             }
+        ])->withCount([
+            'invoices as unpaid_periods_count' => function ($query) {
+                $query->where('status', 'unpaid');
+            },
         ]);
         AreaScope::applyToCustomers($query, $request->user());
 
@@ -329,6 +340,14 @@ class CustomerController extends Controller
             $status = $request->mikrotik_sync;
             if (in_array($status, ['unknown', 'synced', 'missing'], true)) {
                 $query->where('mikrotik_sync_status', $status);
+            }
+        }
+
+        if ($request->has('unpaid_periods') && $request->unpaid_periods !== 'all') {
+            if ($request->unpaid_periods === '3plus') {
+                $query->has('invoices', '>=', 3, 'and', function ($invoiceQuery) {
+                    $invoiceQuery->where('status', 'unpaid');
+                });
             }
         }
 

@@ -114,6 +114,28 @@ WWWGROUP=$(id -g) WWWUSER=$(id -u) docker compose exec -T laravel.test env \
   php artisan test tests/Feature/IsolationFeatureTest.php
 ```
 
+## MikroTik-First Cleanup Flow
+
+MikroTik is treated as the active-network source of truth. Run a full router sync before cleanup so eBilling has fresh `synced`/`missing` customer states and router-only PPPoE secrets are staged for review.
+
+```bash
+./vendor/bin/sail artisan routers:scan
+```
+
+Customers with at least three unpaid invoice periods can be reviewed with a dry run:
+
+```bash
+./vendor/bin/sail artisan customers:cleanup-delinquent
+```
+
+Apply cleanup only after reviewing the dry-run table:
+
+```bash
+./vendor/bin/sail artisan customers:cleanup-delinquent --apply
+```
+
+Cleanup soft-deletes eligible customers and preserves invoices, transactions, and activity logs.
+
 ## Isolation and Queue Behavior
 
 Manual customer isolation/reconnection from the customer page is real-time: the web request talks to MikroTik immediately and returns success or failure to the admin.
@@ -121,7 +143,6 @@ Manual customer isolation/reconnection from the customer page is real-time: the 
 Background automation is queued through Redis:
 - overdue invoice isolation
 - payment-triggered reconnection
-- Tripay callback reconnection
 - router full sync
 
 Production workers should run the default queue and dedicated MikroTik queues. The included `supervisord.conf` starts:
