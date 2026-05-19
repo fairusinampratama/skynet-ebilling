@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UserStoreRequest;
+use App\Http\Requests\UserUpdateRequest;
 use App\Models\Area;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 
 class UserManagementController extends Controller
 {
     public function index(Request $request)
     {
+        $allowedSorts = ['name', 'email', 'role', 'created_at'];
+        $sort = in_array($request->input('sort'), $allowedSorts, true) ? $request->input('sort') : 'name';
+        $direction = $request->input('direction') === 'desc' ? 'desc' : 'asc';
+
         $users = User::query()
             ->with('areas:id,name,code')
             ->when($request->search, function ($query, $search) {
@@ -22,14 +26,18 @@ class UserManagementController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
-            ->orderByRaw("FIELD(role, 'superadmin', 'admin')")
-            ->orderBy('name')
+            ->when($request->role, fn ($query, $role) => $query->where('role', $role))
+            ->orderBy($sort, $direction)
             ->paginate($request->input('limit', 20))
             ->withQueryString();
 
         return Inertia::render('Users/Index', [
             'users' => $users,
-            'filters' => $request->only(['search', 'limit']),
+            'filters' => [
+                ...$request->only(['search', 'role', 'limit']),
+                'sort' => $sort,
+                'direction' => $direction,
+            ],
         ]);
     }
 
@@ -40,16 +48,9 @@ class UserManagementController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(UserStoreRequest $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'role' => ['required', Rule::in(['superadmin', 'admin'])],
-            'area_ids' => ['array'],
-            'area_ids.*' => ['integer', 'exists:areas,id'],
-        ]);
+        $validated = $request->validated();
 
         $user = User::create([
             'name' => $validated['name'],
@@ -74,16 +75,9 @@ class UserManagementController extends Controller
         ]);
     }
 
-    public function update(Request $request, User $user)
+    public function update(UserUpdateRequest $request, User $user)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
-            'role' => ['required', Rule::in(['superadmin', 'admin'])],
-            'area_ids' => ['array'],
-            'area_ids.*' => ['integer', 'exists:areas,id'],
-        ]);
+        $validated = $request->validated();
 
         if ($user->isSuperAdmin() && $validated['role'] !== 'superadmin' && $this->superAdminCount() <= 1) {
             return back()->with('error', 'Cannot demote the last superadmin.');

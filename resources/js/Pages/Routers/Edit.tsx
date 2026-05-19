@@ -7,6 +7,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Switch } from '@/Components/ui/switch';
 import { ChevronLeft, Save, Server } from 'lucide-react';
 import { FormEventHandler } from 'react';
+import { requiredNumber, requiredString, validateForm } from '@/lib/validation';
+import { z } from 'zod';
+
+const ipAddressSchema = requiredString('IP address')
+    .refine((value) => {
+        const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(value)
+            && value.split('.').every((part) => Number(part) >= 0 && Number(part) <= 255);
+        const ipv6 = value.includes(':') && /^[0-9a-fA-F:]+$/.test(value);
+
+        return ipv4 || ipv6;
+    }, 'IP address must be valid.');
+
+const routerUpdateSchema = z.object({
+    name: requiredString('Router name'),
+    ip_address: ipAddressSchema,
+    port: requiredNumber('API port', 1).refine((value) => value <= 65535, 'API port must be at most 65535.'),
+    username: requiredString('Username'),
+    password: z.string(),
+    is_active: z.boolean(),
+});
 
 interface RouterData {
     id: number;
@@ -22,7 +42,7 @@ interface Props {
 }
 
 export default function Edit({ router }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
+    const form = useForm({
         name: router.name || '',
         ip_address: router.ip_address || '',
         port: router.port || 8728,
@@ -30,9 +50,11 @@ export default function Edit({ router }: Props) {
         password: '',
         is_active: router.is_active ?? true,
     });
+    const { data, setData, put, processing, errors } = form;
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        if (!validateForm(routerUpdateSchema, data, form)) return;
         put(route('routers.update', router.id));
     };
 
@@ -85,6 +107,7 @@ export default function Edit({ router }: Props) {
                                                 value={data.name}
                                                 onChange={(e) => setData('name', e.target.value)}
                                                 placeholder="e.g., Skynet-Tutur"
+                                                maxLength={255}
                                                 required
                                                 className={errors.name ? 'border-red-500' : ''}
                                             />
@@ -100,6 +123,7 @@ export default function Edit({ router }: Props) {
                                                 value={data.ip_address}
                                                 onChange={(e) => setData('ip_address', e.target.value)}
                                                 placeholder="103.156.128.231"
+                                                maxLength={255}
                                                 required
                                                 className={errors.ip_address ? 'border-red-500' : ''}
                                             />
@@ -118,6 +142,8 @@ export default function Edit({ router }: Props) {
                                         <Input
                                             id="port"
                                             type="number"
+                                            min={1}
+                                            max={65535}
                                             value={data.port}
                                             onChange={(e) => setData('port', parseInt(e.target.value) || 8728)}
                                             placeholder="8728"
@@ -141,6 +167,7 @@ export default function Edit({ router }: Props) {
                                                 value={data.username}
                                                 onChange={(e) => setData('username', e.target.value)}
                                                 placeholder="admin"
+                                                maxLength={255}
                                                 required
                                                 className={errors.username ? 'border-red-500' : ''}
                                             />

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CustomerStoreRequest;
+use App\Http\Requests\CustomerUpdateRequest;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\Area;
@@ -124,23 +126,9 @@ class CustomerController extends Controller
     /**
      * Store a newly created customer in storage.
      */
-    public function store(Request $request)
+    public function store(CustomerStoreRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string',
-            'phone' => 'nullable|string|max:20',
-            'nik' => 'nullable|string|max:20',
-            'pppoe_user' => 'required|string|unique:customers,pppoe_user',
-            'package_id' => 'required|exists:packages,id',
-            'area_id' => 'nullable|exists:areas,id',
-            'router_id' => 'nullable|exists:routers,id',
-            'mikrotik_profile' => 'nullable|string',
-            'status' => 'required|in:pending_installation,active,isolated,terminated',
-            'geo_lat' => 'nullable|numeric|between:-90,90',
-            'geo_long' => 'nullable|numeric|between:-180,180',
-            'ktp_photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+        $validated = $request->validated();
         AreaScope::authorizeAreaId(isset($validated['area_id']) ? (int) $validated['area_id'] : null, $request->user());
 
         // Auto-generate join date if not provided
@@ -170,6 +158,7 @@ class CustomerController extends Controller
         $customer->load([
             'package', 
             'area', 
+            'router:id,name,connection_status,is_active',
             'invoices' => function($q) {
                 $q->latest('period'); 
             },
@@ -201,24 +190,11 @@ class CustomerController extends Controller
     /**
      * Update the specified customer
      */
-    public function update(Request $request, Customer $customer)
+    public function update(CustomerUpdateRequest $request, Customer $customer)
     {
         AreaScope::authorizeCustomer($customer, $request->user());
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'package_id' => 'required|exists:packages,id',
-            'area_id' => 'nullable|exists:areas,id',
-            'router_id' => 'nullable|exists:routers,id',
-            'mikrotik_profile' => 'nullable|string',
-            'address' => 'required|string',
-            'phone' => 'nullable|string',
-            'nik' => 'nullable|string',
-            'status' => 'required|in:pending_installation,active,isolated,terminated',
-            'geo_lat' => 'nullable|numeric|between:-90,90',
-            'geo_long' => 'nullable|numeric|between:-180,180',
-            'ktp_photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+        $validated = $request->validated();
         AreaScope::authorizeAreaId(isset($validated['area_id']) ? (int) $validated['area_id'] : null, $request->user());
 
         // Handle KTP photo upload

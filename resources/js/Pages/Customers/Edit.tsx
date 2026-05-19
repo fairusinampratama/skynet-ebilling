@@ -9,6 +9,8 @@ import { Textarea } from '@/Components/ui/textarea';
 import { ChevronLeft, Save, User, Network, MapPin, Shield, Trash2 } from 'lucide-react';
 import MapPicker from '@/Components/MapPicker';
 import { FormEventHandler } from 'react';
+import { nullableId, optionalImage, optionalNumberInRange, requiredId, requiredString, validateForm } from '@/lib/validation';
+import { z } from 'zod';
 import {
     Dialog,
     DialogContent,
@@ -52,7 +54,6 @@ interface Customer {
     geo_long?: string;
     ktp_photo_url?: string | null;
     router_id?: number | null;
-    mikrotik_profile?: string | null;
 }
 
 interface Props {
@@ -62,8 +63,22 @@ interface Props {
     routers: Router[];
 }
 
+const customerUpdateSchema = z.object({
+    name: requiredString('Customer name'),
+    address: z.string().trim().min(1, 'Installation address is required.'),
+    phone: z.string().max(20, 'Phone may not be greater than 20 characters.').optional(),
+    nik: z.string().max(20, 'NIK may not be greater than 20 characters.').optional(),
+    package_id: requiredId('Package'),
+    area_id: nullableId('Area'),
+    router_id: nullableId('Router'),
+    status: z.enum(['pending_installation', 'active', 'isolated', 'terminated'], { error: 'Status is required.' }),
+    geo_lat: optionalNumberInRange('Latitude', -90, 90),
+    geo_long: optionalNumberInRange('Longitude', -180, 180),
+    ktp_photo: optionalImage('KTP photo'),
+});
+
 export default function Edit({ customer, packages, areas, routers }: Props) {
-    const { data, setData, put, delete: destroy, processing, errors } = useForm({
+    const form = useForm({
         name: customer.name || '',
         // internal_id removed
         address: customer.address || '',
@@ -74,15 +89,16 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
         package_id: String(customer.package_id),
         area_id: customer.area_id ? String(customer.area_id) : '',
         router_id: customer.router_id ? String(customer.router_id) : '',
-        mikrotik_profile: customer.mikrotik_profile || '',
         status: customer.status,
         geo_lat: customer.geo_lat || '',
         geo_long: customer.geo_long || '',
         ktp_photo: null as File | null,
     });
+    const { data, setData, put, delete: destroy, processing, errors } = form;
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        if (!validateForm(customerUpdateSchema, data, form)) return;
         put(route('customers.update', customer.id));
     };
 
@@ -176,6 +192,7 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                             value={data.name}
                                             onChange={(e) => setData('name', e.target.value)}
                                             className={errors.name ? 'border-destructive' : ''}
+                                            maxLength={255}
                                             required
                                         />
                                         {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
@@ -189,6 +206,7 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                             id="phone"
                                             value={data.phone}
                                             onChange={(e) => setData('phone', e.target.value)}
+                                            maxLength={20}
                                         />
                                         {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
                                     </div>
@@ -198,6 +216,7 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                             id="nik"
                                             value={data.nik}
                                             onChange={(e) => setData('nik', e.target.value)}
+                                            maxLength={20}
                                         />
                                     </div>
                                 </div>
@@ -370,14 +389,14 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                 <div className="grid gap-2">
                                     <Label htmlFor="router_id">Mikrotik Router</Label>
                                     <Select
-                                        value={data.router_id}
-                                        onValueChange={(val) => setData('router_id', val)}
+                                        value={data.router_id || 'manual'}
+                                        onValueChange={(val) => setData('router_id', val === 'manual' ? '' : val)}
                                     >
                                         <SelectTrigger className="bg-background/50">
                                             <SelectValue placeholder="Select Router" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">-- None (Manual Mode) --</SelectItem>
+                                            <SelectItem value="manual">-- None (Manual Mode) --</SelectItem>
                                             {routers.map((router) => (
                                                 <SelectItem key={router.id} value={String(router.id)}>
                                                     {router.name}
@@ -386,17 +405,6 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mikrotik_profile">Mikrotik Profile (Speed)</Label>
-                                    <Input
-                                        id="mikrotik_profile"
-                                        value={data.mikrotik_profile}
-                                        onChange={(e) => setData('mikrotik_profile', e.target.value)}
-                                        placeholder="e.g. 10MB"
-                                    />
-                                    {errors.mikrotik_profile && <p className="text-sm text-destructive">{errors.mikrotik_profile}</p>}
                                 </div>
 
                                 <div className="border-t border-border/50 my-6"></div>

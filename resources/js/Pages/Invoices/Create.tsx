@@ -11,6 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/Components/ui/popover
 import { ChevronLeft, Save, FileText, DollarSign, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FormEventHandler } from 'react';
+import { requiredId, requiredNumber, requiredString, validateForm } from '@/lib/validation';
+import { z } from 'zod';
 
 interface Package {
     id: number;
@@ -39,16 +41,24 @@ interface Props {
     areas: Area[];
 }
 
+const invoiceCreateSchema = z.object({
+    customer_id: requiredId('Customer'),
+    period: requiredString('Billing period').regex(/^\d{4}-\d{2}$/, 'Billing period is invalid.'),
+    amount: requiredNumber('Amount', 0),
+    due_date: requiredString('Due date').regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date is invalid.'),
+});
+
 export default function Create({ customers, areas }: Props) {
     const now = new Date();
     const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const { data, setData, post, processing, errors } = useForm({
+    const form = useForm({
         customer_id: '',
         period: currentPeriod,
         amount: '',
         due_date: '',
     });
+    const { data, setData, post, processing, errors } = form;
 
     const [open, setOpen] = useState(false);
     const [selectedAreaId, setSelectedAreaId] = useState<string>('all');
@@ -95,6 +105,7 @@ export default function Create({ customers, areas }: Props) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        if (!validateForm(invoiceCreateSchema, data, form)) return;
         post(route('invoices.store'));
     };
 
@@ -262,6 +273,8 @@ export default function Create({ customers, areas }: Props) {
                                     <Input
                                         id="amount"
                                         type="number"
+                                        min={0}
+                                        step="0.01"
                                         value={data.amount}
                                         onChange={(e) => setData('amount', e.target.value)}
                                         placeholder="0"

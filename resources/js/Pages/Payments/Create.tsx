@@ -5,10 +5,11 @@ import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
-import { Textarea } from '@/Components/ui/textarea';
 import { Separator } from '@/Components/ui/separator';
 import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { FormEventHandler } from 'react';
+import { optionalImage, requiredNumber, validateForm } from '@/lib/validation';
+import { z } from 'zod';
 
 interface Customer {
     id: number;
@@ -28,16 +29,23 @@ interface Props {
     invoice: Invoice;
 }
 
+const paymentCreateSchema = z.object({
+    amount: requiredNumber('Payment amount', 0),
+    method: z.enum(['cash', 'transfer', 'payment_gateway'], { error: 'Payment method is required.' }),
+    proof: optionalImage('Payment proof'),
+});
+
 export default function Create({ invoice }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
-        amount: invoice.amount,
+    const form = useForm({
+        amount: String(invoice.amount),
         method: 'cash',
         proof: null as File | null,
-        notes: '',
     });
+    const { data, setData, post, processing, errors } = form;
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+        if (!validateForm(paymentCreateSchema, data, form)) return;
         post(`/invoices/${invoice.id}/payments`);
     };
 
@@ -113,8 +121,9 @@ export default function Create({ invoice }: Props) {
                                         id="amount"
                                         type="number"
                                         step="0.01"
+                                        min={0}
                                         value={data.amount}
-                                        onChange={(e) => setData('amount', parseFloat(e.target.value))}
+                                        onChange={(e) => setData('amount', e.target.value)}
                                         required
                                     />
                                     <p className="text-sm text-muted-foreground">
@@ -151,28 +160,14 @@ export default function Create({ invoice }: Props) {
                                     <Input
                                         id="proof"
                                         type="file"
-                                        accept="image/*,application/pdf"
+                                        accept="image/jpeg,image/png,image/jpg"
                                         onChange={(e) => setData('proof', e.target.files?.[0] || null)}
                                     />
                                     <p className="text-sm text-muted-foreground">
-                                        Upload receipt, screenshot, or transaction proof
+                                        Upload receipt, screenshot, or transaction proof as an image. Max 2MB.
                                     </p>
                                     {errors.proof && (
                                         <p className="text-sm text-destructive">{errors.proof}</p>
-                                    )}
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="notes">Notes (Optional)</Label>
-                                    <Textarea
-                                        id="notes"
-                                        value={data.notes}
-                                        onChange={(e) => setData('notes', e.target.value)}
-                                        placeholder="Add any additional notes about this payment..."
-                                        rows={3}
-                                    />
-                                    {errors.notes && (
-                                        <p className="text-sm text-destructive">{errors.notes}</p>
                                     )}
                                 </div>
 

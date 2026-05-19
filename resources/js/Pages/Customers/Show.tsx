@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import { ArrowLeft, Edit, Trash2, User, Network, MapPin, Search, ChevronLeft, MoreHorizontal, Eye, Loader2, CheckCircle2, AlertTriangle, Power } from 'lucide-react';
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/Components/ConfirmDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
@@ -43,7 +43,7 @@ interface Package {
     id: number;
     name: string;
     price: number;
-
+    mikrotik_profile?: string | null;
 }
 
 interface Customer {
@@ -58,8 +58,18 @@ interface Customer {
     geo_lat: string;
     geo_long: string;
     join_date: string;
+    mikrotik_profile?: string | null;
+    previous_profile?: string | null;
+    mikrotik_sync_status?: 'unknown' | 'synced' | 'missing' | null;
+    mikrotik_sync_checked_at?: string | null;
     package: Package;
     area?: { id: number; name: string };
+    router?: {
+        id: number;
+        name: string;
+        connection_status: 'unknown' | 'online' | 'offline';
+        is_active: boolean;
+    } | null;
     invoices: Invoice[];
     ktp_photo_url?: string | null;
 }
@@ -80,8 +90,28 @@ export default function Show({ customer }: Props) {
 
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmAction, setConfirmAction] = useState<'block' | 'unblock' | null>(null);
+    const hasRouter = !!customer.router;
+    const hasPppoeUser = !!customer.pppoe_user?.trim();
+    const canEnforceOnMikrotik = hasRouter && hasPppoeUser;
+    const enforcementBlockers = [
+        !hasRouter ? 'Assign a MikroTik router.' : null,
+        !hasPppoeUser ? 'Set a PPPoE username.' : null,
+    ].filter((reason): reason is string => Boolean(reason));
+    const syncWarning = customer.mikrotik_sync_status === 'missing'
+        ? 'Last sync did not find this PPPoE user on MikroTik. The action may fail until the router record is fixed or synced again.'
+        : customer.mikrotik_sync_status === 'unknown'
+            ? 'This customer has not been verified against MikroTik yet.'
+            : null;
+    const enforcementLabel = canEnforceOnMikrotik ? 'Ready' : 'Needs setup';
+    const enforcementBadgeClass = canEnforceOnMikrotik
+        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+        : 'border-amber-500/20 bg-amber-500/10 text-amber-600';
 
     const handleToggleBlock = () => {
+        if (!canEnforceOnMikrotik) {
+            return;
+        }
+
         const isActive = customer.status === 'active';
         setConfirmAction(isActive ? 'block' : 'unblock');
         setConfirmOpen(true);
@@ -123,6 +153,9 @@ export default function Show({ customer }: Props) {
             offboarding: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
             terminated: 'text-zinc-600 border-zinc-600/20 bg-zinc-600/10',
             void: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
+            synced: 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10',
+            missing: 'text-red-500 border-red-500/20 bg-red-500/10',
+            unknown: 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10',
         };
         const className = variants[status] || 'text-zinc-500 border-zinc-500/20 bg-zinc-500/10';
 
@@ -130,6 +163,25 @@ export default function Show({ customer }: Props) {
             <Badge variant="outline" className={`${className} capitalize border`}>
                 {status.replace('_', ' ')}
             </Badge>
+        );
+    };
+
+    const DetailRow = ({ label, children }: { label: string; children: ReactNode }) => (
+        <div className="flex items-start justify-between gap-4">
+            <span className="shrink-0 text-muted-foreground">{label}</span>
+            <div className="min-w-0 text-right font-medium">{children}</div>
+        </div>
+    );
+
+    const ProfileValue = ({ value }: { value?: string | null }) => {
+        if (!value) {
+            return <span className="text-muted-foreground">-</span>;
+        }
+
+        return (
+            <span className="inline-block max-w-full truncate rounded bg-muted px-2 py-1 font-mono text-xs">
+                {value}
+            </span>
         );
     };
 
@@ -257,47 +309,107 @@ export default function Show({ customer }: Props) {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4 text-sm">
-                                    <div className="grid grid-cols-3 gap-1 items-center">
-                                        <span className="text-muted-foreground">Account Status</span>
-                                        <div className="col-span-2">
-                                            {getStatusBadge(customer.status)}
-                                        </div>
-                                    </div>
-
-                                    {isAdmin && (
-                                    <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50 mt-4">
-                                        <div>
-                                            <h4 className="font-medium">Service Status</h4>
-                                            <p className="text-sm text-muted-foreground">
-                                                {customer.status === 'active' ? 'Customer service is ACTIVE' : 'Customer service is SUSPENDED'}
-                                            </p>
-                                        </div>
-                                        <Button
-                                            variant={customer.status === 'active' ? "destructive" : "default"}
-                                            onClick={handleToggleBlock}
-                                        >
-                                            {customer.status === 'active' ? 'Suspend Service' : 'Activate Service'}
-                                        </Button>
-                                    </div>
+                                    <DetailRow label="Status">
+                                        {getStatusBadge(customer.status)}
+                                    </DetailRow>
+                                    <DetailRow label="Package">
+                                        <span className="block truncate">{customer.package.name}</span>
+                                    </DetailRow>
+                                    <DetailRow label="Price">
+                                        {formatCurrency(customer.package.price)} / mo
+                                    </DetailRow>
+                                    <DetailRow label="Package Profile">
+                                        <ProfileValue value={customer.package.mikrotik_profile} />
+                                    </DetailRow>
+                                    <DetailRow label="Router Profile">
+                                        <ProfileValue value={customer.mikrotik_profile || 'Unknown'} />
+                                    </DetailRow>
+                                    {customer.previous_profile && (
+                                        <DetailRow label="Previous Profile">
+                                            <ProfileValue value={customer.previous_profile} />
+                                        </DetailRow>
                                     )}
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <span className="text-muted-foreground">Package</span>
-                                        <span className="col-span-2 font-medium">{customer.package.name}</span>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <span className="text-muted-foreground">Price</span>
-                                        <span className="col-span-2 font-medium">{formatCurrency(customer.package.price)} / mo</span>
-                                    </div>
-                                    <div className="border-t border-border/50 my-2 pt-2"></div>
-                                    <div className="grid grid-cols-3 gap-1">
-                                        <span className="text-muted-foreground">PPPoE User</span>
-                                        <span className="col-span-2 font-mono text-xs bg-muted px-2 py-0.5 rounded w-fit">
-                                            {customer.pppoe_user}
-                                        </span>
-                                    </div>
                                 </CardContent>
                             </Card>
+
+                            {isAdmin && (
+                                <Card className="bg-card/50 backdrop-blur border-border">
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <CardTitle className="text-base flex items-center gap-2">
+                                                    <Power className="h-4 w-4 text-amber-500" />
+                                                    Network Enforcement
+                                                </CardTitle>
+                                                <CardDescription className="mt-1">
+                                                    MikroTik isolation and reconnection readiness
+                                                </CardDescription>
+                                            </div>
+                                            <Badge variant="outline" className={`shrink-0 border ${enforcementBadgeClass}`}>
+                                                {enforcementLabel}
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4 text-sm">
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-3 gap-1">
+                                                <span className="text-muted-foreground">Router</span>
+                                                <span className="col-span-2 font-medium">{customer.router?.name || '-'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                <span className="text-muted-foreground">PPPoE User</span>
+                                                <span className="col-span-2 font-mono text-xs bg-muted px-2 py-0.5 rounded w-fit">
+                                                    {customer.pppoe_user || '-'}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1 items-center">
+                                                <span className="text-muted-foreground">Sync Status</span>
+                                                <span className="col-span-2">{getStatusBadge(customer.mikrotik_sync_status || 'unknown')}</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                <span className="text-muted-foreground">Last Checked</span>
+                                                <span className="col-span-2">
+                                                    {customer.mikrotik_sync_checked_at ? formatDate(customer.mikrotik_sync_checked_at) : '-'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {!canEnforceOnMikrotik && (
+                                            <div className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+                                                <div className="flex gap-2">
+                                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                                    <p>{enforcementBlockers.join(' ')}</p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {canEnforceOnMikrotik && syncWarning && (
+                                            <div className="flex gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+                                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                                <p>{syncWarning}</p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap justify-end gap-2 border-t border-border/50 pt-4">
+                                            {!canEnforceOnMikrotik && (
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href={route('customers.edit', customer.id)}>
+                                                        Edit Network Info
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant={customer.status === 'active' ? 'destructive' : 'default'}
+                                                size="sm"
+                                                onClick={handleToggleBlock}
+                                                disabled={!canEnforceOnMikrotik}
+                                            >
+                                                {customer.status === 'active' ? 'Suspend Service' : 'Activate Service'}
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
 
                             {/* Geo Info */}
                             <Card className="bg-card/50 backdrop-blur border-border">

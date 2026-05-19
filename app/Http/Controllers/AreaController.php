@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\AreaRequest;
 use App\Models\Area;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,19 +17,28 @@ class AreaController extends Controller
         $query = Area::query();
 
         if ($request->search) {
-            $query->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('code', 'like', "%{$request->search}%");
+            $query->where(function ($sub) use ($request) {
+                $sub->where('name', 'like', "%{$request->search}%")
+                    ->orWhere('code', 'like', "%{$request->search}%");
+            });
         }
 
+        $allowedSorts = ['name', 'code', 'customers_count', 'created_at'];
+        $sort = in_array($request->input('sort'), $allowedSorts, true) ? $request->input('sort') : 'name';
+        $direction = $request->input('direction') === 'desc' ? 'desc' : 'asc';
+
         $areas = $query->withCount('customers')
-            ->orderBy('name')
-            ->paginate(15)
+            ->orderBy($sort, $direction)
+            ->paginate($request->input('limit', 20))
             ->withQueryString();
 
         return Inertia::render('Areas/Index', [
             'areas' => $areas,
             'filters' => [
                 'search' => $request->search,
+                'limit' => $request->input('limit', 20),
+                'sort' => $sort,
+                'direction' => $direction,
             ],
         ]);
     }
@@ -42,14 +52,23 @@ class AreaController extends Controller
     }
 
     /**
+     * Display the specified resource.
+     */
+    public function show(Area $area)
+    {
+        $area->loadCount(['customers', 'users']);
+
+        return Inertia::render('Areas/Show', [
+            'area' => $area,
+        ]);
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(AreaRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:areas,name',
-            'code' => 'required|string|max:255|unique:areas,code',
-        ]);
+        $validated = $request->validated();
 
         Area::create($validated);
 
@@ -70,12 +89,9 @@ class AreaController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Area $area)
+    public function update(AreaRequest $request, Area $area)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:areas,name,' . $area->id,
-            'code' => 'required|string|max:255|unique:areas,code,' . $area->id,
-        ]);
+        $validated = $request->validated();
 
         $area->update($validated);
 

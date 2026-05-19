@@ -5,6 +5,8 @@ import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Textarea } from '@/Components/ui/textarea';
 import { ArrowLeft, Send } from "lucide-react";
+import { nullableId, requiredString, validateForm } from '@/lib/validation';
+import { z } from 'zod';
 
 interface Area {
     id: number;
@@ -15,16 +17,25 @@ interface Props {
     areas: Area[];
 }
 
+const broadcastCreateSchema = z.object({
+    name: requiredString('Campaign name'),
+    target_type: z.enum(['all', 'active', 'isolated'], { error: 'Target audience is required.' }),
+    target_area_id: nullableId('Area'),
+    message_template: z.string().trim().min(1, 'Message template is required.'),
+});
+
 export default function Create({ areas }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
+    const form = useForm({
         name: '',
         target_type: 'all',
         target_area_id: '',
         message_template: 'Halo {name},\n\nTagihan internet Anda sebesar {billing_amount} sudah terbit.\n\nTerima kasih.',
     });
+    const { data, setData, post, processing, errors } = form;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!validateForm(broadcastCreateSchema, data, form)) return;
         post(route('broadcasts.store'));
     };
 
@@ -56,6 +67,7 @@ export default function Create({ areas }: Props) {
                                 value={data.name}
                                 onChange={e => setData('name', e.target.value)}
                                 placeholder="e.g. February Billing Reminder"
+                                maxLength={255}
                             />
                             {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
                         </div>
