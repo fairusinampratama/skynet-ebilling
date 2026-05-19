@@ -122,9 +122,11 @@ Background automation is queued through Redis:
 - overdue invoice isolation
 - payment-triggered reconnection
 - Tripay callback reconnection
+- router full sync
 
-Production workers should run both the default queue and the dedicated MikroTik queue. The included `supervisord.conf` starts:
+Production workers should run the default queue and dedicated MikroTik queues. The included `supervisord.conf` starts:
 - `queue-default`
 - `queue-network-enforcement`
+- `queue-router-sync`
 
 After changing queue/session Redis config in production, restart the application workers so they pick up the cached config.
