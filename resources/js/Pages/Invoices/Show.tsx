@@ -31,6 +31,8 @@ import {
     Download, ExternalLink, Plus, ChevronLeft, Ban, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { optionalImage, requiredNumber, requiredString, validateForm } from '@/lib/validation';
+import { z } from 'zod';
 
 interface Customer {
     id: number;
@@ -69,6 +71,13 @@ interface Props {
 
 import { PageProps } from '@/types';
 
+const paymentSchema = z.object({
+    amount: requiredNumber('Payment amount', 0),
+    method: z.enum(['cash', 'transfer', 'payment_gateway'], { error: 'Payment method is required.' }),
+    paid_at: requiredString('Payment date'),
+    proof: optionalImage('Payment proof'),
+});
+
 export default function Show({ invoice }: Props) {
     const { settings, auth } = usePage<PageProps>().props;
     const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
@@ -83,12 +92,13 @@ export default function Show({ invoice }: Props) {
     const balance = Number(invoice.amount) - totalPaid;
     const hasTransactions = invoice.transactions.length > 0;
 
-    const { data, setData, post, processing, errors, reset } = useForm({
-        amount: balance,
+    const paymentForm = useForm({
+        amount: String(balance),
         method: 'cash',
         paid_at: new Date().toISOString().slice(0, 16), // datetime-local format
         proof: null as File | null,
     });
+    const { data, setData, post, processing, errors, reset } = paymentForm;
 
     const handleVoid = () => {
         setVoidProcessing(true);
@@ -149,6 +159,7 @@ export default function Show({ invoice }: Props) {
 
     const handlePaymentSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!validateForm(paymentSchema, data, paymentForm)) return;
         post(route('payments.store', invoice.id), {
             onSuccess: () => {
                 setIsPaymentOpen(false);
@@ -237,10 +248,13 @@ export default function Show({ invoice }: Props) {
                                                     id="amount"
                                                     type="number"
                                                     value={data.amount}
-                                                    onChange={(e) => setData('amount', Number(e.target.value))}
+                                                    onChange={(e) => setData('amount', e.target.value)}
+                                                    min={0}
                                                     max={balance}
+                                                    step="0.01"
                                                     required
                                                 />
+                                                {errors.amount && <p className="text-sm text-destructive">{errors.amount}</p>}
                                                 <p className="text-xs text-muted-foreground">
                                                     Max payable: {formatCurrency(balance)}
                                                 </p>
@@ -255,6 +269,7 @@ export default function Show({ invoice }: Props) {
                                                     onChange={(e) => setData('paid_at', e.target.value)}
                                                     required
                                                 />
+                                                {errors.paid_at && <p className="text-sm text-destructive">{errors.paid_at}</p>}
                                             </div>
 
                                             <div className="space-y-2">
@@ -271,6 +286,7 @@ export default function Show({ invoice }: Props) {
                                                         <SelectItem value="transfer">Bank Transfer</SelectItem>
                                                     </SelectContent>
                                                 </Select>
+                                                {errors.method && <p className="text-sm text-destructive">{errors.method}</p>}
                                             </div>
 
                                             {data.method === 'transfer' && (
@@ -294,9 +310,10 @@ export default function Show({ invoice }: Props) {
                                                 <Input
                                                     id="proof"
                                                     type="file"
-                                                    accept="image/*"
+                                                    accept="image/jpeg,image/png,image/jpg"
                                                     onChange={(e) => setData('proof', e.target.files ? e.target.files[0] : null)}
                                                 />
+                                                {errors.proof && <p className="text-sm text-destructive">{errors.proof}</p>}
                                             </div>
 
                                             <DialogFooter className="pt-4">

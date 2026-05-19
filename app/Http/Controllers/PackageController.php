@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PackageRequest;
 use App\Models\Package;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,14 +18,31 @@ class PackageController extends Controller
     public function index(Request $request)
     {
         $limit = $request->input('limit', 20);
-        
+
+        $allowedSorts = ['name', 'price', 'mikrotik_profile', 'customers_count', 'created_at'];
+        $sort = in_array($request->input('sort'), $allowedSorts, true) ? $request->input('sort') : 'price';
+        $direction = $request->input('direction') === 'desc' ? 'desc' : 'asc';
+
         $packages = Package::withCount('customers')
-                          ->orderBy('price', 'asc')
+                          ->when($request->search, function ($query, $search) {
+                              $query->where(function ($sub) use ($search) {
+                                  $sub->where('name', 'like', "%{$search}%")
+                                      ->orWhere('mikrotik_profile', 'like', "%{$search}%")
+                                      ->orWhere('rate_limit', 'like', "%{$search}%");
+                              });
+                          })
+                          ->orderBy($sort, $direction)
                           ->paginate($limit)
                           ->withQueryString();
 
         return Inertia::render('Packages/Index', [
             'packages' => $packages,
+            'filters' => [
+                'search' => $request->search,
+                'limit' => $limit,
+                'sort' => $sort,
+                'direction' => $direction,
+            ],
         ]);
     }
 
@@ -39,13 +57,9 @@ class PackageController extends Controller
     /**
      * Store a newly created package
      */
-    public function store(Request $request)
+    public function store(PackageRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'mikrotik_profile' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         Package::create($validated);
 
@@ -78,13 +92,9 @@ class PackageController extends Controller
     /**
      * Update the specified package
      */
-    public function update(Request $request, Package $package)
+    public function update(PackageRequest $request, Package $package)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'mikrotik_profile' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         $package->update($validated);
 

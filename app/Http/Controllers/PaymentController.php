@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PaymentStoreRequest;
 use App\Models\Invoice;
 use App\Models\Transaction;
 use App\Support\AreaScope;
@@ -31,16 +32,11 @@ class PaymentController extends Controller
     /**
      * Store a new payment
      */
-    public function store(Request $request, Invoice $invoice)
+    public function store(PaymentStoreRequest $request, Invoice $invoice)
     {
         AreaScope::authorizeInvoice($invoice, $request->user());
 
-        $validated = $request->validate([
-            'amount' => 'required|numeric|min:0',
-            'method' => 'required|in:cash,transfer,payment_gateway',
-            'proof' => 'nullable|image|max:2048', // 2MB max
-            'paid_at' => 'nullable|date',
-        ]);
+        $validated = $request->validated();
 
         // Handle proof upload
         $proofUrl = null;

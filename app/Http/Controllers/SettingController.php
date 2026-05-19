@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\SettingsUpdateRequest;
 use App\Models\Setting;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Redirect;
 
@@ -30,15 +31,9 @@ class SettingController extends Controller
     /**
      * Update settings.
      */
-    public function update(Request $request)
+    public function update(SettingsUpdateRequest $request)
     {
-        $validated = $request->validate([
-            'settings' => 'required|array',
-            'settings.*.key' => 'required|string',
-            'settings.*.value' => 'nullable',
-            'settings.*.group' => 'required|string',
-            'settings.*.type' => 'required|string',
-        ]);
+        $validated = $request->validated();
 
         foreach ($validated['settings'] as $item) {
             Setting::set(

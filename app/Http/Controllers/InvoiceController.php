@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\InvoiceStoreRequest;
 use Illuminate\Http\Request;
 use App\Models\Invoice;
 use App\Models\Customer;
@@ -159,14 +160,9 @@ class InvoiceController extends Controller
     /**
      * Store a newly created invoice
      */
-    public function store(Request $request)
+    public function store(InvoiceStoreRequest $request)
     {
-        $validated = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
-            'period' => 'required|date',
-            'amount' => 'required|numeric|min:0',
-            'due_date' => 'required|date',
-        ]);
+        $validated = $request->validated();
         $customer = Customer::findOrFail($validated['customer_id']);
         AreaScope::authorizeCustomer($customer, $request->user());
 

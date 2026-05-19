@@ -6,6 +6,8 @@ import { Label } from "@/Components/ui/label";
 import { Save } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { toast } from 'sonner';
+import { validateForm } from '@/lib/validation';
+import { z } from 'zod';
 
 
 
@@ -19,18 +21,25 @@ interface Props {
     };
 }
 
+const settingsSchema = z.object({
+    company_name: z.string().max(255, 'Company name may not be greater than 255 characters.'),
+    company_address: z.string(),
+});
+
 export default function Index({ grouped_settings }: Props) {
     // We maintain a local form state specifically for the payment channels structure
     // but when submitting, we map it to the generic 'settings' array structure expected by the backend
-    const { data, setData, post, processing } = useForm({
+    const form = useForm({
         company_name: grouped_settings.billing.company_name,
         company_address: grouped_settings.billing.company_address,
     });
+    const { data, setData, processing, errors } = form;
 
 
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!validateForm(settingsSchema, data, form)) return;
 
         // Transform flat data into the backend-expected Settings array format
         const settingsPayload = [
@@ -50,7 +59,10 @@ export default function Index({ grouped_settings }: Props) {
 
         router.post(route('settings.update'), { settings: settingsPayload as any }, {
             onSuccess: () => toast.success('Settings updated successfully'),
-            onError: () => toast.error('Failed to update settings'),
+            onError: (serverErrors) => {
+                form.setError(serverErrors as Record<string, string>);
+                toast.error('Failed to update settings');
+            },
         });
     };
 
@@ -81,7 +93,9 @@ export default function Index({ grouped_settings }: Props) {
                                         value={data.company_name}
                                         onChange={e => setData('company_name', e.target.value)}
                                         placeholder="e.g. PT. SKYNET LINTAS NUSANTARA"
+                                        maxLength={255}
                                     />
+                                    {errors.company_name && <p className="text-sm text-destructive">{errors.company_name}</p>}
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Address</Label>
@@ -90,6 +104,7 @@ export default function Index({ grouped_settings }: Props) {
                                         onChange={e => setData('company_address', e.target.value)}
                                         placeholder="Full address"
                                     />
+                                    {errors.company_address && <p className="text-sm text-destructive">{errors.company_address}</p>}
                                 </div>
                             </CardContent>
                         </Card>

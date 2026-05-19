@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BroadcastStoreRequest;
 use App\Models\WaCampaign;
 use App\Models\Area;
 use App\Jobs\ProcessWaCampaign;
@@ -33,14 +34,9 @@ class WaCampaignController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(BroadcastStoreRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'target_type' => 'required|in:all,active,isolated',
-            'target_area_id' => 'nullable|exists:areas,id',
-            'message_template' => 'required|string',
-        ]);
+        $validated = $request->validated();
         if ($request->user()->hasAreaScope()) {
             AreaScope::authorizeAreaId(isset($validated['target_area_id']) ? (int) $validated['target_area_id'] : null, $request->user());
         }
