@@ -32,7 +32,8 @@ class ArchiveCustomersNotOnMikrotikTest extends TestCase
         ]);
 
         $this->artisan('customers:archive-not-on-mikrotik')
-            ->expectsOutput('Auditing Dry Router (10.99.0.1)...')
+            ->expectsOutput('Checking router connection Dry Router (10.99.0.1)... attempt 1/5 succeeded')
+            ->expectsOutput('Auditing Dry Router (10.99.0.1)... attempt 1/5 succeeded')
             ->expectsTable(['Metric', 'Count'], [
                 ['Routers audited', 1],
                 ['eBilling customers total', 4],
@@ -113,15 +114,60 @@ class ArchiveCustomersNotOnMikrotikTest extends TestCase
         $mikrotik = Mockery::mock(MikrotikService::class);
         $mikrotik->shouldReceive('connect')->once()->andThrow(new \RuntimeException('router offline'));
         $mikrotik->shouldReceive('disconnect')->once();
+        $mikrotik->shouldNotReceive('getPPPSecrets');
         $this->app->instance(MikrotikService::class, $mikrotik);
 
         $this->artisan('customers:archive-not-on-mikrotik', [
             '--apply' => true,
             '--backup-confirmed' => true,
-        ])->expectsOutput('Archive aborted because one or more routers could not be audited.')
+            '--retries' => 1,
+        ])->expectsOutput('Checking router connection Fail Router (10.99.0.1)... attempt 1/1 failed: router offline')
+            ->expectsOutput('Archive aborted because one or more router connections failed.')
             ->assertExitCode(1);
 
         $this->assertDatabaseHas('customers', ['id' => $customer->id, 'deleted_at' => null]);
+    }
+
+    public function test_archive_retries_router_audit_before_continuing(): void
+    {
+        [$router, $package] = [$this->router('Retry Router'), $this->package()];
+        $kept = $this->customer($package, 'CUST-RETRY-KEEP', 'retry.keep', ['router_id' => $router->id]);
+
+        $mikrotik = Mockery::mock(MikrotikService::class);
+        $connectAttempts = 0;
+        $mikrotik->shouldReceive('connect')
+            ->times(3)
+            ->withArgs(fn ($attemptRouter, array $options) => $attemptRouter->id === $router->id
+                && $options['timeout'] === 15
+                && $options['attempts'] === 1)
+            ->andReturnUsing(function () use (&$connectAttempts, $mikrotik) {
+                $connectAttempts++;
+
+                if ($connectAttempts === 1) {
+                    throw new \RuntimeException('Stream timed out');
+                }
+
+                return $mikrotik;
+            });
+        $mikrotik->shouldReceive('getPPPSecrets')
+            ->once()
+            ->andReturn([
+                ['name' => 'retry.keep', 'disabled' => 'false'],
+            ]);
+        $mikrotik->shouldReceive('disconnect')->times(3);
+        $this->app->instance(MikrotikService::class, $mikrotik);
+
+        $this->artisan('customers:archive-not-on-mikrotik', [
+            '--retries' => 2,
+            '--retry-delay' => 0,
+        ])
+            ->expectsOutput('Checking router connection Retry Router (10.99.0.1)... attempt 1/2 failed: Stream timed out')
+            ->expectsOutput('Retrying in 0 seconds...')
+            ->expectsOutput('Checking router connection Retry Router (10.99.0.1)... attempt 2/2 succeeded')
+            ->expectsOutput('Auditing Retry Router (10.99.0.1)... attempt 1/2 succeeded')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseHas('customers', ['id' => $kept->id, 'deleted_at' => null]);
     }
 
     public function test_archive_aborts_without_mutation_when_duplicate_mikrotik_usernames_exist_across_routers(): void
@@ -151,13 +197,13 @@ class ArchiveCustomersNotOnMikrotikTest extends TestCase
 
         foreach ($secretsByRouter as $routerId => $secrets) {
             $mikrotik->shouldReceive('connect')
-                ->once()
-                ->withArgs(fn ($router) => $router->id === $routerId)
+                ->twice()
+                ->withArgs(fn ($router, array $options = []) => $router->id === $routerId)
                 ->andReturnSelf();
             $mikrotik->shouldReceive('getPPPSecrets')
                 ->once()
                 ->andReturn($secrets);
-            $mikrotik->shouldReceive('disconnect')->once();
+            $mikrotik->shouldReceive('disconnect')->twice();
         }
 
         $this->app->instance(MikrotikService::class, $mikrotik);
