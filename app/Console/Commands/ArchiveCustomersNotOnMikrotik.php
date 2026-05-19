@@ -14,7 +14,10 @@ class ArchiveCustomersNotOnMikrotik extends Command
     protected $signature = 'customers:archive-not-on-mikrotik
                             {--apply : Soft-delete archive candidates}
                             {--backup-confirmed : Confirm a database backup exists before applying}
-                            {--timeout=10 : MikroTik connection timeout in seconds}';
+                            {--use-snapshot : Use locally persisted MikroTik sync statuses instead of connecting to routers}
+                            {--timeout=15 : MikroTik connection timeout in seconds}
+                            {--retries=5 : MikroTik audit attempts per router before aborting}
+                            {--retry-delay=10 : Seconds to wait between MikroTik audit attempts}';
 
     protected $description = 'Archive eBilling customers whose PPPoE username is absent from live MikroTik routers';
 
@@ -22,7 +25,10 @@ class ArchiveCustomersNotOnMikrotik extends Command
     {
         $apply = (bool) $this->option('apply');
         $backupConfirmed = (bool) $this->option('backup-confirmed');
+        $useSnapshot = (bool) $this->option('use-snapshot');
         $timeout = max(1, (int) $this->option('timeout'));
+        $retries = max(1, (int) $this->option('retries'));
+        $retryDelay = max(0, (int) $this->option('retry-delay'));
 
         if ($apply && ! $backupConfirmed) {
             $this->error('Refusing to apply: pass --backup-confirmed after taking a production database backup.');
@@ -35,7 +41,19 @@ class ArchiveCustomersNotOnMikrotik extends Command
             return self::FAILURE;
         }
 
-        $audit = $this->readMikrotikSecrets($routers, $mikrotik, $timeout);
+        if ($useSnapshot) {
+            return $this->handleSnapshotArchive($routers, $apply);
+        }
+
+        $connectionCheck = $this->checkRouterConnections($routers, $mikrotik, $timeout, $retries, $retryDelay);
+
+        if ($connectionCheck['failed_routers']->isNotEmpty()) {
+            $this->error('Archive aborted because one or more router connections failed.');
+            $this->table(['Router', 'IP', 'Error'], $connectionCheck['failed_routers']->all());
+            return self::FAILURE;
+        }
+
+        $audit = $this->readMikrotikSecrets($routers, $mikrotik, $timeout, $retries, $retryDelay);
 
         if ($audit['failed_routers']->isNotEmpty()) {
             $this->error('Archive aborted because one or more routers could not be audited.');
@@ -86,6 +104,48 @@ class ArchiveCustomersNotOnMikrotik extends Command
             return self::SUCCESS;
         }
 
+        $deleted = $this->archiveCandidates($candidates);
+
+        $this->info("Soft-deleted archive candidates: {$deleted}");
+
+        return self::SUCCESS;
+    }
+
+    private function handleSnapshotArchive(Collection $routers, bool $apply): int
+    {
+        $customers = Customer::ebilling()
+            ->with('router:id,name')
+            ->select('id', 'code', 'name', 'pppoe_user', 'router_id', 'status', 'mikrotik_sync_status', 'mikrotik_sync_checked_at')
+            ->get();
+
+        $candidates = $customers
+            ->filter(fn (Customer $customer) => ! $this->validUsername($customer->pppoe_user)
+                || $customer->router_id === null
+                || $customer->mikrotik_sync_status === 'missing')
+            ->values();
+
+        $kept = $customers
+            ->filter(fn (Customer $customer) => $this->validUsername($customer->pppoe_user)
+                && $customer->router_id !== null
+                && $customer->mikrotik_sync_status !== 'missing')
+            ->values();
+
+        $this->printSnapshotSummary($routers, $customers, $kept, $candidates);
+
+        if (! $apply) {
+            $this->warn('Snapshot dry run only. Re-run with --use-snapshot --apply --backup-confirmed to soft-delete archive candidates.');
+            return self::SUCCESS;
+        }
+
+        $deleted = $this->archiveCandidates($candidates);
+
+        $this->info("Soft-deleted archive candidates: {$deleted}");
+
+        return self::SUCCESS;
+    }
+
+    private function archiveCandidates(Collection $candidates): int
+    {
         $deleted = 0;
         $candidateIds = $candidates->pluck('id')->all();
 
@@ -112,31 +172,88 @@ class ArchiveCustomersNotOnMikrotik extends Command
                 });
             });
 
-        $this->info("Soft-deleted archive candidates: {$deleted}");
-
-        return self::SUCCESS;
+        return $deleted;
     }
 
-    private function readMikrotikSecrets(Collection $routers, MikrotikService $mikrotik, int $timeout): array
+    private function checkRouterConnections(Collection $routers, MikrotikService $mikrotik, int $timeout, int $retries, int $retryDelay): array
+    {
+        $failedRouters = collect();
+
+        foreach ($routers as $router) {
+            $connected = false;
+            $lastError = null;
+
+            for ($attempt = 1; $attempt <= $retries; $attempt++) {
+                try {
+                    $mikrotik->connect($router, ['timeout' => $timeout, 'attempts' => 1]);
+                    $connected = true;
+                    $this->line("Checking router connection {$router->name} ({$router->ip_address})... attempt {$attempt}/{$retries} succeeded");
+                    break;
+                } catch (\Throwable $e) {
+                    $lastError = $e;
+                    $this->warn("Checking router connection {$router->name} ({$router->ip_address})... attempt {$attempt}/{$retries} failed: {$e->getMessage()}");
+
+                    if ($attempt < $retries) {
+                        $this->line("Retrying in {$retryDelay} seconds...");
+
+                        if ($retryDelay > 0) {
+                            sleep($retryDelay);
+                        }
+                    }
+                } finally {
+                    $mikrotik->disconnect();
+                }
+            }
+
+            if (! $connected) {
+                $failedRouters->push([$router->name, $router->ip_address, $lastError?->getMessage() ?? 'Unknown MikroTik connection failure']);
+            }
+        }
+
+        return [
+            'failed_routers' => $failedRouters,
+        ];
+    }
+
+    private function readMikrotikSecrets(Collection $routers, MikrotikService $mikrotik, int $timeout, int $retries, int $retryDelay): array
     {
         $allSecrets = collect();
         $routerRows = [];
         $failedRouters = collect();
 
         foreach ($routers as $router) {
-            $this->line("Auditing {$router->name} ({$router->ip_address})...");
+            $secrets = null;
+            $lastError = null;
 
-            try {
-                $mikrotik->connect($router, ['timeout' => $timeout, 'attempts' => 1]);
-                $secrets = collect($mikrotik->getPPPSecrets())
-                    ->map(fn (array $secret) => $this->secretRow($router, $secret))
-                    ->filter(fn (array $secret) => $this->validUsername($secret['pppoe_user']))
-                    ->values();
-            } catch (\Throwable $e) {
-                $failedRouters->push([$router->name, $router->ip_address, $e->getMessage()]);
+            for ($attempt = 1; $attempt <= $retries; $attempt++) {
+                try {
+                    $mikrotik->connect($router, ['timeout' => $timeout, 'attempts' => 1]);
+                    $secrets = collect($mikrotik->getPPPSecrets())
+                        ->map(fn (array $secret) => $this->secretRow($router, $secret))
+                        ->filter(fn (array $secret) => $this->validUsername($secret['pppoe_user']))
+                        ->values();
+
+                    $this->line("Auditing {$router->name} ({$router->ip_address})... attempt {$attempt}/{$retries} succeeded");
+                    break;
+                } catch (\Throwable $e) {
+                    $lastError = $e;
+                    $this->warn("Auditing {$router->name} ({$router->ip_address})... attempt {$attempt}/{$retries} failed: {$e->getMessage()}");
+
+                    if ($attempt < $retries) {
+                        $this->line("Retrying in {$retryDelay} seconds...");
+
+                        if ($retryDelay > 0) {
+                            sleep($retryDelay);
+                        }
+                    }
+                } finally {
+                    $mikrotik->disconnect();
+                }
+            }
+
+            if ($secrets === null) {
+                $failedRouters->push([$router->name, $router->ip_address, $lastError?->getMessage() ?? 'Unknown MikroTik audit failure']);
                 continue;
-            } finally {
-                $mikrotik->disconnect();
             }
 
             $routerRows[] = [
@@ -205,6 +322,68 @@ class ArchiveCustomersNotOnMikrotik extends Command
                     $customer->pppoe_user ?? '',
                     $customer->router?->name ?? '',
                     $customer->status,
+                ])
+                ->all()
+        );
+    }
+
+    private function printSnapshotSummary(
+        Collection $routers,
+        Collection $customers,
+        Collection $kept,
+        Collection $candidates
+    ): void {
+        $this->newLine();
+        $this->warn('Using local MikroTik sync snapshot. Routers will not be contacted.');
+
+        $this->table(
+            ['Metric', 'Count'],
+            [
+                ['Active routers in scope', $routers->count()],
+                ['eBilling customers total', $customers->count()],
+                ['Snapshot kept', $kept->count()],
+                ['Snapshot missing candidates', $customers->where('mikrotik_sync_status', 'missing')->count()],
+                ['No router candidates', $customers->whereNull('router_id')->count()],
+                ['Blank PPPoE candidates', $customers->filter(fn (Customer $customer) => ! $this->validUsername($customer->pppoe_user))->count()],
+                ['Archive candidates', $candidates->count()],
+            ]
+        );
+
+        $this->newLine();
+        $this->table(
+            ['Router', 'Last Scanned', 'Sync Status', 'Message'],
+            $routers
+                ->map(fn (Router $router) => [
+                    $router->name,
+                    optional($router->last_scanned_at)->toDateTimeString() ?? '',
+                    $router->sync_status,
+                    $router->sync_message ?? '',
+                ])
+                ->all()
+        );
+
+        $this->newLine();
+        $this->table(
+            ['Status', 'Archive Candidates'],
+            $candidates
+                ->groupBy('status')
+                ->map(fn (Collection $customers, string $status) => [$status, $customers->count()])
+                ->values()
+                ->all()
+        );
+
+        $this->newLine();
+        $this->table(
+            ['Code', 'Name', 'PPPoE', 'Router', 'Status', 'MikroTik Snapshot'],
+            $candidates
+                ->take(50)
+                ->map(fn (Customer $customer) => [
+                    $customer->code,
+                    $customer->name,
+                    $customer->pppoe_user ?? '',
+                    $customer->router?->name ?? '',
+                    $customer->status,
+                    $customer->mikrotik_sync_status ?? 'unknown',
                 ])
                 ->all()
         );
