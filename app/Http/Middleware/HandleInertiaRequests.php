@@ -51,7 +51,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'settings' => [
                 'payment_channels' => fn () => $request->user()?->isGlobalAdmin()
-                    ? \App\Models\Setting::get('payment_channels', [])
+                    ? \App\Models\Setting::get('payment_channels', \App\Models\Setting::DEFAULT_PAYMENT_CHANNELS)
                     : [],
             ],
         ];

@@ -166,6 +166,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('global-admin')->group(function () {
         Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
         Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
+        Route::post('/settings/whatsapp/test', [SettingController::class, 'testWhatsapp'])->name('settings.whatsapp.test');
     });
 });
 
