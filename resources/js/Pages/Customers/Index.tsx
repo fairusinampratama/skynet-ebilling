@@ -84,6 +84,7 @@ interface Customer {
     mikrotik_synced_at?: string | null;
     mikrotik_sync_checked_at?: string | null;
     unpaid_periods_count?: number;
+    deleted_at?: string | null;
     // is_online removed
     package: Package;
     area?: Area;
@@ -110,6 +111,7 @@ interface Props {
         area_id?: string;
         mikrotik_sync?: string;
         unpaid_periods?: string;
+        lifecycle?: string;
         sort?: string;
         direction?: 'asc' | 'desc';
         limit?: string;
@@ -178,7 +180,16 @@ export default function Index({ customers, packages = [], areas = [], filters = 
             header: "Status",
             accessorKey: "status",
             sortable: true,
-            cell: (customer) => getStatusBadge(customer.status)
+            cell: (customer) => (
+                <div className="flex flex-col gap-1">
+                    {getStatusBadge(customer.status)}
+                    {customer.deleted_at && (
+                        <Badge variant="outline" className="w-fit border-zinc-500/20 bg-zinc-500/10 text-[10px] text-zinc-500">
+                            Dismantle
+                        </Badge>
+                    )}
+                </div>
+            )
         },
         {
             header: "Join Date",
@@ -295,6 +306,13 @@ export default function Index({ customers, packages = [], areas = [], filters = 
             placeholder: 'All Billing',
             options: [
                 { label: '3+ unpaid periods', value: '3plus' },
+            ]
+        },
+        {
+            key: 'lifecycle',
+            placeholder: 'All Lifecycle',
+            options: [
+                { label: 'Dismantle list', value: 'dismantle' },
             ]
         }
     ];

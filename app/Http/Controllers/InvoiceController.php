@@ -35,6 +35,7 @@ class InvoiceController extends Controller
             'filters' => [
                 'search' => $request->search,
                 'status' => $request->status ?? 'all',
+                'period_filter' => $request->period_filter ?? 'all',
                 'limit' => $limit,
             ],
         ]);
@@ -294,6 +295,9 @@ class InvoiceController extends Controller
                 if ($status !== 'all') {
                     $q->where('status', $status);
                 }
+            })
+            ->when($request->input('period_filter', 'all') !== 'history', function ($q) {
+                $q->whereDate('period', now()->startOfMonth()->toDateString());
             })
             // Default sort: Unpaid first, then newest
             ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
