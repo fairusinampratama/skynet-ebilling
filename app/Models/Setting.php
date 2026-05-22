@@ -8,6 +8,19 @@ use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
+    public const DEFAULT_PAYMENT_CHANNELS = [
+        [
+            'bank' => 'BCA',
+            'account_number' => '1234567890',
+            'account_name' => 'Skynet Lintas Nusantara',
+        ],
+        [
+            'bank' => 'Mandiri',
+            'account_number' => '0987654321',
+            'account_name' => 'Skynet Lintas Nusantara',
+        ],
+    ];
+
     protected $fillable = ['key', 'value', 'type', 'group', 'label'];
 
     /**
@@ -58,7 +71,7 @@ class Setting extends Model
     {
         switch ($type) {
             case 'boolean':
-                return (bool) $value;
+                return filter_var($value, FILTER_VALIDATE_BOOLEAN);
             case 'int':
             case 'integer':
                 return (int) $value;

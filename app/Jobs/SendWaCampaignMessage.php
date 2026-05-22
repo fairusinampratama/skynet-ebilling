@@ -20,6 +20,7 @@ class SendWaCampaignMessage implements ShouldQueue
 
     public function handle(WhatspieService $whatspie): void
     {
+        $this->recipient->refresh();
         $campaign = $this->recipient->campaign;
 
         if ($this->recipient->status !== 'pending' && $this->recipient->status !== 'failed') {
@@ -39,11 +40,11 @@ class SendWaCampaignMessage implements ShouldQueue
 
         // Lock campaign to prevent race conditions during updates
         // To be safe we'll use DB transactions for count
-        \DB::transaction(function() use ($campaign, $response, $message) {
+        \DB::transaction(function() use ($campaign, $response, $message, $whatspie) {
             // refresh campaign
             $campaign->refresh();
 
-            if ($response) {
+            if ($whatspie->wasSuccessful($response)) {
                 $this->recipient->update([
                     'status' => 'sent',
                     'sent_at' => now(),
@@ -53,7 +54,7 @@ class SendWaCampaignMessage implements ShouldQueue
             } else {
                 $this->recipient->update([
                     'status' => 'failed',
-                    'error_message' => 'Failed to send message or Whatspie API error.',
+                    'error_message' => $response['error'] ?? 'Failed to send message or Whatspie API error.',
                 ]);
                 $campaign->increment('failed_count');
             }

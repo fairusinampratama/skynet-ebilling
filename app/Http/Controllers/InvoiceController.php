@@ -252,7 +252,7 @@ class InvoiceController extends Controller
             'phone' => '081252095394',
         ];
         
-        $manual_accounts = Setting::get('payment_channels', []);
+        $manual_accounts = Setting::get('payment_channels', Setting::DEFAULT_PAYMENT_CHANNELS);
         
         $pdf = Pdf::loadView('invoices.pdf', compact('invoice', 'company', 'manual_accounts'));
         
