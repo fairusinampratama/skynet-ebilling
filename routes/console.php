@@ -9,6 +9,10 @@ Schedule::command('billing:generate')
     ->monthlyOn(1, '00:00')
     ->description('Generate monthly invoices for active customers');
 
+Schedule::command('billing:send-reminders')
+    ->dailyAt('07:00')
+    ->description('Send automated WhatsApp invoice reminders');
+
 Schedule::command('billing:check-overdue')
     ->dailyAt('08:00')
     ->description('Check overdue invoices and isolate delinquent customers');

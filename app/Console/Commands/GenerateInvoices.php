@@ -7,7 +7,7 @@ use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GenerateInvoices extends Command
 {
@@ -41,6 +41,10 @@ class GenerateInvoices extends Command
             : now()->startOfMonth();
             
         $this->info("Billing Period: " . $period->format('F Y'));
+        Log::info('Billing generation started.', [
+            'period' => $period->toDateString(),
+            'dry_run' => $isDryRun,
+        ]);
         // $this->info("Due Date: " . $dueDate->format('Y-m-d')); // Removed global due date
         if ($isDryRun) {
             $this->warn("!! DRY RUN MODE - No database changes will be made !!");
@@ -60,6 +64,10 @@ class GenerateInvoices extends Command
 
         $this->newLine();
         $this->info("Billing generation completed.");
+        Log::info('Billing generation completed.', [
+            'period' => $period->toDateString(),
+            'dry_run' => $isDryRun,
+        ]);
     }
 
     private function processCustomer($customer, $period, $isDryRun)

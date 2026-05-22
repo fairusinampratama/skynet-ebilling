@@ -72,7 +72,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/customers/{customer}/isolate', [CustomerController::class, 'isolate'])->name('customers.isolate');
         Route::post('/customers/{customer}/reconnect', [CustomerController::class, 'reconnect'])->name('customers.reconnect');
     });
-    Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+    Route::get('/customers/{customer}', [CustomerController::class, 'show'])->withTrashed()->name('customers.show');
     
     // =====================================================
     // Package Management

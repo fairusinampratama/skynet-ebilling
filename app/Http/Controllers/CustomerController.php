@@ -32,7 +32,7 @@ class CustomerController extends Controller
 
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
-            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'unpaid_periods', 'sort', 'direction', 'limit']),
+            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'unpaid_periods', 'lifecycle', 'sort', 'direction', 'limit']),
             'packages' => Package::all(), // For filter dropdown
             'areas' => $areasQuery->get(),
         ]);
@@ -59,6 +59,7 @@ class CustomerController extends Controller
                 'mikrotik_sync_checked_at',
                 'join_date',
                 'due_day',
+                'deleted_at',
                 'created_at',
             ])
             ->withCount([
@@ -88,6 +89,7 @@ class CustomerController extends Controller
             $customer->join_date?->toDateString() ?? '',
             $customer->due_day,
             $customer->unpaid_periods_count,
+            $customer->deleted_at?->toDateTimeString() ?? '',
             ];
         });
 
@@ -110,6 +112,7 @@ class CustomerController extends Controller
             'Tanggal Bergabung',
             'Jatuh Tempo',
             'Periode Belum Bayar',
+            'Tanggal Masuk Dismantle',
         ], $rows);
 
         return response()->download($path, 'customers-' . now()->format('Ymd-His') . '.xlsx')->deleteFileAfterSend();
@@ -295,7 +298,13 @@ class CustomerController extends Controller
 
     private function customerIndexQuery(Request $request)
     {
-        $query = Customer::ebilling()->with([
+        $query = Customer::ebilling();
+
+        if ($request->input('lifecycle') === 'dismantle') {
+            $query->onlyTrashed();
+        }
+
+        $query->with([
             'package',
             'area',
             'router:id,name',
