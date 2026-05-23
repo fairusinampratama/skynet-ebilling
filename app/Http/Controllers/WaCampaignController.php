@@ -3,12 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\BroadcastStoreRequest;
-use App\Models\WaCampaign;
-use App\Models\Area;
 use App\Jobs\ProcessWaCampaign;
 use App\Jobs\SendWaCampaignMessage;
+use App\Models\Area;
+use App\Models\WaCampaign;
 use App\Support\AreaScope;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class WaCampaignController extends Controller
@@ -20,7 +19,7 @@ class WaCampaignController extends Controller
         $campaigns = $query->paginate(10);
 
         return Inertia::render('Broadcasts/Index', [
-            'campaigns' => $campaigns
+            'campaigns' => $campaigns,
         ]);
     }
 
@@ -30,7 +29,7 @@ class WaCampaignController extends Controller
         AreaScope::applyToAreas($areasQuery, request()->user());
 
         return Inertia::render('Broadcasts/Create', [
-            'areas' => $areasQuery->get()
+            'areas' => $areasQuery->get(),
         ]);
     }
 
@@ -67,7 +66,7 @@ class WaCampaignController extends Controller
 
         return Inertia::render('Broadcasts/Show', [
             'campaign' => $campaign,
-            'recipients' => $recipients
+            'recipients' => $recipients,
         ]);
     }
 
@@ -84,7 +83,7 @@ class WaCampaignController extends Controller
         // Adjust counts
         $campaign->update([
             'failed_count' => $campaign->failed_count - $failedRecipients->count(),
-            'status' => 'processing'
+            'status' => 'processing',
         ]);
 
         $delaySeconds = 0;

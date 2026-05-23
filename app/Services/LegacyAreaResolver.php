@@ -246,7 +246,7 @@ class LegacyAreaResolver
         ];
 
         if (! str_starts_with($name, 'SKYNET-') && ! str_starts_with($name, 'SUBNET-')) {
-            $name = 'SKYNET-' . $name;
+            $name = 'SKYNET-'.$name;
         }
 
         return $aliases[$name] ?? $name;

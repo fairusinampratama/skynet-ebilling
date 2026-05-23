@@ -32,12 +32,14 @@ class ArchiveCustomersNotOnMikrotik extends Command
 
         if ($apply && ! $backupConfirmed) {
             $this->error('Refusing to apply: pass --backup-confirmed after taking a production database backup.');
+
             return self::FAILURE;
         }
 
         $routers = Router::where('is_active', true)->orderBy('name')->get();
         if ($routers->isEmpty()) {
             $this->warn('No active routers found. Archive aborted.');
+
             return self::FAILURE;
         }
 
@@ -50,6 +52,7 @@ class ArchiveCustomersNotOnMikrotik extends Command
         if ($connectionCheck['failed_routers']->isNotEmpty()) {
             $this->error('Archive aborted because one or more router connections failed.');
             $this->table(['Router', 'IP', 'Error'], $connectionCheck['failed_routers']->all());
+
             return self::FAILURE;
         }
 
@@ -58,6 +61,7 @@ class ArchiveCustomersNotOnMikrotik extends Command
         if ($audit['failed_routers']->isNotEmpty()) {
             $this->error('Archive aborted because one or more routers could not be audited.');
             $this->table(['Router', 'IP', 'Error'], $audit['failed_routers']->all());
+
             return self::FAILURE;
         }
 
@@ -70,6 +74,7 @@ class ArchiveCustomersNotOnMikrotik extends Command
         if ($duplicateUsernames->isNotEmpty()) {
             $this->error('Archive aborted because duplicate MikroTik PPPoE usernames exist across routers.');
             $this->line($duplicateUsernames->implode(', '));
+
             return self::FAILURE;
         }
 
@@ -101,6 +106,7 @@ class ArchiveCustomersNotOnMikrotik extends Command
 
         if (! $apply) {
             $this->warn('Dry run only. Re-run with --apply --backup-confirmed to soft-delete archive candidates.');
+
             return self::SUCCESS;
         }
 
@@ -134,6 +140,7 @@ class ArchiveCustomersNotOnMikrotik extends Command
 
         if (! $apply) {
             $this->warn('Snapshot dry run only. Re-run with --use-snapshot --apply --backup-confirmed to soft-delete archive candidates.');
+
             return self::SUCCESS;
         }
 
@@ -253,6 +260,7 @@ class ArchiveCustomersNotOnMikrotik extends Command
 
             if ($secrets === null) {
                 $failedRouters->push([$router->name, $router->ip_address, $lastError?->getMessage() ?? 'Unknown MikroTik audit failure']);
+
                 continue;
             }
 

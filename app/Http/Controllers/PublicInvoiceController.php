@@ -18,7 +18,7 @@ class PublicInvoiceController extends Controller
                 'name' => Setting::get('company_name', 'Skynet Network'),
                 'address' => Setting::get('company_address', ''),
             ],
-            'manual_accounts' => Setting::get('payment_channels', []),
+            'manual_accounts' => Setting::get('payment_channels', Setting::DEFAULT_PAYMENT_CHANNELS),
         ]);
     }
 }

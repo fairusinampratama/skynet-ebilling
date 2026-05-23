@@ -145,7 +145,7 @@ class AuditRouterCustomersTest extends TestCase
     {
         return Package::create([
             'name' => 'Audit Package',
-            'code' => 'PKG-AUDIT-' . uniqid(),
+            'code' => 'PKG-AUDIT-'.uniqid(),
             'price' => 100000,
         ]);
     }

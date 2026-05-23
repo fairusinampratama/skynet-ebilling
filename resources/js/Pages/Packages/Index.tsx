@@ -3,12 +3,12 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
-import DataTable, { Column, PaginatedData } from '@/Components/DataTable';
+import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 import { ConfirmDialog } from '@/Components/ConfirmDialog';
 import { MoneyText } from '@/Components/Format';
 import { ResourcePageHeader } from '@/Components/ResourcePageHeader';
 import { DeleteAction, EditAction } from '@/Components/TableActions';
-import { Plus } from 'lucide-react';
+import { Archive, CheckCircle2, Plus, Server } from 'lucide-react';
 
 interface Package {
     id: number;
@@ -16,21 +16,73 @@ interface Package {
     price: number;
     mikrotik_profile?: string;
     rate_limit?: string;
+    router?: {
+        id: number;
+        name: string;
+    } | null;
     customers_count: number;
+    is_assignable: boolean;
+    archive_reason?: string | null;
+    profile_exists: boolean;
+}
+
+interface Router {
+    id: number;
+    name: string;
 }
 
 interface Props {
     packages: PaginatedData<Package>;
+    routers: Router[];
     filters?: {
         search?: string;
         limit?: number;
         sort?: string;
         direction?: 'asc' | 'desc';
+        router_id?: string | null;
+        view?: 'active' | 'archive';
     };
 }
 
-export default function Index({ packages, filters = {} }: Props) {
+export default function Index({ packages, routers, filters = {} }: Props) {
     const [packageToDelete, setPackageToDelete] = useState<Package | null>(null);
+    const isArchive = filters.view === 'archive';
+
+    const filterConfigs: FilterConfig[] = [
+        {
+            key: 'view',
+            placeholder: 'View',
+            options: [
+                { label: 'Active Catalog', value: 'active', icon: CheckCircle2 },
+                { label: 'Archive', value: 'archive', icon: Archive },
+            ],
+        },
+        {
+            key: 'router_id',
+            placeholder: 'Router',
+            options: routers.map((item) => ({
+                label: item.name,
+                value: String(item.id),
+                icon: Server,
+            })),
+        },
+    ];
+
+    const statusBadge = (pkg: Package) => {
+        if (pkg.is_assignable) {
+            return (
+                <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700">
+                    Assignable
+                </Badge>
+            );
+        }
+
+        return (
+            <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-amber-700">
+                {pkg.archive_reason || 'Archived'}
+            </Badge>
+        );
+    };
 
     const columns: Column<Package>[] = [
         {
@@ -40,10 +92,22 @@ export default function Index({ packages, filters = {} }: Props) {
             cell: (pkg) => <span className="font-medium">{pkg.name}</span>,
         },
         {
+            header: 'Router',
+            accessorKey: 'router',
+            cell: (pkg) => <span className="text-sm text-muted-foreground">{pkg.router?.name || '-'}</span>,
+        },
+        {
             header: 'Tech Profile',
             accessorKey: 'mikrotik_profile',
             sortable: true,
-            cell: (pkg) => <span className="font-mono text-xs text-muted-foreground">{pkg.mikrotik_profile || '-'}</span>,
+            cell: (pkg) => (
+                <div className="flex flex-col gap-1">
+                    <span className="font-mono text-xs text-muted-foreground">{pkg.mikrotik_profile || '-'}</span>
+                    {!pkg.profile_exists && (
+                        <span className="text-xs text-amber-600">Not synced on router</span>
+                    )}
+                </div>
+            ),
         },
         {
             header: 'Rate Limit',
@@ -65,6 +129,10 @@ export default function Index({ packages, filters = {} }: Props) {
                     {pkg.customers_count} {pkg.customers_count === 1 ? 'customer' : 'customers'}
                 </Badge>
             ),
+        },
+        {
+            header: 'Status',
+            cell: statusBadge,
         },
         {
             header: 'Actions',
@@ -98,12 +166,22 @@ export default function Index({ packages, filters = {} }: Props) {
             <Head title="Packages" />
 
             <div className="py-8">
+                {isArchive && (
+                    <div className="mb-4 rounded-md border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+                        Archive contains legacy, retired, global, or invalid packages. These packages are not available for customer assignment.
+                    </div>
+                )}
                 <DataTable
                     data={packages}
                     columns={columns}
                     filters={filters}
-                    title="Packages"
-                    description={`Showing ${packages.data.length} of ${packages.total} packages`}
+                    filterConfigs={filterConfigs}
+                    title={isArchive ? 'Package Archive' : 'Router Package Catalog'}
+                    description={
+                        isArchive
+                            ? `Showing ${packages.data.length} of ${packages.total} archived packages`
+                            : `Showing ${packages.data.length} of ${packages.total} assignable packages`
+                    }
                     searchPlaceholder="Search packages..."
                     routeName="packages.index"
                     onRowClick={(item) => router.visit(route('packages.show', item.id))}

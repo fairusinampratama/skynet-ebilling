@@ -4,14 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CustomerStoreRequest;
 use App\Http\Requests\CustomerUpdateRequest;
+use App\Models\Area;
 use App\Models\Customer;
 use App\Models\Package;
-use App\Models\Area;
 use App\Models\Router;
 use App\Services\MikrotikService;
 use App\Support\AreaScope;
 use App\Support\SimpleXlsxWriter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class CustomerController extends Controller
@@ -32,7 +34,7 @@ class CustomerController extends Controller
 
         return Inertia::render('Customers/Index', [
             'customers' => $customers,
-            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'unpaid_periods', 'sort', 'direction', 'limit']),
+            'filters' => $request->only(['search', 'status', 'package_id', 'area_id', 'mikrotik_sync', 'unpaid_periods', 'lifecycle', 'sort', 'direction', 'limit']),
             'packages' => Package::all(), // For filter dropdown
             'areas' => $areasQuery->get(),
         ]);
@@ -59,6 +61,7 @@ class CustomerController extends Controller
                 'mikrotik_sync_checked_at',
                 'join_date',
                 'due_day',
+                'deleted_at',
                 'created_at',
             ])
             ->withCount([
@@ -70,24 +73,25 @@ class CustomerController extends Controller
         $rowNumber = 1;
         $rows = $query->lazy(1000)->map(function (Customer $customer) use (&$rowNumber) {
             return [
-            $rowNumber++,
-            $customer->code,
-            $customer->nik ?? '',
-            $customer->name,
-            $customer->address,
-            $customer->phone,
-            $customer->area?->name ?? '',
-            $customer->package?->name ?? '',
-            $customer->package?->rate_limit ?? '',
-            $customer->package?->price ?? '',
-            $customer->status,
-            $customer->router?->name ?? '',
-            $customer->mikrotik_sync_status ?? 'unknown',
-            $customer->mikrotik_synced_at?->toDateTimeString() ?? '',
-            $customer->mikrotik_sync_checked_at?->toDateTimeString() ?? '',
-            $customer->join_date?->toDateString() ?? '',
-            $customer->due_day,
-            $customer->unpaid_periods_count,
+                $rowNumber++,
+                $customer->code,
+                $customer->nik ?? '',
+                $customer->name,
+                $customer->address,
+                $customer->phone,
+                $customer->area?->name ?? '',
+                $customer->package?->name ?? '',
+                $customer->package?->rate_limit ?? '',
+                $customer->package?->price ?? '',
+                $customer->status,
+                $customer->router?->name ?? '',
+                $customer->mikrotik_sync_status ?? 'unknown',
+                $customer->mikrotik_synced_at?->toDateTimeString() ?? '',
+                $customer->mikrotik_sync_checked_at?->toDateTimeString() ?? '',
+                $customer->join_date?->toDateString() ?? '',
+                $customer->due_day,
+                $customer->unpaid_periods_count,
+                $customer->deleted_at?->toDateTimeString() ?? '',
             ];
         });
 
@@ -110,9 +114,10 @@ class CustomerController extends Controller
             'Tanggal Bergabung',
             'Jatuh Tempo',
             'Periode Belum Bayar',
+            'Tanggal Masuk Dismantle',
         ], $rows);
 
-        return response()->download($path, 'customers-' . now()->format('Ymd-His') . '.xlsx')->deleteFileAfterSend();
+        return response()->download($path, 'customers-'.now()->format('Ymd-His').'.xlsx')->deleteFileAfterSend();
     }
 
     /**
@@ -124,7 +129,7 @@ class CustomerController extends Controller
         AreaScope::applyToAreas($areasQuery, request()->user());
 
         return Inertia::render('Customers/Create', [
-            'packages' => Package::select('id', 'name', 'price')->get(),
+            'packages' => $this->packagesForCustomerForms(),
             'areas' => $areasQuery->get(),
             'routers' => Router::select('id', 'name')->get(),
         ]);
@@ -140,12 +145,14 @@ class CustomerController extends Controller
 
         // Auto-generate join date if not provided
         $validated['join_date'] = now();
+        $validated['router_id'] = Package::findOrFail($validated['package_id'])->router_id;
+        $validated['code'] = $this->uniqueCustomerCode($validated['name']);
 
         // Handle KTP photo upload
         if ($request->hasFile('ktp_photo')) {
             $file = $request->file('ktp_photo');
-            $filename = 'customer-' . uniqid() . '.' . $file->extension();
-            $path = $file->storeAs('ktp/' . now()->format('Y/m'), $filename, 'public');
+            $filename = 'customer-'.uniqid().'.'.$file->extension();
+            $path = $file->storeAs('ktp/'.now()->format('Y/m'), $filename, 'public');
             $validated['ktp_photo_url'] = $path; // Store path in mapped URL column
         }
 
@@ -163,13 +170,13 @@ class CustomerController extends Controller
         AreaScope::authorizeCustomer($customer, request()->user());
 
         $customer->load([
-            'package', 
-            'area', 
+            'package',
+            'area',
             'router:id,name,connection_status,is_active',
-            'invoices' => function($q) {
-                $q->latest('period'); 
+            'invoices' => function ($q) {
+                $q->latest('period');
             },
-            'invoices.transactions'
+            'invoices.transactions',
         ]);
 
         return Inertia::render('Customers/Show', [
@@ -188,7 +195,7 @@ class CustomerController extends Controller
 
         return Inertia::render('Customers/Edit', [
             'customer' => $customer,
-            'packages' => Package::select('id', 'name', 'price')->get(),
+            'packages' => $this->packagesForCustomerForms(),
             'areas' => $areasQuery->get(),
             'routers' => Router::select('id', 'name')->get(),
         ]);
@@ -203,18 +210,19 @@ class CustomerController extends Controller
 
         $validated = $request->validated();
         AreaScope::authorizeAreaId(isset($validated['area_id']) ? (int) $validated['area_id'] : null, $request->user());
+        $validated['router_id'] = Package::findOrFail($validated['package_id'])->router_id;
 
         // Handle KTP photo upload
         if ($request->hasFile('ktp_photo')) {
             // Delete old file if exists and is a local path (not a full URL)
-            if ($customer->ktp_photo_url && !filter_var($customer->ktp_photo_url, FILTER_VALIDATE_URL)) {
+            if ($customer->ktp_photo_url && ! filter_var($customer->ktp_photo_url, FILTER_VALIDATE_URL)) {
                 \Storage::disk('public')->delete($customer->ktp_photo_url);
             }
-            
+
             $file = $request->file('ktp_photo');
-            $filename = 'customer-' . $customer->id . '-' . uniqid() . '.' . $file->extension();
-            $path = $file->storeAs('ktp/' . now()->format('Y/m'), $filename, 'public');
-            
+            $filename = 'customer-'.$customer->id.'-'.uniqid().'.'.$file->extension();
+            $path = $file->storeAs('ktp/'.now()->format('Y/m'), $filename, 'public');
+
             $validated['ktp_photo_url'] = $path;
         }
 
@@ -240,7 +248,7 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')
             ->with('success', 'Customer deleted successfully.');
     }
-    
+
     /**
      * Isolate the customer (block internet via Mikrotik)
      */
@@ -295,13 +303,19 @@ class CustomerController extends Controller
 
     private function customerIndexQuery(Request $request)
     {
-        $query = Customer::ebilling()->with([
+        $query = Customer::ebilling();
+
+        if ($request->input('lifecycle') === 'dismantle') {
+            $query->onlyTrashed();
+        }
+
+        $query->with([
             'package',
             'area',
             'router:id,name',
-            'invoices' => function($q) {
+            'invoices' => function ($q) {
                 $q->where('status', 'unpaid')->orderBy('due_date', 'asc')->limit(1);
-            }
+            },
         ])->withCount([
             'invoices as unpaid_periods_count' => function ($query) {
                 $query->where('status', 'unpaid');
@@ -312,11 +326,11 @@ class CustomerController extends Controller
         // Search functionality
         if ($request->has('search') && $request->search) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('pppoe_user', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('pppoe_user', 'like', "%{$search}%")
+                    ->orWhere('address', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -363,5 +377,36 @@ class CustomerController extends Controller
         $query->orderBy($sortField, $sortDirection);
 
         return $query;
+    }
+
+    private function packagesForCustomerForms()
+    {
+        return Package::select('id', 'name', 'price', 'router_id', 'mikrotik_profile', 'rate_limit')
+            ->whereNotNull('router_id')
+            ->whereRaw("LOWER(TRIM(mikrotik_profile)) <> '5'")
+            ->whereRaw("LOWER(TRIM(mikrotik_profile)) NOT LIKE '5m%'")
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('router_profiles')
+                    ->whereColumn('router_profiles.router_id', 'packages.router_id')
+                    ->whereColumn('router_profiles.name', 'packages.mikrotik_profile');
+            })
+            ->with('router:id,name')
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function uniqueCustomerCode(string $name): string
+    {
+        $base = 'CUST-'.Str::upper(Str::slug(Str::limit($name, 24, '')));
+        $base = $base !== 'CUST-' ? $base : 'CUST';
+        $candidate = $base;
+        $suffix = 1;
+
+        while (Customer::withTrashed()->where('code', $candidate)->exists()) {
+            $candidate = $base.'-'.$suffix++;
+        }
+
+        return $candidate;
     }
 }

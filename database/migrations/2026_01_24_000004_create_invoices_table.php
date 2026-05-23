@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('invoices')) {
+        if (! Schema::hasTable('invoices')) {
             Schema::create('invoices', function (Blueprint $table) {
                 $table->id();
                 $table->uuid('uuid')->nullable()->unique();
@@ -24,7 +24,7 @@ return new class extends Migration
                 $table->timestamp('generated_at')->nullable();
                 $table->string('payment_link')->nullable();
                 $table->timestamps();
-                
+
                 $table->unique(['customer_id', 'period']);
             });
         }

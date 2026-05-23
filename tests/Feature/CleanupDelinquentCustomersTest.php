@@ -20,8 +20,11 @@ class CleanupDelinquentCustomersTest extends TestCase
         $this->unpaidInvoice($candidate, '2026-02-01');
         $this->unpaidInvoice($candidate, '2026-03-01');
 
-        $this->artisan('customers:cleanup-delinquent')
+        $this->artisan('customers:cleanup-delinquent', ['--date' => '2026-05-22'])
             ->expectsOutput('Minimum unpaid periods: 3')
+            ->expectsOutput('Enforceable billing window: 3 month(s)')
+            ->expectsOutput('Stale invoice cutoff: before 2026-03-01')
+            ->expectsOutput('Stale unpaid invoices to void: 2')
             ->expectsOutput('Eligible customers: 1')
             ->assertExitCode(0);
 
@@ -29,9 +32,14 @@ class CleanupDelinquentCustomersTest extends TestCase
             'id' => $candidate->id,
             'deleted_at' => null,
         ]);
+        $this->assertDatabaseHas('invoices', [
+            'customer_id' => $candidate->id,
+            'period' => '2026-01-01',
+            'status' => 'unpaid',
+        ]);
     }
 
-    public function test_apply_soft_deletes_only_customers_with_three_unpaid_periods(): void
+    public function test_apply_voids_stale_unpaid_invoices_and_soft_deletes_only_delinquent_customers(): void
     {
         $package = $this->package();
         $candidate = $this->customer($package, 'CUST-DELETE');
@@ -46,14 +54,20 @@ class CleanupDelinquentCustomersTest extends TestCase
         $this->unpaidInvoice($safeCustomer, '2026-02-01');
         $this->paidInvoice($safeCustomer, '2026-03-01');
 
-        $this->artisan('customers:cleanup-delinquent', ['--apply' => true])
+        $this->artisan('customers:cleanup-delinquent', ['--apply' => true, '--date' => '2026-05-22'])
+            ->expectsOutput('Voided stale unpaid invoices: 6')
             ->expectsOutput('Soft-deleted customers: 1')
             ->assertExitCode(0);
 
         $this->assertSoftDeleted('customers', ['id' => $candidate->id]);
+        $this->assertDatabaseHas('customers', ['id' => $candidate->id, 'status' => 'terminated']);
         $this->assertDatabaseHas('customers', ['id' => $safeCustomer->id, 'deleted_at' => null]);
         $this->assertDatabaseHas('customers', ['id' => $terminatedCustomer->id, 'deleted_at' => null]);
-        $this->assertDatabaseHas('invoices', ['customer_id' => $candidate->id, 'status' => 'unpaid']);
+        $this->assertDatabaseHas('invoices', ['customer_id' => $candidate->id, 'period' => '2026-01-01', 'status' => 'void']);
+        $this->assertDatabaseHas('invoices', ['customer_id' => $candidate->id, 'period' => '2026-02-01', 'status' => 'void']);
+        $this->assertDatabaseHas('invoices', ['customer_id' => $candidate->id, 'period' => '2026-03-01', 'status' => 'unpaid']);
+        $this->assertDatabaseHas('invoices', ['customer_id' => $safeCustomer->id, 'period' => '2026-01-01', 'status' => 'void']);
+        $this->assertDatabaseHas('invoices', ['customer_id' => $safeCustomer->id, 'period' => '2026-02-01', 'status' => 'void']);
         $this->assertDatabaseHas('activity_log', [
             'subject_type' => Customer::class,
             'subject_id' => $candidate->id,
@@ -83,11 +97,31 @@ class CleanupDelinquentCustomersTest extends TestCase
         $this->assertSame(3, $rows[0]['unpaid_periods_count']);
     }
 
+    public function test_customers_index_can_filter_dismantle_list(): void
+    {
+        $package = $this->package();
+        $dismantle = $this->customer($package, 'CUST-DISMANTLE', ['status' => 'terminated']);
+        $active = $this->customer($package, 'CUST-ACTIVE');
+
+        $dismantle->delete();
+
+        $user = \App\Models\User::factory()->create(['role' => 'admin']);
+
+        $response = $this->actingAs($user)->get(route('customers.index', ['lifecycle' => 'dismantle']));
+
+        $response->assertOk();
+        $rows = $response->viewData('page')['props']['customers']['data'];
+        $this->assertCount(1, $rows);
+        $this->assertSame($dismantle->id, $rows[0]['id']);
+        $this->assertNotNull($rows[0]['deleted_at']);
+        $this->assertNotSame($active->id, $rows[0]['id']);
+    }
+
     private function package(): Package
     {
         return Package::create([
             'name' => 'Cleanup Package',
-            'code' => 'PKG-CLEANUP-' . uniqid(),
+            'code' => 'PKG-CLEANUP-'.uniqid(),
             'price' => 100000,
         ]);
     }

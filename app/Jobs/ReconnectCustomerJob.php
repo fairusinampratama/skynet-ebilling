@@ -17,6 +17,7 @@ class ReconnectCustomerJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
+
     public $backoff = [60, 180, 600];
 
     /**
@@ -35,13 +36,15 @@ class ReconnectCustomerJob implements ShouldQueue
         $this->customer->refresh();
 
         // Check if customer has a router assigned
-        if (!$this->customer->router_id || !$this->customer->router) {
+        if (! $this->customer->router_id || ! $this->customer->router) {
             Log::warning("Customer {$this->customer->name} has no router assigned. Skipping reconnection.");
+
             return;
         }
 
-        if (!$this->customer->pppoe_user) {
+        if (! $this->customer->pppoe_user) {
             Log::warning("Customer {$this->customer->name} has no PPPoE username. Skipping reconnection.");
+
             return;
         }
 
@@ -90,8 +93,8 @@ class ReconnectCustomerJob implements ShouldQueue
             }
 
         } catch (Exception $e) {
-            Log::error("Failed to reconnect customer {$this->customer->name}: " . $e->getMessage());
-            
+            Log::error("Failed to reconnect customer {$this->customer->name}: ".$e->getMessage());
+
             // Log the failure
             activity()
                 ->causedBy(auth()->user() ?? null)

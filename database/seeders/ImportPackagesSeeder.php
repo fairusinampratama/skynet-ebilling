@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Package;
+use Illuminate\Database\Seeder;
 
 class ImportPackagesSeeder extends Seeder
 {
@@ -85,8 +85,8 @@ class ImportPackagesSeeder extends Seeder
             Package::firstOrCreate(
                 ['name' => $pkg['name']],
                 [
-                    'code' => 'PKG-' . strtoupper(substr(md5($pkg['name']), 0, 8)),
-                    'price' => $pkg['price'], 
+                    'code' => 'PKG-'.strtoupper(substr(md5($pkg['name']), 0, 8)),
+                    'price' => $pkg['price'],
                     'rate_limit' => $pkg['bandwidth_label'],
                 ]
             );

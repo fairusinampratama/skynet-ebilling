@@ -73,10 +73,9 @@ fi
 echo "📦 Running database migrations..."
 php artisan migrate --force
 
-# 2. Seed only safe default users.
-# Do not run DatabaseSeeder here: it imports legacy/test data and can overwrite operational data.
-echo "👤 Seeding default users..."
-php artisan db:seed --class=UserSeeder --force
+# 2. Create the first superadmin only when the database has none.
+echo "👤 Bootstrapping initial admin if needed..."
+php artisan users:bootstrap-initial-admin
 
 # 3. Create storage link (ignore if exists)
 echo "🔗 Creating storage symlink..."
@@ -88,9 +87,9 @@ php artisan config:clear || true
 php artisan view:clear || true
 
 # 4. Cache optimization.
-# Avoid route:cache while web routes include closures.
 echo "⚡ Optimizing application cache..."
 php artisan config:cache
+php artisan route:cache
 php artisan view:cache
 
 echo "✅ Deployment tasks complete. Starting application processes..."

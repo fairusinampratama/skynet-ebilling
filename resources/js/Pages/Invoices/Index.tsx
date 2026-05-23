@@ -32,6 +32,7 @@ interface Props {
         sort?: string;
         direction?: 'asc' | 'desc';
         limit?: string;
+        period_filter?: string;
     };
 }
 
@@ -197,6 +198,13 @@ export default function Index({ invoices, filters = {} }: Props) {
     ];
 
     const filterConfigs: FilterConfig[] = [
+        {
+            key: 'period_filter',
+            placeholder: 'Current Period',
+            options: [
+                { label: 'All History', value: 'history' },
+            ]
+        },
         {
             key: 'status',
             placeholder: 'All Status',

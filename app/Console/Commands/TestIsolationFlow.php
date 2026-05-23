@@ -21,13 +21,15 @@ class TestIsolationFlow extends Command
     {
         $customer = Customer::with(['router', 'package'])->find($this->argument('customer_id'));
 
-        if (!$customer) {
+        if (! $customer) {
             $this->error('Customer not found.');
+
             return self::FAILURE;
         }
 
-        if (!$customer->router || !$customer->pppoe_user) {
+        if (! $customer->router || ! $customer->pppoe_user) {
             $this->error('Customer must have both a router and PPPoE username.');
+
             return self::FAILURE;
         }
 
@@ -38,8 +40,9 @@ class TestIsolationFlow extends Command
             $mikrotik->connect($customer->router, ['timeout' => 10, 'attempts' => 1]);
             $secret = $mikrotik->getPPPSecret($customer->pppoe_user);
 
-            if (!$secret) {
+            if (! $secret) {
                 $this->error('PPPoE secret was not found on the router.');
+
                 return self::FAILURE;
             }
 
@@ -49,12 +52,14 @@ class TestIsolationFlow extends Command
             $this->info("Current router profile: {$originalProfile}");
             $this->info("Isolation profile target: {$isolationProfile}");
 
-            if (!$this->option('yes')) {
+            if (! $this->option('yes')) {
                 $this->warn('Preflight only. Re-run with --yes to isolate this customer.');
+
                 return self::SUCCESS;
             }
         } catch (\Throwable $e) {
             $this->error("Preflight failed: {$e->getMessage()}");
+
             return self::FAILURE;
         } finally {
             $mikrotik->disconnect();
@@ -72,13 +77,15 @@ class TestIsolationFlow extends Command
 
             if (strcasecmp((string) $isolatedProfile, $isolationProfile) !== 0) {
                 $this->error("Isolation verification failed. Router profile is '{$isolatedProfile}'.");
+
                 return self::FAILURE;
             }
 
             $this->info('Isolation verified.');
 
-            if (!$this->option('restore')) {
+            if (! $this->option('restore')) {
                 $this->warn('Customer was left isolated because --restore was not provided.');
+
                 return self::SUCCESS;
             }
 
@@ -93,13 +100,16 @@ class TestIsolationFlow extends Command
 
             if ($restoredProfile !== $originalProfile) {
                 $this->error("Reconnection verification failed. Expected '{$originalProfile}', got '{$restoredProfile}'.");
+
                 return self::FAILURE;
             }
 
             $this->info('Reconnection verified. Original profile restored.');
+
             return self::SUCCESS;
         } catch (\Throwable $e) {
             $this->error("Live test failed: {$e->getMessage()}");
+
             return self::FAILURE;
         } finally {
             $mikrotik->disconnect();

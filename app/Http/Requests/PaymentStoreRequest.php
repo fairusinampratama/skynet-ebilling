@@ -18,7 +18,7 @@ class PaymentStoreRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0'],
             'method' => ['required', Rule::in(['cash', 'transfer', 'payment_gateway'])],
             'proof' => ['nullable', 'image', 'max:2048'],
-            'paid_at' => ['nullable', 'date'],
+            'paid_at' => ['required', 'date'],
         ];
     }
 }
