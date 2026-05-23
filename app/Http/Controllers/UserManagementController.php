@@ -118,6 +118,7 @@ class UserManagementController extends Controller
     {
         if ($user->isAdmin()) {
             $user->areas()->sync($areaIds);
+
             return;
         }
 

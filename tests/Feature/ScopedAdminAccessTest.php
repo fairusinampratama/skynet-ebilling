@@ -69,6 +69,7 @@ class ScopedAdminAccessTest extends TestCase
         $this->actingAs($admin)->post(route('payments.store', $invoiceB), [
             'amount' => 50000,
             'method' => 'cash',
+            'paid_at' => now()->format('Y-m-d'),
         ])->assertForbidden();
     }
 

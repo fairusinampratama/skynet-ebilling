@@ -86,7 +86,7 @@ When you're done working, you can safely stop and remove the containers by runni
 
 ## Running Tests
 
-Use the disposable `mysql-test` service for MySQL-backed PHPUnit runs. It uses an in-memory Docker filesystem, so each start is clean and it does not reuse the development database volume.
+Use the disposable `mysql-test` service for MySQL-backed PHPUnit runs. It uses an in-memory Docker filesystem, so each start is clean and it does not reuse the development database volume. This mirrors CI and avoids relying on a host-level `mysql` DNS name.
 
 ```bash
 WWWGROUP=$(id -g) WWWUSER=$(id -u) docker compose up -d mysql-test laravel.test
@@ -99,6 +99,18 @@ WWWGROUP=$(id -g) WWWUSER=$(id -u) docker compose exec -T laravel.test env \
   DB_USERNAME=sail \
   DB_PASSWORD=password \
   php artisan test
+```
+
+For a host-level run, point PHPUnit at a reachable MySQL server explicitly:
+
+```bash
+DB_CONNECTION=mysql \
+DB_HOST=127.0.0.1 \
+DB_PORT=3306 \
+DB_DATABASE=testing \
+DB_USERNAME=sail \
+DB_PASSWORD=password \
+php artisan test
 ```
 
 For the restored isolation feature only:
@@ -151,3 +163,17 @@ Production workers should run the default queue and dedicated MikroTik queues. T
 - `queue-router-sync`
 
 After changing queue/session Redis config in production, restart the application workers so they pick up the cached config.
+
+## Production Operations
+
+Production deployments use `deploy.sh`, which runs migrations, bootstraps the first superadmin only when none exists, creates the storage link, and caches config, routes, and views.
+
+Required launch environment:
+- `APP_ENV=production`, `APP_DEBUG=false`, `APP_FORCE_HTTPS=true`, and `SESSION_SECURE_COOKIE=true`.
+- Redis-backed `SESSION_DRIVER`, `CACHE_STORE`, and `QUEUE_CONNECTION`.
+- `INITIAL_ADMIN_NAME`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD` for the first deploy only. Once any superadmin exists, the bootstrap command skips without reading these values.
+- `SENTRY_LARAVEL_DSN` for production error tracking. Keep `SENTRY_TRACES_SAMPLE_RATE=0.0` unless tracing is intentionally enabled.
+
+Health checks should target `/up`. Application, queue, scheduler, and web server logs are written to stdout/stderr for platform log collection.
+
+Managed database backups are required before launch. Configure scheduled provider backups with retention, then run and document one restore drill before production traffic. Before destructive maintenance commands, confirm a fresh production database backup exists.

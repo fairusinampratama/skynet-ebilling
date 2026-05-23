@@ -76,15 +76,15 @@ class LegacySyncService
     public function syncPackages(): int
     {
         $response = Http::timeout(30)->get("{$this->baseUrl}/api/v1/packages");
-        if (!$response->successful()) {
-            throw new \Exception("Failed to fetch packages: " . $response->body());
+        if (! $response->successful()) {
+            throw new \Exception('Failed to fetch packages: '.$response->body());
         }
 
         $packages = $response->json();
         $count = 0;
 
         foreach ($packages as $data) {
-            $code = 'PKG-' . strtoupper(substr(md5($data['name']), 0, 8));
+            $code = 'PKG-'.strtoupper(substr(md5($data['name']), 0, 8));
             Package::updateOrCreate(
                 ['name' => $data['name']],
                 [
@@ -101,8 +101,8 @@ class LegacySyncService
     public function syncCustomers(): int
     {
         $response = Http::timeout(60)->get("{$this->baseUrl}/api/v1/customers");
-        if (!$response->successful()) {
-            throw new \Exception("Failed to fetch customers: " . $response->body());
+        if (! $response->successful()) {
+            throw new \Exception('Failed to fetch customers: '.$response->body());
         }
 
         $customers = $response->json();
@@ -135,11 +135,11 @@ class LegacySyncService
             $networkSyncStats["source_{$source}"] = ($networkSyncStats["source_{$source}"] ?? 0) + 1;
 
             $packageId = null;
-            if (!empty($data['package'])) {
+            if (! empty($data['package'])) {
                 $packageId = $packagesByName->get($data['package']['name']);
             }
 
-            if (!$packageId) {
+            if (! $packageId) {
                 $packageId = $fallbackPkg->id;
             }
 
@@ -163,7 +163,7 @@ class LegacySyncService
                 ]);
             }
 
-            $joinDate = !empty($data['join_date']) ? Carbon::parse($data['join_date']) : null;
+            $joinDate = ! empty($data['join_date']) ? Carbon::parse($data['join_date']) : null;
 
             $scrapedPppoeUser = $data['pppoe_username'] ?? $data['pppoe_user'] ?? null;
             $pppoeUser = $this->resolvePppoeUser(
@@ -179,7 +179,7 @@ class LegacySyncService
                 && $seenPppoeUsers[$pppoeUser] !== $customerCode
             ) {
                 $attempts++;
-                $pppoeUser = $customerCode . '_USR_' . ($attempts + 1);
+                $pppoeUser = $customerCode.'_USR_'.($attempts + 1);
             }
             $seenPppoeUsers[$pppoeUser] = $customerCode;
 
@@ -187,14 +187,14 @@ class LegacySyncService
             $networkSyncStats[$isMikrotikSyncable ? 'mikrotik_syncable' : 'not_mikrotik_syncable']++;
             $routerId = $this->resolveRouterId($data, $routersByScraperName, $networkSyncStats);
 
-            $phone = !empty($data['phone']) ? $data['phone'] : '';
-            $address = !empty($data['address']) ? $data['address'] : '-';
-            
+            $phone = ! empty($data['phone']) ? $data['phone'] : '';
+            $address = ! empty($data['address']) ? $data['address'] : '-';
+
             $statusRaw = strtolower($data['status'] ?? 'active');
             $validStatuses = ['active', 'suspended', 'inactive', 'isolated', 'terminated', 'pending_installation'];
             if ($statusRaw === 'deleted') {
                 $statusRaw = 'terminated';
-            } elseif (!in_array($statusRaw, $validStatuses)) {
+            } elseif (! in_array($statusRaw, $validStatuses)) {
                 $statusRaw = 'active';
             }
 
@@ -202,7 +202,7 @@ class LegacySyncService
                 'code' => $customerCode,
                 'legacy_id' => $customerCode,
                 'name' => $data['name'],
-                'nik' => !empty($data['nik']) ? $data['nik'] : null,
+                'nik' => ! empty($data['nik']) ? $data['nik'] : null,
                 'address' => $address,
                 'phone' => $phone,
                 'geo_lat' => $data['geo_lat'],
@@ -318,9 +318,9 @@ class LegacySyncService
     }
 
     /**
-     * @param \Illuminate\Support\Collection<string, string> $existingPppoeByCode
-     * @param \Illuminate\Support\Collection<string, Customer> $existingPppoeOwners
-     * @param array<string, int> $stats
+     * @param  \Illuminate\Support\Collection<string, string>  $existingPppoeByCode
+     * @param  \Illuminate\Support\Collection<string, Customer>  $existingPppoeOwners
+     * @param  array<string, int>  $stats
      */
     private function resolvePppoeUser(
         string $customerCode,
@@ -343,27 +343,31 @@ class LegacySyncService
                     $stats['released_deleted_imp_conflicts']++;
                 } else {
                     $stats['pppoe_conflict']++;
-                    return $existingPppoeByCode->get($customerCode) ?: $customerCode . '_USR';
+
+                    return $existingPppoeByCode->get($customerCode) ?: $customerCode.'_USR';
                 }
             }
 
             $stats['pppoe_from_scraper']++;
+
             return $scrapedPppoeUser;
         }
 
         $existingPppoeUser = trim((string) ($existingPppoeByCode->get($customerCode) ?? ''));
         if ($existingPppoeUser !== '') {
             $stats['pppoe_preserved_existing']++;
+
             return $existingPppoeUser;
         }
 
         $stats['pppoe_placeholder']++;
-        return $customerCode . '_USR';
+
+        return $customerCode.'_USR';
     }
 
     private function releasedImportedPppoeValue(Customer $customer): string
     {
-        return 'RELEASED-IMP-' . $customer->id . '-' . substr(md5((string) $customer->pppoe_user), 0, 8);
+        return 'RELEASED-IMP-'.$customer->id.'-'.substr(md5((string) $customer->pppoe_user), 0, 8);
     }
 
     /**
@@ -390,9 +394,9 @@ class LegacySyncService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, Router> $routersByScraperName
-     * @param array<string, int> $stats
+     * @param  array<string, mixed>  $data
+     * @param  array<string, Router>  $routersByScraperName
+     * @param  array<string, int>  $stats
      */
     private function resolveRouterId(array $data, array $routersByScraperName, array &$stats): ?int
     {
@@ -405,16 +409,19 @@ class LegacySyncService
 
         if ($routerName === '') {
             $stats['router_blank']++;
+
             return null;
         }
 
         $router = $routersByScraperName[$routerName] ?? null;
         if (! $router) {
             $stats['router_unmapped']++;
+
             return null;
         }
 
         $stats['router_mapped']++;
+
         return $router->id;
     }
 
@@ -466,10 +473,10 @@ class LegacySyncService
                 ->timeout(180)
                 ->get("{$this->baseUrl}/api/v1/invoices");
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
                 $body = File::exists($tmpFile) ? File::get($tmpFile) : '';
 
-                throw new \Exception("Failed to fetch invoices: " . $body);
+                throw new \Exception('Failed to fetch invoices: '.$body);
             }
 
             $customerIdsByCode = Customer::withTrashed()->pluck('id', 'code');
@@ -479,9 +486,10 @@ class LegacySyncService
 
             foreach ($this->streamJsonArrayFile($tmpFile) as $data) {
                 $customerId = $customerIdsByCode->get((string) $data['customer_id']);
-                if (!$customerId) {
+                if (! $customerId) {
                     // If customer is missing locally, we cannot assign the invoice.
                     Log::warning("Skipping invoice sync for missing customer: {$data['customer_id']}");
+
                     continue;
                 }
 
@@ -493,7 +501,7 @@ class LegacySyncService
                     'period' => $periodDate->toDateString(),
                     'legacy_id' => isset($data['id']) ? (string) $data['id'] : null,
                     'uuid' => $data['uuid'] ?? (string) Str::uuid(),
-                    'code' => $data['code'] ?? 'INV-' . $periodDate->format('Ym') . '-' . $data['customer_id'],
+                    'code' => $data['code'] ?? 'INV-'.$periodDate->format('Ym').'-'.$data['customer_id'],
                     'amount' => $data['amount'],
                     'status' => $data['status'],
                     'due_date' => $dueDate->toDateString(),
@@ -583,6 +591,7 @@ class LegacySyncService
 
                     if ($char === '"') {
                         $inString = true;
+
                         continue;
                     }
 
@@ -592,6 +601,7 @@ class LegacySyncService
                         }
 
                         $depth++;
+
                         continue;
                     }
 
@@ -618,7 +628,7 @@ class LegacySyncService
     {
         $response = Http::timeout(60)->get("{$this->baseUrl}/api/v1/customers");
         if (! $response->successful()) {
-            throw new \Exception("Failed to fetch areas and customer fallback: " . $response->body());
+            throw new \Exception('Failed to fetch areas and customer fallback: '.$response->body());
         }
 
         return collect($response->json())

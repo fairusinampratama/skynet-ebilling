@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('password'); // Encrypted
             $table->boolean('is_active')->default(true);
             $table->enum('connection_status', ['unknown', 'online', 'offline'])->default('unknown');
-            
+
             // Monitoring & Health
             $table->string('isolation_profile')->nullable();
             $table->timestamp('last_scanned_at')->nullable();
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('board_name')->nullable();
 
             $table->timestamps();
-            
+
             $table->index(['ip_address', 'port']);
         });
     }

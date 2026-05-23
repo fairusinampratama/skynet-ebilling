@@ -26,7 +26,9 @@ interface Package {
     id: number;
     name: string;
     price: number;
-
+    router_id?: number | null;
+    mikrotik_profile?: string | null;
+    rate_limit?: string | null;
 }
 
 interface Area {
@@ -95,6 +97,7 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
         ktp_photo: null as File | null,
     });
     const { data, setData, put, delete: destroy, processing, errors } = form;
+    const availablePackages = packages.filter((pkg) => String(pkg.router_id || '') === data.router_id);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -345,23 +348,56 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                 </div>
 
                                 <div className="grid gap-2">
+                                    <Label htmlFor="router_id">Mikrotik Router</Label>
+                                    <Select
+                                        value={data.router_id || 'manual'}
+                                        onValueChange={(val) => {
+                                            setData((current) => ({
+                                                ...current,
+                                                router_id: val === 'manual' ? '' : val,
+                                                package_id: '',
+                                            }));
+                                        }}
+                                    >
+                                        <SelectTrigger className="bg-background/50">
+                                            <SelectValue placeholder="Select Router" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="manual">-- None (Pending Only) --</SelectItem>
+                                            {routers.map((router) => (
+                                                <SelectItem key={router.id} value={String(router.id)}>
+                                                    {router.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
+                                </div>
+
+                                <div className="grid gap-2">
                                     <Label htmlFor="package">Subscription Package <span className="text-red-500">*</span></Label>
                                     <Select
                                         value={data.package_id}
                                         onValueChange={(val) => setData('package_id', val)}
+                                        disabled={!data.router_id}
                                     >
                                         <SelectTrigger className="bg-background/50">
-                                            <SelectValue placeholder="Select a package" />
+                                            <SelectValue placeholder={data.router_id ? 'Select a package' : 'Select router first'} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {packages.map((pkg) => (
+                                            {availablePackages.map((pkg) => (
                                                 <SelectItem key={pkg.id} value={String(pkg.id)}>
                                                     <span className="font-medium">{pkg.name}</span>
                                                     <span className="text-muted-foreground ml-2">
-                                                        (Rp {pkg.price.toLocaleString('id-ID')})
+                                                        ({pkg.mikrotik_profile || 'No profile'} / Rp {pkg.price.toLocaleString('id-ID')})
                                                     </span>
                                                 </SelectItem>
                                             ))}
+                                            {data.router_id && availablePackages.length === 0 && (
+                                                <div className="p-2 text-sm text-muted-foreground text-center">
+                                                    No packages are available for this router.
+                                                </div>
+                                            )}
                                         </SelectContent>
                                     </Select>
                                     {errors.package_id && <p className="text-sm text-destructive">{errors.package_id}</p>}
@@ -384,27 +420,6 @@ export default function Edit({ customer, packages, areas, routers }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.status && <p className="text-sm text-destructive">{errors.status}</p>}
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="router_id">Mikrotik Router</Label>
-                                    <Select
-                                        value={data.router_id || 'manual'}
-                                        onValueChange={(val) => setData('router_id', val === 'manual' ? '' : val)}
-                                    >
-                                        <SelectTrigger className="bg-background/50">
-                                            <SelectValue placeholder="Select Router" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="manual">-- None (Manual Mode) --</SelectItem>
-                                            {routers.map((router) => (
-                                                <SelectItem key={router.id} value={String(router.id)}>
-                                                    {router.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.router_id && <p className="text-sm text-destructive">{errors.router_id}</p>}
                                 </div>
 
                                 <div className="border-t border-border/50 my-6"></div>

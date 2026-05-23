@@ -290,8 +290,8 @@ class EbillingOnlyRouterSyncTest extends TestCase
     private function router(array $overrides = []): Router
     {
         return Router::create(array_merge([
-            'name' => 'Test Router ' . uniqid(),
-            'ip_address' => '10.10.10.' . rand(1, 254),
+            'name' => 'Test Router '.uniqid(),
+            'ip_address' => '10.10.10.'.rand(1, 254),
             'username' => 'admin',
             'password' => 'secret',
             'port' => 8728,

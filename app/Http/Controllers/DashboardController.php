@@ -6,7 +6,6 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Transaction;
 use App\Support\AreaScope;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -22,7 +21,7 @@ class DashboardController extends Controller
         // Projected Revenue (Sum of all active customer packages)
         $projectedCustomers = Customer::ebilling()->where('status', 'active')->with('package');
         AreaScope::applyToCustomers($projectedCustomers, $user);
-        $projectedRevenue = $projectedCustomers->get()->sum(function($customer) {
+        $projectedRevenue = $projectedCustomers->get()->sum(function ($customer) {
             return $customer->package->price ?? 0;
         });
 

@@ -15,9 +15,9 @@ class InvoiceStoreRequest extends FormRequest
     {
         return [
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
-            'period' => ['required', 'date'],
+            'period' => ['required', 'date_format:Y-m'],
             'amount' => ['required', 'numeric', 'min:0'],
-            'due_date' => ['required', 'date'],
+            'due_date' => ['required', 'date_format:Y-m-d'],
         ];
     }
 }

@@ -3,11 +3,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-
 use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
+    public const DEFAULT_PAYMENT_CHANNELS = [
+        [
+            'bank' => 'BCA',
+            'account_number' => '1234567890',
+            'account_name' => 'Skynet Lintas Nusantara',
+        ],
+        [
+            'bank' => 'Mandiri',
+            'account_number' => '0987654321',
+            'account_name' => 'Skynet Lintas Nusantara',
+        ],
+    ];
+
     protected $fillable = ['key', 'value', 'type', 'group', 'label'];
 
     /**
@@ -19,8 +31,8 @@ class Setting extends Model
         // Clear cache when updating
         return Cache::rememberForever("setting.{$key}", function () use ($key, $default) {
             $setting = self::where('key', $key)->first();
-            
-            if (!$setting) {
+
+            if (! $setting) {
                 return $default;
             }
 
@@ -44,7 +56,7 @@ class Setting extends Model
                 'value' => $value,
                 'type' => $type,
                 'group' => $group,
-                'label' => $label ?? ucfirst(str_replace('_', ' ', $key))
+                'label' => $label ?? ucfirst(str_replace('_', ' ', $key)),
             ]
         );
 
@@ -58,7 +70,7 @@ class Setting extends Model
     {
         switch ($type) {
             case 'boolean':
-                return (bool) $value;
+                return filter_var($value, FILTER_VALIDATE_BOOLEAN);
             case 'int':
             case 'integer':
                 return (int) $value;

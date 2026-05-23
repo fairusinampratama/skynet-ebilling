@@ -22,13 +22,15 @@ class ScopeCustomersToXlsx extends Command
 
         if (! is_file($path)) {
             $this->error("XLSX file not found: {$path}");
+
             return self::FAILURE;
         }
 
         try {
             $rows = $this->readSheetRows($path);
         } catch (\Throwable $e) {
-            $this->error('Failed to read XLSX: ' . $e->getMessage());
+            $this->error('Failed to read XLSX: '.$e->getMessage());
+
             return self::FAILURE;
         }
 
@@ -36,7 +38,8 @@ class ScopeCustomersToXlsx extends Command
         $missingHeaders = array_values(array_diff($requiredHeaders, array_keys($rows[0] ?? [])));
 
         if ($missingHeaders) {
-            $this->error('Missing required XLSX headers: ' . implode(', ', $missingHeaders));
+            $this->error('Missing required XLSX headers: '.implode(', ', $missingHeaders));
+
             return self::FAILURE;
         }
 
@@ -125,6 +128,7 @@ class ScopeCustomersToXlsx extends Command
                 foreach ($customers as $customer) {
                     if ($customer->trashed()) {
                         $stats['already_soft_deleted_out_of_scope']++;
+
                         continue;
                     }
 
@@ -140,7 +144,7 @@ class ScopeCustomersToXlsx extends Command
         $this->info('Customer XLSX scoping complete.');
 
         foreach ($stats as $label => $count) {
-            $this->line(str_replace('_', ' ', $label) . ": {$count}");
+            $this->line(str_replace('_', ' ', $label).": {$count}");
         }
 
         if ($stats['missing_from_legacy'] > 0) {
@@ -206,6 +210,7 @@ class ScopeCustomersToXlsx extends Command
 
             if ($rowIndex === 0) {
                 $headers = $values;
+
                 continue;
             }
 
@@ -254,7 +259,7 @@ class ScopeCustomersToXlsx extends Command
     private function readZipEntry(string $path, string $entry): string|false
     {
         if (class_exists(\ZipArchive::class)) {
-            $zip = new \ZipArchive();
+            $zip = new \ZipArchive;
             if ($zip->open($path) !== true) {
                 throw new \RuntimeException('Unable to open XLSX archive.');
             }
@@ -265,7 +270,7 @@ class ScopeCustomersToXlsx extends Command
             return $content;
         }
 
-        $command = 'unzip -p ' . escapeshellarg($path) . ' ' . escapeshellarg($entry);
+        $command = 'unzip -p '.escapeshellarg($path).' '.escapeshellarg($entry);
         $content = shell_exec($command);
 
         return $content === null || $content === '' ? false : $content;
@@ -282,7 +287,7 @@ class ScopeCustomersToXlsx extends Command
     }
 
     /**
-     * @param array<int, string> $sharedStrings
+     * @param  array<int, string>  $sharedStrings
      */
     private function readCellValue(\SimpleXMLElement $cell, array $sharedStrings): mixed
     {
@@ -294,6 +299,7 @@ class ScopeCustomersToXlsx extends Command
             foreach ($cell->xpath('.//x:t') as $text) {
                 $parts[] = (string) $text;
             }
+
             return implode('', $parts);
         }
 
@@ -316,6 +322,7 @@ class ScopeCustomersToXlsx extends Command
     private function columnLetters(string $cellRef): string
     {
         preg_match('/^[A-Z]+/', $cellRef, $matches);
+
         return $matches[0] ?? '';
     }
 }

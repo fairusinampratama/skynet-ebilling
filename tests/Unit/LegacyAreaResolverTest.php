@@ -9,7 +9,7 @@ class LegacyAreaResolverTest extends TestCase
 {
     public function test_bedali_code_prefix_maps_to_bedali(): void
     {
-        $result = (new LegacyAreaResolver())->resolve(['id' => 'BDL001']);
+        $result = (new LegacyAreaResolver)->resolve(['id' => 'BDL001']);
 
         $this->assertSame('SKYNET-BEDALI', $result['area']);
         $this->assertSame('prefix', $result['reason']);
@@ -17,7 +17,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_arjosari_code_prefix_maps_to_arjosari(): void
     {
-        $result = (new LegacyAreaResolver())->resolve(['id' => 'ARJ1017']);
+        $result = (new LegacyAreaResolver)->resolve(['id' => 'ARJ1017']);
 
         $this->assertSame('SKYNET-ARJOSARI', $result['area']);
         $this->assertSame('prefix', $result['reason']);
@@ -25,7 +25,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_gkw_code_prefix_maps_to_jambuwer(): void
     {
-        $result = (new LegacyAreaResolver())->resolve(['id' => 'GKW0001']);
+        $result = (new LegacyAreaResolver)->resolve(['id' => 'GKW0001']);
 
         $this->assertSame('SKYNET-JAMBUWER', $result['area']);
         $this->assertSame('prefix', $result['reason']);
@@ -33,7 +33,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_high_confidence_corrected_prefixes_map_to_legacy_location_truth(): void
     {
-        $resolver = new LegacyAreaResolver();
+        $resolver = new LegacyAreaResolver;
 
         $this->assertSame('SKYNET-KARANGPLOSO', $resolver->resolve(['id' => 'LSS001'])['area']);
         $this->assertSame('SKYNET-KARANGPLOSO', $resolver->resolve(['id' => 'REST001'])['area']);
@@ -46,7 +46,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_transaction_only_stub_evidence_maps_to_real_areas(): void
     {
-        $resolver = new LegacyAreaResolver();
+        $resolver = new LegacyAreaResolver;
 
         $this->assertSame('SKYNET-NONGKOJAJAR', $resolver->resolve(['id_pelanggan' => 'NKJ009'])['area']);
         $this->assertSame('SKYNET-BEDALI', $resolver->resolve(['id_pelanggan' => 'SRV1227', 'alamat' => 'PERUM BDL INDAH'])['area']);
@@ -55,7 +55,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_api_area_object_wins_over_conflicting_fallback_evidence(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => 'RDG001',
             'area' => ['name' => 'SUBNET-WAJAK'],
             'package' => ['name' => 'Paket Randuagung'],
@@ -69,7 +69,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_blank_api_area_falls_back_to_prefix_mapping(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => 'RDG001',
             'area' => ['name' => ''],
         ]);
@@ -80,7 +80,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_invalid_api_area_does_not_block_valid_fallback_mapping(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => 'BDL001',
             'area' => ['name' => 'SKYNET-GENERAL'],
         ]);
@@ -91,7 +91,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_package_keyword_maps_to_wajak(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => '2210174501',
             'package' => ['name' => 'Paket up to 5Mb WAJAK'],
         ]);
@@ -102,7 +102,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_legacy_location_variant_maps_to_bedali(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id_pelanggan' => 'CUSTOM001',
             'nama_lokasi' => 'SKYNET -  BEDALI',
         ]);
@@ -113,7 +113,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_historical_glagaharum_address_maps_to_jambuwer(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => 'NUMERIC001',
             'address' => 'Dusun Glagaharum',
         ]);
@@ -124,7 +124,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_historical_cakruan_klopo_kuning_address_maps_to_jambuwer(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => 'NUMERIC002',
             'address' => 'Cakruan Klopo Kuning',
         ]);
@@ -135,7 +135,7 @@ class LegacyAreaResolverTest extends TestCase
 
     public function test_unknown_customer_returns_unmapped_and_never_general(): void
     {
-        $result = (new LegacyAreaResolver())->resolve([
+        $result = (new LegacyAreaResolver)->resolve([
             'id' => 'UNKNOWN001',
             'name' => 'Unknown Customer',
             'address' => 'Unknown Address',

@@ -6,8 +6,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GenerateInvoices extends Command
 {
@@ -36,14 +35,18 @@ class GenerateInvoices extends Command
         $isDryRun = $this->option('dry-run');
 
         // Determine Billing Period (1st of the month)
-        $period = $inputMonth 
+        $period = $inputMonth
             ? Carbon::createFromFormat('Y-m', $inputMonth)->startOfMonth()
             : now()->startOfMonth();
-            
-        $this->info("Billing Period: " . $period->format('F Y'));
+
+        $this->info('Billing Period: '.$period->format('F Y'));
+        Log::info('Billing generation started.', [
+            'period' => $period->toDateString(),
+            'dry_run' => $isDryRun,
+        ]);
         // $this->info("Due Date: " . $dueDate->format('Y-m-d')); // Removed global due date
         if ($isDryRun) {
-            $this->warn("!! DRY RUN MODE - No database changes will be made !!");
+            $this->warn('!! DRY RUN MODE - No database changes will be made !!');
         }
 
         // Fetch eligible customers (Active or Suspended)
@@ -59,7 +62,11 @@ class GenerateInvoices extends Command
             });
 
         $this->newLine();
-        $this->info("Billing generation completed.");
+        $this->info('Billing generation completed.');
+        Log::info('Billing generation completed.', [
+            'period' => $period->toDateString(),
+            'dry_run' => $isDryRun,
+        ]);
     }
 
     private function processCustomer($customer, $period, $isDryRun)
@@ -67,13 +74,13 @@ class GenerateInvoices extends Command
         // Calculate Due Date based on Customer's preferred Due Day
         // Fallback to join_date day, or 20th if all else fails
         $day = $customer->due_day ?? ($customer->join_date ? $customer->join_date->day : 20);
-        
+
         // Handle end of month edge cases (e.g. Due Day 30, but Feb only has 28 days)
         $daysInMonth = $period->daysInMonth;
         $day = min($day, $daysInMonth);
-        
+
         $dueDate = $period->copy()->day($day);
-        
+
         // Check Idempotency: Has an invoice been generated for this period?
         $exists = Invoice::where('customer_id', $customer->id)
             ->where('period', $period->format('Y-m-d'))
@@ -86,9 +93,9 @@ class GenerateInvoices extends Command
 
         $amount = $customer->package->price;
 
-        $this->line("Generating invoice for: <comment>{$customer->name}</comment> (Rp " . number_format($amount) . ") - Due: " . $dueDate->format('Y-m-d'));
+        $this->line("Generating invoice for: <comment>{$customer->name}</comment> (Rp ".number_format($amount).') - Due: '.$dueDate->format('Y-m-d'));
 
-        if (!$isDryRun) {
+        if (! $isDryRun) {
             Invoice::create([
                 'customer_id' => $customer->id,
                 'period' => $period->format('Y-m-d'),

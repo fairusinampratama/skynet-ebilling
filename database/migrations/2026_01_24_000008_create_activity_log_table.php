@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('activity_log')) {
+        if (! Schema::hasTable('activity_log')) {
             Schema::create('activity_log', function (Blueprint $table) {
                 $table->id();
                 $table->string('log_name')->nullable();
@@ -22,7 +22,7 @@ return new class extends Migration
                 $table->nullableMorphs('causer', 'causer');
                 $table->json('properties')->nullable();
                 $table->timestamps();
-                
+
                 $table->index('log_name');
             });
         }

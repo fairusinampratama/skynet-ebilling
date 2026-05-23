@@ -280,7 +280,7 @@
             
             @foreach($manual_accounts as $account)
             <div class="payment-details">
-                <div class="text-bold">{{ $account['bank'] }} A/N {{ $company['name'] }}</div>
+                <div class="text-bold">{{ $account['bank'] }} A/N {{ $account['account_name'] ?? $company['name'] }}</div>
                 <div class="account-number">{{ $account['account_number'] }}</div>
             </div>
             @endforeach

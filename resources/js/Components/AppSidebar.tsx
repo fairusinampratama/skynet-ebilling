@@ -52,7 +52,7 @@ export function AppSidebar() {
             <div className="flex h-16 items-center border-b border-border px-6 bg-card">
                 <Link href="/" className="flex items-center gap-2 font-semibold">
                     <ApplicationLogo className="h-6 w-6 fill-current text-primary" />
-                    <span className="text-lg tracking-tight">Skynet Admin</span>
+                    <span className="text-lg tracking-tight">SkyNet Admin</span>
                 </Link>
             </div>
             <div className="flex-1 overflow-auto py-4 bg-card">

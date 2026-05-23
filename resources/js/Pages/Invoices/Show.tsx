@@ -45,6 +45,7 @@ interface Customer {
 interface Transaction {
     id: number;
     amount: number;
+    status: 'pending' | 'verified' | 'rejected' | 'paid' | 'failed';
     method: string;
     paid_at: string;
     proof_url?: string | null;
@@ -71,12 +72,7 @@ interface Props {
 
 import { PageProps } from '@/types';
 
-const paymentSchema = z.object({
-    amount: requiredNumber('Payment amount', 0),
-    method: z.enum(['cash', 'transfer', 'payment_gateway'], { error: 'Payment method is required.' }),
-    paid_at: requiredString('Payment date'),
-    proof: optionalImage('Payment proof'),
-});
+const payableTransactionStatuses = new Set(['verified', 'paid']);
 
 export default function Show({ invoice }: Props) {
     const { settings, auth } = usePage<PageProps>().props;
@@ -88,9 +84,18 @@ export default function Show({ invoice }: Props) {
     const [voidProcessing, setVoidProcessing] = useState(false);
     const [deleteProcessing, setDeleteProcessing] = useState(false);
 
-    const totalPaid = invoice.transactions.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-    const balance = Number(invoice.amount) - totalPaid;
+    const totalPaid = invoice.transactions
+        .filter((transaction) => payableTransactionStatuses.has(transaction.status))
+        .reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
+    const balance = Math.max(0, Number(invoice.amount) - totalPaid);
     const hasTransactions = invoice.transactions.length > 0;
+    const paymentSchema = z.object({
+        amount: requiredNumber('Payment amount', 0)
+            .refine((amount) => amount <= balance, `Payment amount cannot exceed ${formatCurrency(balance)}.`),
+        method: z.enum(['cash', 'transfer', 'payment_gateway'], { error: 'Payment method is required.' }),
+        paid_at: requiredString('Payment date'),
+        proof: optionalImage('Payment proof'),
+    });
 
     const paymentForm = useForm({
         amount: String(balance),
@@ -122,13 +127,13 @@ export default function Show({ invoice }: Props) {
         });
     };
 
-    const formatCurrency = (amount: number) => {
+    function formatCurrency(amount: number) {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
             minimumFractionDigits: 0,
         }).format(amount);
-    };
+    }
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('id-ID', {

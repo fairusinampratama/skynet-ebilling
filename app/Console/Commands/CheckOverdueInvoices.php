@@ -5,9 +5,9 @@ namespace App\Console\Commands;
 use App\Jobs\IsolateCustomerJob;
 use App\Models\Invoice;
 use App\Models\Setting;
+use App\Services\InvoiceReminderService;
 use Illuminate\Console\Command;
-use Spatie\Activitylog\Facades\LogBatch;
-use Spatie\Activitylog\Models\Activity;
+use Illuminate\Support\Facades\Log;
 
 class CheckOverdueInvoices extends Command
 {
@@ -28,39 +28,48 @@ class CheckOverdueInvoices extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(InvoiceReminderService $reminders)
     {
         $isDryRun = $this->option('dry-run');
         $graceDays = (int) Setting::get('billing_grace_period_days', 7);
-        
-        // Cutoff date is (Today - Grace Period). e.g. If today is 15th and grace is 7, 
+
+        // Cutoff date is (Today - Grace Period). e.g. If today is 15th and grace is 7,
         // invoices due on or before the 8th are now actionable.
         $cutoffDate = now()->subDays($graceDays)->startOfDay();
 
-        $this->info("Checking for overdue invoices due on or before: " . $cutoffDate->format('Y-m-d'));
+        $this->info('Checking for overdue invoices due on or before: '.$cutoffDate->format('Y-m-d'));
+        Log::info('Overdue invoice check started.', [
+            'cutoff_date' => $cutoffDate->toDateString(),
+            'dry_run' => $isDryRun,
+            'grace_days' => $graceDays,
+        ]);
         if ($isDryRun) {
-            $this->warn("!! DRY RUN MODE - No actions will be taken !!");
+            $this->warn('!! DRY RUN MODE - No actions will be taken !!');
         }
 
         // Find unpaid invoices past the cutoff date
         // Only for active customers (don't re-isolate already isolated ones)
         Invoice::where('status', 'unpaid')
-            ->where('due_date', '<', $cutoffDate)
+            ->where('due_date', '<=', $cutoffDate)
             ->whereHas('customer', function ($query) {
                 $query->where('status', 'active');
             })
             ->with('customer')
-            ->chunk(100, function ($invoices) use ($isDryRun, $cutoffDate) {
+            ->chunk(100, function ($invoices) use ($isDryRun, $cutoffDate, $reminders) {
                 foreach ($invoices as $invoice) {
-                    $this->processOverdueInvoice($invoice, $isDryRun, $cutoffDate);
+                    $this->processOverdueInvoice($invoice, $isDryRun, $cutoffDate, $reminders);
                 }
             });
 
         $this->newLine();
-        $this->info("Overdue check completed.");
+        $this->info('Overdue check completed.');
+        Log::info('Overdue invoice check completed.', [
+            'cutoff_date' => $cutoffDate->toDateString(),
+            'dry_run' => $isDryRun,
+        ]);
     }
 
-    private function processOverdueInvoice($invoice, $isDryRun, $cutoffDate)
+    private function processOverdueInvoice($invoice, $isDryRun, $cutoffDate, InvoiceReminderService $reminders)
     {
         $customer = $invoice->customer;
         $daysOverdue = $invoice->due_date->diffInDays(now());
@@ -70,6 +79,11 @@ class CheckOverdueInvoices extends Command
 
         if ($isDryRun) {
             $this->info("   [DRY RUN] Would isolate customer {$customer->name}");
+            $result = $reminders->send($invoice, 'isolation', true);
+            if (($result['status'] ?? null) === 'dry-run') {
+                $this->info('   [DRY RUN] Would send isolation WhatsApp notification');
+            }
+
             return;
         }
 
@@ -82,11 +96,14 @@ class CheckOverdueInvoices extends Command
                 'invoice_id' => $invoice->id,
                 'due_date' => $invoice->due_date->format('Y-m-d'),
                 'days_overdue' => $daysOverdue,
-                'reason' => 'payment_overdue'
+                'reason' => 'payment_overdue',
             ])
             ->log('system_isolation_triggered');
 
         // Dispatch the job
         IsolateCustomerJob::dispatch($customer);
+
+        $result = $reminders->send($invoice, 'isolation');
+        $this->info('   Isolation notification: '.($result['status'] ?? 'skipped'));
     }
 }

@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Area;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Package;
-use App\Models\Area;
 use App\Services\LegacyAreaResolver;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -33,12 +33,14 @@ class ImportLegacyTransactions extends Command
 
         if (! File::exists($path)) {
             $this->error("Transaction JSON not found: {$path}");
+
             return self::FAILURE;
         }
 
         $rows = json_decode(File::get($path), true);
         if (! is_array($rows)) {
             $this->error("Invalid transaction JSON: {$path}");
+
             return self::FAILURE;
         }
 
@@ -52,7 +54,7 @@ class ImportLegacyTransactions extends Command
         $invoiceIdsByCustomerPeriod = Invoice::query()
             ->select('id', 'customer_id', 'period', 'amount', 'status')
             ->get()
-            ->keyBy(fn (Invoice $invoice) => $invoice->customer_id . '|' . $invoice->period->toDateString());
+            ->keyBy(fn (Invoice $invoice) => $invoice->customer_id.'|'.$invoice->period->toDateString());
 
         $stats = [
             'rows' => count($rows),
@@ -83,6 +85,7 @@ class ImportLegacyTransactions extends Command
             if ($customerCode === '') {
                 $stats['skipped_bad_customer_code']++;
                 $bar->advance();
+
                 continue;
             }
 
@@ -97,13 +100,14 @@ class ImportLegacyTransactions extends Command
             if (! $period) {
                 $stats['skipped_bad_period']++;
                 $bar->advance();
+
                 continue;
             }
 
-            $invoice = $invoiceIdsByCustomerPeriod->get($customerId . '|' . $period->toDateString());
+            $invoice = $invoiceIdsByCustomerPeriod->get($customerId.'|'.$period->toDateString());
             if (! $invoice) {
                 $invoice = $this->createStubInvoice($row, $customerId, $customerCode, $period, $now);
-                $invoiceIdsByCustomerPeriod->put($customerId . '|' . $period->toDateString(), $invoice);
+                $invoiceIdsByCustomerPeriod->put($customerId.'|'.$period->toDateString(), $invoice);
                 $stats['created_stub_invoices']++;
             }
 
@@ -117,14 +121,14 @@ class ImportLegacyTransactions extends Command
             $legacyOccurrences[$baseLegacyId] = ($legacyOccurrences[$baseLegacyId] ?? 0) + 1;
             $legacyId = $legacyOccurrences[$baseLegacyId] === 1
                 ? $baseLegacyId
-                : $baseLegacyId . '-' . $legacyOccurrences[$baseLegacyId];
+                : $baseLegacyId.'-'.$legacyOccurrences[$baseLegacyId];
 
             $upsertRows[] = [
                 'legacy_id' => $legacyId,
                 'legacy_customer_code' => $customerCode,
                 'legacy_period' => $period->toDateString(),
                 'invoice_id' => $invoice->id,
-                'reference' => 'LEGACY-' . $legacyId,
+                'reference' => 'LEGACY-'.$legacyId,
                 'channel' => 'manual',
                 'admin_id' => null,
                 'amount' => $amount,
@@ -164,7 +168,7 @@ class ImportLegacyTransactions extends Command
         $this->newLine(2);
 
         foreach ($stats as $label => $count) {
-            $this->line(str_replace('_', ' ', $label) . ": {$count}");
+            $this->line(str_replace('_', ' ', $label).": {$count}");
         }
 
         return self::SUCCESS;
@@ -271,7 +275,7 @@ class ImportLegacyTransactions extends Command
             'address' => $row['alamat'] ?: '-',
             'area_id' => $areaId,
             'package_id' => $fallbackPackageId,
-            'pppoe_user' => $customerCode . '_LEGACY',
+            'pppoe_user' => $customerCode.'_LEGACY',
             'status' => 'terminated',
             'due_day' => 20,
             'created_at' => $now,
@@ -286,7 +290,7 @@ class ImportLegacyTransactions extends Command
         $status = str_contains(strtolower((string) ($row['status_pembayaran'] ?? '')), 'lunas') ? 'paid' : 'unpaid';
         $invoiceId = DB::table('invoices')->insertGetId([
             'uuid' => (string) Str::uuid(),
-            'code' => 'LEGACY-' . $period->format('Ym') . '-' . $customerCode,
+            'code' => 'LEGACY-'.$period->format('Ym').'-'.$customerCode,
             'customer_id' => $customerId,
             'period' => $period->toDateString(),
             'amount' => $amount,

@@ -225,7 +225,7 @@ class ArchiveCustomersNotOnMikrotikTest extends TestCase
     {
         return Package::create([
             'name' => 'Archive Package',
-            'code' => 'PKG-ARCHIVE-' . uniqid(),
+            'code' => 'PKG-ARCHIVE-'.uniqid(),
             'price' => 100000,
         ]);
     }

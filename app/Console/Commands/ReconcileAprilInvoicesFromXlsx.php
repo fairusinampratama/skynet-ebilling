@@ -25,6 +25,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
 
         if (! is_file($path)) {
             $this->error("XLSX file not found: {$path}");
+
             return self::FAILURE;
         }
 
@@ -35,7 +36,8 @@ class ReconcileAprilInvoicesFromXlsx extends Command
         try {
             $rows = $this->readSheetRows($path);
         } catch (\Throwable $e) {
-            $this->error('Failed to read XLSX: ' . $e->getMessage());
+            $this->error('Failed to read XLSX: '.$e->getMessage());
+
             return self::FAILURE;
         }
 
@@ -43,7 +45,8 @@ class ReconcileAprilInvoicesFromXlsx extends Command
         $missingHeaders = array_values(array_diff($requiredHeaders, array_keys($rows[0] ?? [])));
 
         if ($missingHeaders) {
-            $this->error('Missing required XLSX headers: ' . implode(', ', $missingHeaders));
+            $this->error('Missing required XLSX headers: '.implode(', ', $missingHeaders));
+
             return self::FAILURE;
         }
 
@@ -64,18 +67,21 @@ class ReconcileAprilInvoicesFromXlsx extends Command
 
             if (strcasecmp($xlsxStatus, 'Aktif') !== 0) {
                 $stats['skipped_inactive']++;
+
                 continue;
             }
 
             $code = trim((string) ($row['ID Pelanggan'] ?? ''));
             if ($code === '') {
                 $stats['skipped_missing_customer']++;
+
                 continue;
             }
 
             $customer = Customer::with('package')->where('code', $code)->first();
             if (! $customer) {
                 $stats['skipped_missing_customer']++;
+
                 continue;
             }
 
@@ -86,6 +92,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
             $amount = $invoice?->amount ?? $customer->package?->price;
             if ($amount === null) {
                 $stats['skipped_no_package_or_amount']++;
+
                 continue;
             }
 
@@ -105,6 +112,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
 
             if ($dryRun) {
                 $this->line("{$code}: {$targetStatus}");
+
                 continue;
             }
 
@@ -136,7 +144,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
         $this->info('April 2026 invoice reconciliation complete.');
 
         foreach ($stats as $label => $count) {
-            $this->line(str_replace('_', ' ', $label) . ": {$count}");
+            $this->line(str_replace('_', ' ', $label).": {$count}");
         }
 
         return self::SUCCESS;
@@ -198,6 +206,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
 
             if ($rowIndex === 0) {
                 $headers = $values;
+
                 continue;
             }
 
@@ -246,7 +255,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
     private function readZipEntry(string $path, string $entry): string|false
     {
         if (class_exists(\ZipArchive::class)) {
-            $zip = new \ZipArchive();
+            $zip = new \ZipArchive;
             if ($zip->open($path) !== true) {
                 throw new \RuntimeException('Unable to open XLSX archive.');
             }
@@ -257,7 +266,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
             return $content;
         }
 
-        $command = 'unzip -p ' . escapeshellarg($path) . ' ' . escapeshellarg($entry);
+        $command = 'unzip -p '.escapeshellarg($path).' '.escapeshellarg($entry);
         $content = shell_exec($command);
 
         return $content === null || $content === '' ? false : $content;
@@ -274,7 +283,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
     }
 
     /**
-     * @param array<int, string> $sharedStrings
+     * @param  array<int, string>  $sharedStrings
      */
     private function readCellValue(\SimpleXMLElement $cell, array $sharedStrings): mixed
     {
@@ -286,6 +295,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
             foreach ($cell->xpath('.//x:t') as $text) {
                 $parts[] = (string) $text;
             }
+
             return implode('', $parts);
         }
 
@@ -308,6 +318,7 @@ class ReconcileAprilInvoicesFromXlsx extends Command
     private function columnLetters(string $cellRef): string
     {
         preg_match('/^[A-Z]+/', $cellRef, $matches);
+
         return $matches[0] ?? '';
     }
 

@@ -9,7 +9,7 @@ class LegacyAreaCoordinateServiceTest extends TestCase
 {
     public function test_it_parses_normal_coordinates(): void
     {
-        $coordinate = (new LegacyAreaCoordinateService())->parse('-7.858129, 112.686149');
+        $coordinate = (new LegacyAreaCoordinateService)->parse('-7.858129, 112.686149');
 
         $this->assertSame(-7.858129, $coordinate['lat']);
         $this->assertSame(112.686149, $coordinate['lng']);
@@ -17,7 +17,7 @@ class LegacyAreaCoordinateServiceTest extends TestCase
 
     public function test_it_parses_safe_comma_decimal_coordinates(): void
     {
-        $coordinate = (new LegacyAreaCoordinateService())->parse('-7,788014,112.752410');
+        $coordinate = (new LegacyAreaCoordinateService)->parse('-7,788014,112.752410');
 
         $this->assertSame(-7.788014, $coordinate['lat']);
         $this->assertSame(112.752410, $coordinate['lng']);
@@ -25,7 +25,7 @@ class LegacyAreaCoordinateServiceTest extends TestCase
 
     public function test_it_rejects_unusable_coordinates(): void
     {
-        $service = new LegacyAreaCoordinateService();
+        $service = new LegacyAreaCoordinateService;
 
         $this->assertNull($service->parse('0'));
         $this->assertNull($service->parse('0,0'));
@@ -35,7 +35,7 @@ class LegacyAreaCoordinateServiceTest extends TestCase
 
     public function test_it_finds_nearest_centroid(): void
     {
-        $service = new LegacyAreaCoordinateService();
+        $service = new LegacyAreaCoordinateService;
         $centroids = $service->centroids([
             'SKYNET-BEDALI' => [
                 ['lat' => -7.858, 'lng' => 112.686],

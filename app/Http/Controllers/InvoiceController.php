@@ -3,15 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\InvoiceStoreRequest;
-use Illuminate\Http\Request;
-use App\Models\Invoice;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Setting;
 use App\Models\Transaction;
 use App\Support\AreaScope;
 use App\Support\SimpleXlsxWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
-
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InvoiceController extends Controller
@@ -22,9 +21,9 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $query = $this->invoiceIndexQuery($request, [
-            'customer' => function($q) {
+            'customer' => function ($q) {
                 $q->select('id', 'name', 'code')->withTrashed();
-            }
+            },
         ]);
 
         $limit = $request->input('limit', 20);
@@ -35,6 +34,7 @@ class InvoiceController extends Controller
             'filters' => [
                 'search' => $request->search,
                 'status' => $request->status ?? 'all',
+                'period_filter' => $request->period_filter ?? 'all',
                 'limit' => $limit,
             ],
         ]);
@@ -43,7 +43,7 @@ class InvoiceController extends Controller
     public function export(Request $request)
     {
         $query = $this->invoiceIndexQuery($request, [
-            'customer' => function($q) {
+            'customer' => function ($q) {
                 $q->withTrashed()->with(['package:id,name,rate_limit']);
             },
             'transactions.admin',
@@ -74,7 +74,7 @@ class InvoiceController extends Controller
                 $this->paymentStatusLabel($invoice->status),
                 $this->paymentMethodLabel($latestPayment),
                 $latestPayment?->paid_at?->toDateTimeString() ?? '',
-                $latestPayment?->admin ? 'Diinput oleh ' . $latestPayment->admin->name : '',
+                $latestPayment?->admin ? 'Diinput oleh '.$latestPayment->admin->name : '',
             ];
         });
 
@@ -96,7 +96,7 @@ class InvoiceController extends Controller
             'Keterangan',
         ], $rows);
 
-        return response()->download($path, 'invoices-' . now()->format('Ymd-His') . '.xlsx')->deleteFileAfterSend();
+        return response()->download($path, 'invoices-'.now()->format('Ymd-His').'.xlsx')->deleteFileAfterSend();
     }
 
     /**
@@ -107,8 +107,10 @@ class InvoiceController extends Controller
         AreaScope::authorizeInvoice($invoice, request()->user());
 
         $invoice->load([
-            'customer' => function($q) { $q->withTrashed()->with('package'); },
-            'transactions.admin'
+            'customer' => function ($q) {
+                $q->withTrashed()->with('package');
+            },
+            'transactions.admin',
         ]);
 
         return Inertia::render('Invoices/Show', [
@@ -124,9 +126,9 @@ class InvoiceController extends Controller
         AreaScope::authorizeCustomer($customer, request()->user());
 
         $invoices = $customer->invoices()
-                            ->with('transactions')
-                            ->orderBy('period', 'desc')
-                            ->get();
+            ->with('transactions')
+            ->orderBy('period', 'desc')
+            ->get();
 
         return Inertia::render('Customers/Invoices', [
             'customer' => $customer,
@@ -240,21 +242,23 @@ class InvoiceController extends Controller
         AreaScope::authorizeInvoice($invoice, request()->user());
 
         $invoice->load([
-            'customer' => function($q) { $q->withTrashed()->with('package'); },
-            'transactions'
+            'customer' => function ($q) {
+                $q->withTrashed()->with('package');
+            },
+            'transactions',
         ]);
-        
+
         $company = [
             'name' => Setting::get('company_name', 'PT. SKYNET LINTAS NUSANTARA'),
             'address' => Setting::get('company_address', 'Randuagung Gg VIII RT3, RW7, No.01 Singosari - Malang 65153'),
             'email' => 'cs@sky.net.id',
             'phone' => '081252095394',
         ];
-        
-        $manual_accounts = Setting::get('payment_channels', []);
-        
+
+        $manual_accounts = Setting::get('payment_channels', Setting::DEFAULT_PAYMENT_CHANNELS);
+
         $pdf = Pdf::loadView('invoices.pdf', compact('invoice', 'company', 'manual_accounts'));
-        
+
         return $pdf->stream("Invoice-{$invoice->code}.pdf");
     }
 
@@ -286,7 +290,7 @@ class InvoiceController extends Controller
                     $sub->where('code', 'like', "%{$search}%")
                         ->orWhereHas('customer', function ($c) use ($search) {
                             $c->where('name', 'like', "%{$search}%")
-                              ->orWhere('code', 'like', "%{$search}%");
+                                ->orWhere('code', 'like', "%{$search}%");
                         });
                 });
             })
@@ -294,6 +298,9 @@ class InvoiceController extends Controller
                 if ($status !== 'all') {
                     $q->where('status', $status);
                 }
+            })
+            ->when($request->input('period_filter', 'all') !== 'history', function ($q) {
+                $q->whereDate('period', now()->startOfMonth()->toDateString());
             })
             // Default sort: Unpaid first, then newest
             ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
