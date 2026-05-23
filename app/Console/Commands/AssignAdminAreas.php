@@ -32,7 +32,7 @@ class AssignAdminAreas extends Command
             ->values();
 
         if ($missing->isNotEmpty()) {
-            $this->error('Unknown area(s): ' . $missing->implode(', '));
+            $this->error('Unknown area(s): '.$missing->implode(', '));
 
             return self::FAILURE;
         }
@@ -40,7 +40,7 @@ class AssignAdminAreas extends Command
         $user->forceFill(['role' => 'admin'])->save();
         $user->areas()->sync($areas->pluck('id'));
 
-        $this->info("Assigned {$user->email} to " . $areas->pluck('name')->implode(', ') . '.');
+        $this->info("Assigned {$user->email} to ".$areas->pluck('name')->implode(', ').'.');
 
         return self::SUCCESS;
     }

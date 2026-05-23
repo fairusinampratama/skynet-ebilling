@@ -20,6 +20,7 @@ class AuditRouterCustomers extends Command
 
         if ($routers->isEmpty()) {
             $this->warn('No routers found to audit.');
+
             return self::SUCCESS;
         }
 
@@ -67,6 +68,7 @@ class AuditRouterCustomers extends Command
                     'ERROR',
                     $e->getMessage(),
                 ];
+
                 continue;
             } finally {
                 $mikrotik->disconnect();
@@ -171,11 +173,11 @@ class AuditRouterCustomers extends Command
             ->keys();
 
         if ($ebillingDuplicates->isNotEmpty()) {
-            $this->warn('Duplicate eBilling PPPoE usernames: ' . $ebillingDuplicates->implode(', '));
+            $this->warn('Duplicate eBilling PPPoE usernames: '.$ebillingDuplicates->implode(', '));
         }
 
         if ($mikrotikDuplicates->isNotEmpty()) {
-            $this->warn('Duplicate MikroTik PPPoE usernames across routers: ' . $mikrotikDuplicates->implode(', '));
+            $this->warn('Duplicate MikroTik PPPoE usernames across routers: '.$mikrotikDuplicates->implode(', '));
         }
     }
 }

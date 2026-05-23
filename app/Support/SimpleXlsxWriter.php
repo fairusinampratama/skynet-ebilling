@@ -9,8 +9,8 @@ use ZipArchive;
 class SimpleXlsxWriter
 {
     /**
-     * @param array<int, string> $headers
-     * @param iterable<int, array<int, mixed>> $rows
+     * @param  array<int, string>  $headers
+     * @param  iterable<int, array<int, mixed>>  $rows
      */
     public static function create(string $filename, array $headers, iterable $rows): string
     {
@@ -20,7 +20,7 @@ class SimpleXlsxWriter
 
         $directory = self::temporaryDirectory();
 
-        $xlsxPath = tempnam($directory, pathinfo($filename, PATHINFO_FILENAME) . '-');
+        $xlsxPath = tempnam($directory, pathinfo($filename, PATHINFO_FILENAME).'-');
         $sheetPath = tempnam($directory, 'sheet-');
         if ($xlsxPath === false || $sheetPath === false) {
             throw new RuntimeException('Failed to create temporary XLSX export files.');
@@ -47,7 +47,7 @@ class SimpleXlsxWriter
             fclose($sheet);
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($xlsxPath, ZipArchive::OVERWRITE) !== true) {
             File::delete($sheetPath);
             throw new RuntimeException('Failed to create XLSX archive.');
@@ -83,22 +83,23 @@ class SimpleXlsxWriter
     }
 
     /**
-     * @param resource $handle
-     * @param array<int, mixed> $values
+     * @param  resource  $handle
+     * @param  array<int, mixed>  $values
      */
     private static function writeRow($handle, int $rowNumber, array $values, bool $header = false): void
     {
-        fwrite($handle, '<row r="' . $rowNumber . '">');
+        fwrite($handle, '<row r="'.$rowNumber.'">');
 
         foreach (array_values($values) as $index => $value) {
-            $cell = self::columnName($index + 1) . $rowNumber;
+            $cell = self::columnName($index + 1).$rowNumber;
 
             if (! $header && is_numeric($value) && $value !== '') {
-                fwrite($handle, '<c r="' . $cell . '"><v>' . $value . '</v></c>');
+                fwrite($handle, '<c r="'.$cell.'"><v>'.$value.'</v></c>');
+
                 continue;
             }
 
-            fwrite($handle, '<c r="' . $cell . '" t="inlineStr"><is><t>' . self::escape((string) $value) . '</t></is></c>');
+            fwrite($handle, '<c r="'.$cell.'" t="inlineStr"><is><t>'.self::escape((string) $value).'</t></is></c>');
         }
 
         fwrite($handle, '</row>');
@@ -109,7 +110,7 @@ class SimpleXlsxWriter
         $name = '';
         while ($number > 0) {
             $number--;
-            $name = chr(65 + ($number % 26)) . $name;
+            $name = chr(65 + ($number % 26)).$name;
             $number = intdiv($number, 26);
         }
 
@@ -124,35 +125,35 @@ class SimpleXlsxWriter
     private static function contentTypesXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-            . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-            . '<Default Extension="xml" ContentType="application/xml"/>'
-            . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-            . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-            . '</Types>';
+            .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            .'<Default Extension="xml" ContentType="application/xml"/>'
+            .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            .'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            .'</Types>';
     }
 
     private static function rootRelationshipsXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
-            . '</Relationships>';
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            .'</Relationships>';
     }
 
     private static function workbookXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            . '<sheets><sheet name="Export" sheetId="1" r:id="rId1"/></sheets>'
-            . '</workbook>';
+            .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            .'<sheets><sheet name="Export" sheetId="1" r:id="rId1"/></sheets>'
+            .'</workbook>';
     }
 
     private static function workbookRelationshipsXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-            . '</Relationships>';
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            .'</Relationships>';
     }
 }

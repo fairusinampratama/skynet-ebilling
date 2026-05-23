@@ -194,6 +194,7 @@ class IsolationFeatureTest extends TestCase
         $mikrotik->shouldReceive('connect')->once()->with(Mockery::on(fn ($value) => $value->is($router)))->andReturnSelf();
         $mikrotik->shouldReceive('isolateUser')->once()->with('user.iso')->andReturnUsing(function () use ($customer) {
             $customer->update(['previous_profile' => '20MB']);
+
             return true;
         });
         $mikrotik->shouldReceive('disconnect')->once();
@@ -221,6 +222,7 @@ class IsolationFeatureTest extends TestCase
         $mikrotik->shouldReceive('connect')->once()->with(Mockery::on(fn ($value) => $value->is($router)))->andReturnSelf();
         $mikrotik->shouldReceive('reconnectUser')->once()->with($customer->pppoe_user, 'PACKAGE_PROFILE')->andReturnUsing(function () use ($customer) {
             $customer->update(['previous_profile' => null]);
+
             return true;
         });
         $mikrotik->shouldReceive('disconnect')->once();
@@ -285,8 +287,8 @@ class IsolationFeatureTest extends TestCase
     private function router(array $overrides = []): Router
     {
         return Router::create(array_merge([
-            'name' => 'Test Router ' . uniqid(),
-            'ip_address' => '10.10.10.' . rand(1, 254),
+            'name' => 'Test Router '.uniqid(),
+            'ip_address' => '10.10.10.'.rand(1, 254),
             'username' => 'admin',
             'password' => 'secret',
             'port' => 8728,
@@ -304,11 +306,11 @@ class IsolationFeatureTest extends TestCase
         ]);
 
         return Customer::create(array_merge([
-            'code' => 'CUST-' . strtoupper(substr(uniqid(), -6)),
+            'code' => 'CUST-'.strtoupper(substr(uniqid(), -6)),
             'name' => 'Isolation Customer',
             'phone' => '081234567890',
             'address' => 'Isolation Address',
-            'pppoe_user' => 'user.' . substr(uniqid(), -6),
+            'pppoe_user' => 'user.'.substr(uniqid(), -6),
             'package_id' => $package->id,
             'status' => 'active',
         ], $overrides));
@@ -331,9 +333,7 @@ class FakeIsolationMikrotikService extends MikrotikService
 {
     public ?string $lastSetProfile = null;
 
-    public function __construct(private array $profiles, public array $secret)
-    {
-    }
+    public function __construct(private array $profiles, public array $secret) {}
 
     public function connect(Router $router, array $options = []): self
     {
@@ -342,9 +342,7 @@ class FakeIsolationMikrotikService extends MikrotikService
         return $this;
     }
 
-    protected function ensureConnected(): void
-    {
-    }
+    protected function ensureConnected(): void {}
 
     public function getProfiles(): array
     {
@@ -362,7 +360,5 @@ class FakeIsolationMikrotikService extends MikrotikService
         $this->secret['profile'] = $profile;
     }
 
-    public function kickUser(string $username): void
-    {
-    }
+    public function kickUser(string $username): void {}
 }

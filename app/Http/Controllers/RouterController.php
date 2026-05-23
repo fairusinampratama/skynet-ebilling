@@ -5,9 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\RouterStoreRequest;
 use App\Http\Requests\RouterUpdateRequest;
 use App\Jobs\SyncRouterJob;
-use Illuminate\Http\Request;
-
 use App\Models\Router;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class RouterController extends Controller
@@ -81,7 +80,7 @@ class RouterController extends Controller
             'stagedCustomers as staged_unmatched_customers_count' => fn ($query) => $query->where('status', 'unmatched'),
         ]);
         // Customers will be loaded lazily via API
-        
+
         return Inertia::render('Routers/Show', [
             'router' => $router,
         ]);
@@ -144,7 +143,7 @@ class RouterController extends Controller
 
         try {
             $payload = \Cache::remember($cacheKey, now()->addSeconds(60), function () use ($router) {
-                $mikrotik = new \App\Services\MikrotikService();
+                $mikrotik = new \App\Services\MikrotikService;
                 $mikrotik->connect($router, ['timeout' => 5, 'attempts' => 1]);
 
                 try {
@@ -242,21 +241,22 @@ class RouterController extends Controller
      */
     public function scanRouter(Router $router)
     {
-        if (!$router->is_active) {
+        if (! $router->is_active) {
             return back()->with('error', "Cannot scan inactive router. Please enable it first or 'Test Connection'.");
         }
 
         try {
             \Log::info("Initiating synchronous scan for router: {$router->name} (ID: {$router->id})");
-            
+
             $syncService = app(\App\Services\RouterSyncService::class);
             $stats = $syncService->syncCustomers($router);
-            
+
             $message = "Scan completed. Mapped: {$stats['mapped']}, Router-only staged: {$stats['staged_router_only']}, eBilling missing: {$stats['not_found_ebilling']}";
-            
+
             return back()->with('success', $message);
         } catch (\Exception $e) {
             \Log::error("Scan failed for {$router->name}: {$e->getMessage()}");
+
             return back()->with('error', "Failed to scan: {$e->getMessage()}");
         }
     }
@@ -298,7 +298,7 @@ class RouterController extends Controller
             'total' => $routers->count(),
             'synced' => 0,
             'failed' => 0,
-            'errors' => []
+            'errors' => [],
         ];
 
         foreach ($routers as $router) {
@@ -309,6 +309,7 @@ class RouterController extends Controller
             if ($isLocked) {
                 $results['failed']++;
                 $results['errors'][] = "{$router->name}: already {$router->sync_status}";
+
                 continue;
             }
 

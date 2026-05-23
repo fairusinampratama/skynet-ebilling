@@ -3,16 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PaymentStoreRequest;
+use App\Jobs\ReconnectCustomerJob;
 use App\Models\Invoice;
 use App\Models\Transaction;
 use App\Support\AreaScope;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
-
-use App\Jobs\ReconnectCustomerJob;
-use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -74,7 +71,7 @@ class PaymentController extends Controller
             // Create transaction. Manual admin-entered payments are considered verified.
             Transaction::create([
                 'invoice_id' => $invoice->id,
-                'reference' => 'MANUAL-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6)),
+                'reference' => 'MANUAL-'.now()->format('YmdHis').'-'.strtoupper(Str::random(6)),
                 'admin_id' => auth()->id(),
                 'amount' => $validated['amount'],
                 'status' => 'verified',
@@ -101,20 +98,5 @@ class PaymentController extends Controller
 
         return redirect()->route('invoices.show', $invoice)
             ->with('success', 'Payment recorded successfully.');
-    }
-
-    /**
-     * Bulk import payments from CSV
-     */
-    public function bulkImport(Request $request)
-    {
-        $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt',
-        ]);
-
-        // TODO: Implement CSV parsing and payment matching
-        // This is marked as MVP+ in the spec
-
-        return back()->with('success', 'CSV uploaded. Processing payments...');
     }
 }

@@ -76,7 +76,7 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
     private function createPackage(): Package
     {
         return Package::create([
-            'code' => 'PKG-' . uniqid(),
+            'code' => 'PKG-'.uniqid(),
             'name' => 'Paket Test',
             'price' => 111000,
         ]);
@@ -86,7 +86,7 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
     {
         return Customer::create([
             'code' => $code,
-            'name' => 'Customer ' . $code,
+            'name' => 'Customer '.$code,
             'phone' => '08123456789',
             'address' => 'Test Address',
             'pppoe_user' => strtolower($code),
@@ -105,24 +105,24 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
     }
 
     /**
-     * @param array<int, array{0: string, 1: string, 2: string|int}> $rows
+     * @param  array<int, array{0: string, 1: string, 2: string|int}>  $rows
      */
     private function makeXlsx(array $rows): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'april-xlsx-') . '.xlsx';
-        $dir = sys_get_temp_dir() . '/april-xlsx-dir-' . uniqid();
+        $path = tempnam(sys_get_temp_dir(), 'april-xlsx-').'.xlsx';
+        $dir = sys_get_temp_dir().'/april-xlsx-dir-'.uniqid();
 
-        mkdir($dir . '/_rels', 0777, true);
-        mkdir($dir . '/xl/_rels', 0777, true);
-        mkdir($dir . '/xl/worksheets', 0777, true);
+        mkdir($dir.'/_rels', 0777, true);
+        mkdir($dir.'/xl/_rels', 0777, true);
+        mkdir($dir.'/xl/worksheets', 0777, true);
 
-        file_put_contents($dir . '/[Content_Types].xml', $this->contentTypesXml());
-        file_put_contents($dir . '/_rels/.rels', $this->rootRelsXml());
-        file_put_contents($dir . '/xl/workbook.xml', $this->workbookXml());
-        file_put_contents($dir . '/xl/_rels/workbook.xml.rels', $this->workbookRelsXml());
-        file_put_contents($dir . '/xl/worksheets/sheet1.xml', $this->sheetXml($rows));
+        file_put_contents($dir.'/[Content_Types].xml', $this->contentTypesXml());
+        file_put_contents($dir.'/_rels/.rels', $this->rootRelsXml());
+        file_put_contents($dir.'/xl/workbook.xml', $this->workbookXml());
+        file_put_contents($dir.'/xl/_rels/workbook.xml.rels', $this->workbookRelsXml());
+        file_put_contents($dir.'/xl/worksheets/sheet1.xml', $this->sheetXml($rows));
 
-        $command = 'cd ' . escapeshellarg($dir) . ' && zip -qr ' . escapeshellarg($path) . ' .';
+        $command = 'cd '.escapeshellarg($dir).' && zip -qr '.escapeshellarg($path).' .';
         exec($command, $output, $exitCode);
 
         if ($exitCode !== 0) {
@@ -153,7 +153,7 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
         foreach ($rows as $index => $row) {
             $xmlRows[] = $this->rowXml($index + 2, [
                 $row[0],
-                'Customer ' . $row[0],
+                'Customer '.$row[0],
                 'Address',
                 '08123456789',
                 strtolower($row[0]),
@@ -168,9 +168,9 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
         }
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            . '<sheetData>' . implode('', $xmlRows) . '</sheetData>'
-            . '</worksheet>';
+            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            .'<sheetData>'.implode('', $xmlRows).'</sheetData>'
+            .'</worksheet>';
     }
 
     private function rowXml(int $rowNumber, array $values): string
@@ -178,19 +178,20 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
         $cells = [];
         foreach ($values as $index => $value) {
             $column = $this->columnName($index + 1);
-            $ref = $column . $rowNumber;
+            $ref = $column.$rowNumber;
 
             if (is_int($value) || is_float($value)) {
-                $cells[] = '<c r="' . $ref . '"><v>' . $value . '</v></c>';
+                $cells[] = '<c r="'.$ref.'"><v>'.$value.'</v></c>';
+
                 continue;
             }
 
-            $cells[] = '<c r="' . $ref . '" t="inlineStr"><is><t>'
-                . htmlspecialchars((string) $value, ENT_XML1)
-                . '</t></is></c>';
+            $cells[] = '<c r="'.$ref.'" t="inlineStr"><is><t>'
+                .htmlspecialchars((string) $value, ENT_XML1)
+                .'</t></is></c>';
         }
 
-        return '<row r="' . $rowNumber . '">' . implode('', $cells) . '</row>';
+        return '<row r="'.$rowNumber.'">'.implode('', $cells).'</row>';
     }
 
     private function columnName(int $number): string
@@ -198,7 +199,7 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
         $name = '';
         while ($number > 0) {
             $number--;
-            $name = chr(65 + ($number % 26)) . $name;
+            $name = chr(65 + ($number % 26)).$name;
             $number = intdiv($number, 26);
         }
 
@@ -208,35 +209,35 @@ class ReconcileAprilInvoicesFromXlsxTest extends TestCase
     private function contentTypesXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-            . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-            . '<Default Extension="xml" ContentType="application/xml"/>'
-            . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-            . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-            . '</Types>';
+            .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            .'<Default Extension="xml" ContentType="application/xml"/>'
+            .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            .'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            .'</Types>';
     }
 
     private function rootRelsXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
-            . '</Relationships>';
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            .'</Relationships>';
     }
 
     private function workbookXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-            . '<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>'
-            . '</workbook>';
+            .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            .'<sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>'
+            .'</workbook>';
     }
 
     private function workbookRelsXml(): string
     {
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-            . '</Relationships>';
+            .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            .'</Relationships>';
     }
 }

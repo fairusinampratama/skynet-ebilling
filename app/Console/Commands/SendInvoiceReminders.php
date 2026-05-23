@@ -28,7 +28,7 @@ class SendInvoiceReminders extends Command
         $date = $this->processingDate();
         $dryRun = (bool) $this->option('dry-run');
 
-        $this->info('Invoice reminder date: ' . $date->toDateString());
+        $this->info('Invoice reminder date: '.$date->toDateString());
         Log::info('Invoice reminder run started.', [
             'date' => $date->toDateString(),
             'dry_run' => $dryRun,
@@ -85,7 +85,7 @@ class SendInvoiceReminders extends Command
                 $stats[$status] = ($stats[$status] ?? 0) + 1;
 
                 if ($status === 'skipped') {
-                    $this->line(" - skipped {$invoice->code}: " . ($result['reason'] ?? 'unknown'));
+                    $this->line(" - skipped {$invoice->code}: ".($result['reason'] ?? 'unknown'));
                 }
             }
         });

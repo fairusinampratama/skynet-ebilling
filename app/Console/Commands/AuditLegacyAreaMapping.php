@@ -56,7 +56,7 @@ class AuditLegacyAreaMapping extends Command
                 'legacy_area' => $legacyArea ?? '',
                 'prefix' => $prefix ?? '',
                 'prefix_area' => $prefixArea ?? '',
-                'coordinate' => $coordinate ? $coordinate['lat'] . ',' . $coordinate['lng'] : '',
+                'coordinate' => $coordinate ? $coordinate['lat'].','.$coordinate['lng'] : '',
                 'nearest_centroid_area' => $nearest['area'] ?? '',
                 'nearest_centroid_km' => isset($nearest['distance_km']) ? (string) round($nearest['distance_km'], 3) : '',
                 'transaction_address_evidence' => $evidence ?? '',
@@ -70,8 +70,8 @@ class AuditLegacyAreaMapping extends Command
             }
         }
 
-        $this->line('Total customers audited: ' . count($rows));
-        $this->line('Suspicious mappings: ' . count($suspicious));
+        $this->line('Total customers audited: '.count($rows));
+        $this->line('Suspicious mappings: '.count($suspicious));
 
         if ($this->option('write-report')) {
             $this->writeReports($rows, $suspicious);
@@ -89,8 +89,8 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<string, mixed> $customer
-     * @param array{area: string, distance_km: float}|null $nearest
+     * @param  array<string, mixed>  $customer
+     * @param  array{area: string, distance_km: float}|null  $nearest
      * @return array{0: string, 1: string, 2: bool}
      */
     private function classify(?string $resolverArea, ?string $legacyArea, ?string $prefixArea, ?array $nearest): array
@@ -126,7 +126,7 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, mixed> $customers
+     * @param  array<int, mixed>  $customers
      * @return array<string, array{lat: float, lng: float, count: int}>
      */
     private function areaCentroids(array $customers, LegacyAreaResolver $resolver, LegacyAreaCoordinateService $coordinates): array
@@ -215,7 +215,7 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<string, mixed> $customer
+     * @param  array<string, mixed>  $customer
      */
     private function legacyArea(array $customer, LegacyAreaResolver $resolver): ?string
     {
@@ -230,7 +230,7 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<string, mixed> $customer
+     * @param  array<string, mixed>  $customer
      */
     private function customerCode(array $customer): string
     {
@@ -264,8 +264,8 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, array<string, string>> $rows
-     * @param array<int, array<string, string>> $suspicious
+     * @param  array<int, array<string, string>>  $rows
+     * @param  array<int, array<string, string>>  $suspicious
      */
     private function writeReports(array $rows, array $suspicious): void
     {
@@ -288,7 +288,7 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, array<string, string>> $rows
+     * @param  array<int, array<string, string>>  $rows
      */
     private function writeCsv(string $path, array $rows): void
     {
@@ -326,7 +326,7 @@ class AuditLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, array<string, string>> $rows
+     * @param  array<int, array<string, string>>  $rows
      */
     private function writeJson(string $path, array $rows): void
     {

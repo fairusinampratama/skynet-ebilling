@@ -9,9 +9,13 @@ use Illuminate\Support\Facades\Log;
 class WhatspieService
 {
     protected string $baseUrl = 'https://api.whatspie.com';
+
     protected ?string $apiKey;
+
     protected ?string $deviceId;
+
     protected bool $enabled;
+
     protected ?string $testNumber;
 
     public function __construct()
@@ -26,8 +30,8 @@ class WhatspieService
     /**
      * Send a text message to a phone number.
      *
-     * @param string $phone The recipient's phone number (local format 08xxx is fine, will be converted)
-     * @param string $message The message content
+     * @param  string  $phone  The recipient's phone number (local format 08xxx is fine, will be converted)
+     * @param  string  $message  The message content
      * @return array|null The response data, with ok=false on handled failure, or null on unexpected failure
      */
     public function sendMessage(string $phone, string $message): ?array
@@ -52,7 +56,7 @@ class WhatspieService
 
         // Format phone number: convert 08xxx to 628xxx
         $formattedPhone = $this->formatPhoneNumber($phone);
-        
+
         // Ensure Device ID is clean
         $deviceId = trim($this->deviceId);
 
@@ -62,11 +66,12 @@ class WhatspieService
             // Otherwise, just simulate a success response to avoid spamming real users locally.
             if (empty($this->testNumber) || $this->formatPhoneNumber($this->testNumber) !== $formattedPhone) {
                 Log::info("[LOCAL SAFEGUARD] Simulated WhatsApp to {$formattedPhone}: {$message}");
+
                 return [
                     'ok' => true,
                     'status' => 'success',
                     'message' => 'Simulated message in local environment',
-                    'simulated' => true
+                    'simulated' => true,
                 ];
             }
         }
@@ -74,7 +79,7 @@ class WhatspieService
         try {
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
-                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Authorization' => 'Bearer '.$this->apiKey,
             ])->post("{$this->baseUrl}/messages", [
                 'device' => $deviceId,
                 'receiver' => $formattedPhone,
@@ -92,7 +97,7 @@ class WhatspieService
                     'http_status' => $response->status(),
                 ]);
             } else {
-                Log::error("Whatspie Error: " . $response->body());
+                Log::error('Whatspie Error: '.$response->body());
 
                 return [
                     'ok' => false,
@@ -101,7 +106,7 @@ class WhatspieService
                 ];
             }
         } catch (\Exception $e) {
-            Log::error("Whatspie Exception: " . $e->getMessage());
+            Log::error('Whatspie Exception: '.$e->getMessage());
 
             return [
                 'ok' => false,
@@ -133,7 +138,7 @@ class WhatspieService
         try {
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
-                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Authorization' => 'Bearer '.$this->apiKey,
             ])->get("{$this->baseUrl}/devices");
 
             if (! $response->successful()) {
@@ -210,12 +215,12 @@ class WhatspieService
         // Remove leading zeros beyond one (e.g. 0008 -> keep processing)
         // 08xxxxxxxxx -> 628xxxxxxxxx
         if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
+            $phone = '62'.substr($phone, 1);
         }
 
         // 8xxxxxxxxx (without country code) -> 628xxxxxxxxx
         elseif (str_starts_with($phone, '8')) {
-            $phone = '62' . $phone;
+            $phone = '62'.$phone;
         }
 
         // Already correct: 62xxxxxxxxx — no change needed

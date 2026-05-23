@@ -17,6 +17,7 @@ class IsolateCustomerJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
+
     public $backoff = [60, 180, 600]; // 1min, 3min, 10min
 
     /**
@@ -35,23 +36,25 @@ class IsolateCustomerJob implements ShouldQueue
         $this->customer->refresh();
 
         // Check if customer has a router assigned
-        if (!$this->customer->router_id || !$this->customer->router) {
+        if (! $this->customer->router_id || ! $this->customer->router) {
             Log::warning("Customer {$this->customer->name} has no router assigned. Skipping isolation.");
             activity()
                 ->causedBy(auth()->user() ?? null)
                 ->performedOn($this->customer)
                 ->withProperties(['reason' => 'no_router_assigned'])
                 ->log('isolation_skipped');
+
             return;
         }
 
-        if (!$this->customer->pppoe_user) {
+        if (! $this->customer->pppoe_user) {
             Log::warning("Customer {$this->customer->name} has no PPPoE username. Skipping isolation.");
             activity()
                 ->causedBy(auth()->user() ?? null)
                 ->performedOn($this->customer)
                 ->withProperties(['reason' => 'no_pppoe_user'])
                 ->log('isolation_skipped');
+
             return;
         }
 
@@ -90,9 +93,9 @@ class IsolateCustomerJob implements ShouldQueue
             } else {
                 // PPPoE secret not found on router - this is a critical error
                 $errorMsg = "PPPoE user '{$this->customer->pppoe_user}' not found on router '{$router->name}'";
-                
+
                 Log::error($errorMsg);
-                
+
                 activity()
                     ->causedBy(auth()->user() ?? null)
                     ->performedOn($this->customer)
@@ -102,15 +105,15 @@ class IsolateCustomerJob implements ShouldQueue
                         'pppoe_user' => $this->customer->pppoe_user,
                     ])
                     ->log('isolation_failed');
-                
+
                 throw new Exception($errorMsg);
             }
 
         } catch (Exception $e) {
             $isConfigError = str_contains($e->getMessage(), 'Isolation profile');
-            
-            Log::error("Failed to isolate customer {$this->customer->name}: " . $e->getMessage());
-            
+
+            Log::error("Failed to isolate customer {$this->customer->name}: ".$e->getMessage());
+
             // Log the failure
             activity()
                 ->causedBy(auth()->user() ?? null)
@@ -118,12 +121,12 @@ class IsolateCustomerJob implements ShouldQueue
                 ->withProperties([
                     'error' => $e->getMessage(),
                     'router' => $router->name,
-                    'is_config_error' => $isConfigError
+                    'is_config_error' => $isConfigError,
                 ])
                 ->log('isolation_failed');
 
             // Retry logic (Skip retry if it's a configuration error)
-            if (!$isConfigError && $this->attempts() < $this->tries) {
+            if (! $isConfigError && $this->attempts() < $this->tries) {
                 $this->release($this->backoff[$this->attempts() - 1] ?? 600);
             } else {
                 $this->fail($e);

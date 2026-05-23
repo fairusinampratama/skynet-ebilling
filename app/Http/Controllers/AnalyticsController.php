@@ -31,7 +31,7 @@ class AnalyticsController extends Controller
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
 
-        $cacheKey = "analytics.revenue_trend.{$months}." . $this->cacheScopeKey($user);
+        $cacheKey = "analytics.revenue_trend.{$months}.".$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -60,7 +60,7 @@ class AnalyticsController extends Controller
     {
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
-        $cacheKey = 'analytics.mrr.' . $this->cacheScopeKey($user);
+        $cacheKey = 'analytics.mrr.'.$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -112,7 +112,7 @@ class AnalyticsController extends Controller
     {
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
-        $cacheKey = 'analytics.collection_rate.' . $this->cacheScopeKey($user);
+        $cacheKey = 'analytics.collection_rate.'.$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -121,11 +121,11 @@ class AnalyticsController extends Controller
         $data = Cache::remember($cacheKey, 3600, function () use ($user) {
             $currentPeriod = now()->startOfMonth()->format('Y-m-d');
 
-            $statsQuery = Invoice::selectRaw("
+            $statsQuery = Invoice::selectRaw('
                     status,
                     COUNT(*) as count,
                     SUM(amount) as total_amount
-                ")
+                ')
                 ->where('period', $currentPeriod);
             AreaScope::applyToInvoices($statsQuery, $user);
             $stats = $statsQuery->groupBy('status')->get()->keyBy('status');
@@ -162,7 +162,7 @@ class AnalyticsController extends Controller
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
 
-        $cacheKey = "analytics.revenue_by_area.{$months}." . $this->cacheScopeKey($user);
+        $cacheKey = "analytics.revenue_by_area.{$months}.".$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -206,7 +206,7 @@ class AnalyticsController extends Controller
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
 
-        $cacheKey = "analytics.package_performance.{$months}." . $this->cacheScopeKey($user);
+        $cacheKey = "analytics.package_performance.{$months}.".$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -219,12 +219,12 @@ class AnalyticsController extends Controller
                         ->where('invoices.period', '>=', now()->subMonths($months)->startOfMonth());
                 })
                 ->whereIn('customers.status', ['active', 'isolated'])
-                ->selectRaw("
+                ->selectRaw('
                     packages.name as package_name,
                     packages.price,
                     COUNT(DISTINCT customers.id) as active_customers,
                     COALESCE(SUM(invoices.amount), 0) as total_revenue
-                ");
+                ');
             AreaScope::applyToCustomers($query, $user);
 
             return $query->groupBy('packages.id', 'packages.name', 'packages.price')
@@ -244,18 +244,18 @@ class AnalyticsController extends Controller
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
 
-        $cacheKey = "analytics.payment_methods.{$months}." . $this->cacheScopeKey($user);
+        $cacheKey = "analytics.payment_methods.{$months}.".$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
         }
 
         $data = Cache::remember($cacheKey, 3600, function () use ($months, $user) {
-            $query = Transaction::selectRaw("
+            $query = Transaction::selectRaw('
                     method,
                     COUNT(*) as transaction_count,
                     SUM(amount) as total_amount
-                ")
+                ')
                 ->where('paid_at', '>=', now()->subMonths($months));
             AreaScope::applyToTransactions($query, $user);
 
@@ -272,7 +272,7 @@ class AnalyticsController extends Controller
     {
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
-        $cacheKey = 'analytics.outstanding_aging.' . $this->cacheScopeKey($user);
+        $cacheKey = 'analytics.outstanding_aging.'.$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -310,7 +310,7 @@ class AnalyticsController extends Controller
         $refresh = $request->boolean('refresh', false);
         $user = $request->user();
 
-        $cacheKey = "analytics.customer_growth.{$months}." . $this->cacheScopeKey($user);
+        $cacheKey = "analytics.customer_growth.{$months}.".$this->cacheScopeKey($user);
 
         if ($refresh) {
             Cache::forget($cacheKey);
@@ -327,10 +327,10 @@ class AnalyticsController extends Controller
             $newCustomers = $newCustomersQuery->groupBy('month')->orderBy('month')->get()->keyBy('month');
 
             // Active/Isolated count by month (current snapshot)
-            $statusCountsQuery = Customer::ebilling()->selectRaw("
+            $statusCountsQuery = Customer::ebilling()->selectRaw('
                     status,
                     COUNT(*) as count
-                ")
+                ')
                 ->whereIn('status', ['active', 'isolated', 'terminated']);
             AreaScope::applyToCustomers($statusCountsQuery, $user);
             $statusCounts = $statusCountsQuery->groupBy('status')->get()->keyBy('status');
@@ -356,6 +356,6 @@ class AnalyticsController extends Controller
 
         $areaIds = $user->accessibleAreaIds()->sort()->values()->implode('-');
 
-        return 'admin.scoped.' . ($areaIds ?: 'none');
+        return 'admin.scoped.'.($areaIds ?: 'none');
     }
 }

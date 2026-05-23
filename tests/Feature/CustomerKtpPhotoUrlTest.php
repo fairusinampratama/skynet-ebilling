@@ -50,7 +50,7 @@ class CustomerKtpPhotoUrlTest extends TestCase
     {
         return Package::create([
             'name' => 'KTP Package',
-            'code' => 'KTP-PKG-' . uniqid(),
+            'code' => 'KTP-PKG-'.uniqid(),
             'price' => 100000,
         ]);
     }

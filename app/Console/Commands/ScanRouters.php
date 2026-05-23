@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 class ScanRouters extends Command
 {
     protected $signature = 'routers:scan {router?} {--force}';
+
     protected $description = 'Scan specific or all active routers for customers and map them to the database';
 
     public function handle()
@@ -24,10 +25,11 @@ class ScanRouters extends Command
 
         if ($routers->isEmpty()) {
             $this->warn('No active routers found to scan.');
+
             return;
         }
 
-        $this->info("Scanning " . $routers->count() . " router(s)...");
+        $this->info('Scanning '.$routers->count().' router(s)...');
 
         $syncService = app(RouterSyncService::class);
 
@@ -36,14 +38,14 @@ class ScanRouters extends Command
 
             try {
                 $stats = $syncService->syncCustomers($router);
-                
+
                 $this->table(
                     ['Mapped', 'Unmatched MikroTik', 'eBilling Not Found'],
                     [[$stats['mapped'], $stats['unmatched_mikrotik'], $stats['not_found_ebilling']]]
                 );
 
             } catch (\Exception $e) {
-                $this->error("Scan failed for {$router->name}: " . $e->getMessage());
+                $this->error("Scan failed for {$router->name}: ".$e->getMessage());
             }
         }
 

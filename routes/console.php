@@ -17,9 +17,6 @@ Schedule::command('billing:check-overdue')
     ->dailyAt('08:00')
     ->description('Check overdue invoices and isolate delinquent customers');
 
-
-
-
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

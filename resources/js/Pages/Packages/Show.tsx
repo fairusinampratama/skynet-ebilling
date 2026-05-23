@@ -27,6 +27,12 @@ interface Package {
     id: number;
     name: string;
     price: number;
+    mikrotik_profile?: string | null;
+    rate_limit?: string | null;
+    router?: {
+        id: number;
+        name: string;
+    } | null;
     customers_count: number;
     customers?: Customer[];
 }
@@ -197,6 +203,18 @@ export default function Show({ package: pkg }: Props) {
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Price</p>
                                     <p className="text-base font-semibold mt-1">{formatCurrency(pkg.price)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Router</p>
+                                    <p className="text-base font-semibold mt-1">{pkg.router?.name || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">MikroTik Profile</p>
+                                    <p className="text-base font-mono font-semibold mt-1">{pkg.mikrotik_profile || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Rate Limit</p>
+                                    <p className="text-base font-mono font-semibold mt-1">{pkg.rate_limit || '-'}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Active Subscriptions</p>

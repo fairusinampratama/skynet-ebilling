@@ -83,11 +83,11 @@ class AuditLegacyAreaMappingCommandTest extends TestCase
     }
 
     /**
-     * @param array<int, array<string, mixed>> $rows
+     * @param  array<int, array<string, mixed>>  $rows
      */
     private function jsonFile(array $rows): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'legacy-area-audit-') . '.json';
+        $path = tempnam(sys_get_temp_dir(), 'legacy-area-audit-').'.json';
         file_put_contents($path, json_encode($rows, JSON_THROW_ON_ERROR));
 
         return $path;

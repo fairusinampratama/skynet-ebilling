@@ -2,14 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Models\Customer;
 use App\Models\WaCampaign;
 use App\Models\WaCampaignRecipient;
-use App\Models\Customer;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 
 class ProcessWaCampaign implements ShouldQueue
 {
@@ -17,16 +17,14 @@ class ProcessWaCampaign implements ShouldQueue
 
     public $timeout = 300;
 
-    public function __construct(public WaCampaign $campaign)
-    {
-    }
+    public function __construct(public WaCampaign $campaign) {}
 
     public function handle(): void
     {
         $this->campaign->update(['status' => 'processing']);
 
         $query = Customer::whereNotNull('phone');
-        
+
         if ($this->campaign->target_type === 'active') {
             $query->where('status', 'active');
         } elseif ($this->campaign->target_type === 'isolated') {
@@ -43,6 +41,7 @@ class ProcessWaCampaign implements ShouldQueue
 
         if ($customers->count() === 0) {
             $this->campaign->update(['status' => 'completed']);
+
             return;
         }
 

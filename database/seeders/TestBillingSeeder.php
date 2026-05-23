@@ -2,10 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Customer;
 use App\Models\Package;
-use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 class TestBillingSeeder extends Seeder
@@ -37,7 +36,7 @@ class TestBillingSeeder extends Seeder
         // 1. Customer H-5 (Due in 5 days)
         // If today is Feb 2nd, Due date should be Feb 7th.
         // So Join Date should be 7th of any month.
-        $dateH5 = now()->addDays(5); 
+        $dateH5 = now()->addDays(5);
 
         Customer::create([
             'name' => 'Test User H-5',
@@ -87,8 +86,8 @@ class TestBillingSeeder extends Seeder
         ]);
 
         $this->command->info("Test data created with phone: {$testPhone}");
-        $this->command->info("H-5 Due: " . $dateH5->format('Y-m-d'));
-        $this->command->info("H-Day Due: " . $dateHDay->format('Y-m-d'));
-        $this->command->info("Overdue Due: " . $dateOverdue->format('Y-m-d'));
+        $this->command->info('H-5 Due: '.$dateH5->format('Y-m-d'));
+        $this->command->info('H-Day Due: '.$dateHDay->format('Y-m-d'));
+        $this->command->info('Overdue Due: '.$dateOverdue->format('Y-m-d'));
     }
 }
