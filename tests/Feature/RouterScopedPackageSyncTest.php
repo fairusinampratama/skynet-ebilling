@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\Router;
 use App\Models\Customer;
 use App\Models\Package;
+use App\Models\Router;
 use App\Services\MikrotikService;
 use App\Services\RouterSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use Tests\TestCase;
 
 class RouterScopedPackageSyncTest extends TestCase
 {
@@ -19,8 +19,8 @@ class RouterScopedPackageSyncTest extends TestCase
     {
         // 1. Setup Routers
         $routerA = Router::create([
-            'name' => 'Router A ' . uniqid(),
-            'ip_address' => '10.0.0.' . rand(1, 100),
+            'name' => 'Router A '.uniqid(),
+            'ip_address' => '10.0.0.'.rand(1, 100),
             'port' => 8728,
             'username' => 'admin',
             'password' => 'secret',
@@ -28,8 +28,8 @@ class RouterScopedPackageSyncTest extends TestCase
         ]);
 
         $routerB = Router::create([
-            'name' => 'Router B ' . uniqid(),
-            'ip_address' => '10.0.0.' . rand(101, 200),
+            'name' => 'Router B '.uniqid(),
+            'ip_address' => '10.0.0.'.rand(101, 200),
             'port' => 8728,
             'username' => 'admin',
             'password' => 'secret',
@@ -41,7 +41,7 @@ class RouterScopedPackageSyncTest extends TestCase
         // Package for Router A
         $pkgScopeA = Package::create([
             'name' => 'Paket A 10M',
-            'code' => 'PKG-A-' . uniqid(),
+            'code' => 'PKG-A-'.uniqid(),
             'mikrotik_profile' => '10MB',
             'router_id' => $routerA->id,
             'price' => 100000,
@@ -50,7 +50,7 @@ class RouterScopedPackageSyncTest extends TestCase
         // Package for Router B
         $pkgScopeB = Package::create([
             'name' => 'Paket B 10M',
-            'code' => 'PKG-B-' . uniqid(),
+            'code' => 'PKG-B-'.uniqid(),
             'mikrotik_profile' => '10MB',
             'router_id' => $routerB->id,
             'price' => 120000,
@@ -59,7 +59,7 @@ class RouterScopedPackageSyncTest extends TestCase
         // Global Package (Scenario: Should be ignored if scoped exists)
         $pkgGlobal = Package::create([
             'name' => 'Paket Global 10M',
-            'code' => 'PKG-G-' . uniqid(),
+            'code' => 'PKG-G-'.uniqid(),
             'mikrotik_profile' => '10MB',
             'router_id' => null,
             'price' => 90000,
@@ -68,7 +68,7 @@ class RouterScopedPackageSyncTest extends TestCase
         // 3. Setup Customer on Router A
         // Initially on Global Package (or wrong one)
         $customer = Customer::create([
-            'code' => 'CUST-' . uniqid(),
+            'code' => 'CUST-'.uniqid(),
             'name' => 'User on Router A',
             'phone' => '08123456789',
             'address' => 'Test Address',
@@ -87,8 +87,8 @@ class RouterScopedPackageSyncTest extends TestCase
             [
                 'name' => 'user.a',
                 'profile' => '10MB', // Technical Profile
-                'service' => 'pppoe'
-            ]
+                'service' => 'pppoe',
+            ],
         ]);
 
         // 5. Run Sync
@@ -101,13 +101,13 @@ class RouterScopedPackageSyncTest extends TestCase
         $this->assertNotEquals(
             $pkgScopeB->id,
             $customer->package_id,
-            "Customer on Router A should NOT be mapped to Router B package."
+            'Customer on Router A should NOT be mapped to Router B package.'
         );
 
         $this->assertEquals(
             $pkgGlobal->id,
             $customer->package_id,
-            "Customer package should remain the eBilling package."
+            'Customer package should remain the eBilling package.'
         );
 
         $this->assertEquals('10MB', $customer->mikrotik_profile);

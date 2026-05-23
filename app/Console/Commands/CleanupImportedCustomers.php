@@ -23,8 +23,9 @@ class CleanupImportedCustomers extends Command
         $this->info("Eligible for soft delete: {$eligible}");
         $this->info("Skipped because invoice history exists: {$blocked}");
 
-        if (!$apply) {
+        if (! $apply) {
             $this->warn('Dry run only. Re-run with --apply to soft-delete eligible rows.');
+
             return self::SUCCESS;
         }
 

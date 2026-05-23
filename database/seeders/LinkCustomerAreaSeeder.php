@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Customer;
 use App\Models\Area;
+use App\Models\Customer;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 
 class LinkCustomerAreaSeeder extends Seeder
@@ -13,19 +13,21 @@ class LinkCustomerAreaSeeder extends Seeder
     {
         $jsonPath = base_path('migration_data/customers_clean.json');
 
-        if (!File::exists($jsonPath)) {
+        if (! File::exists($jsonPath)) {
             $this->command->error("File not found: $jsonPath");
+
             return;
         }
 
         $jsonData = json_decode(File::get($jsonPath), true);
 
-        if (!$jsonData) {
-            $this->command->error("Invalid JSON data");
+        if (! $jsonData) {
+            $this->command->error('Invalid JSON data');
+
             return;
         }
 
-        $this->command->info("Linking customers to areas...");
+        $this->command->info('Linking customers to areas...');
 
         // Pre-fetch all areas to minimize DB queries
         $areas = Area::all()->pluck('id', 'name');
@@ -34,7 +36,7 @@ class LinkCustomerAreaSeeder extends Seeder
             $customerCode = $item['id_pelanggan']; // Assuming 'id_pel' maps to 'code' in Customer model
             $areaName = $item['nama_lokasi'];
 
-            if (!$customerCode || !$areaName) {
+            if (! $customerCode || ! $areaName) {
                 continue;
             }
 
@@ -44,6 +46,6 @@ class LinkCustomerAreaSeeder extends Seeder
             }
         }
 
-        $this->command->info("Customer areas linked successfully.");
+        $this->command->info('Customer areas linked successfully.');
     }
 }

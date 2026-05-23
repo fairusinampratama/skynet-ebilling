@@ -32,19 +32,19 @@ class CheckOverdueInvoices extends Command
     {
         $isDryRun = $this->option('dry-run');
         $graceDays = (int) Setting::get('billing_grace_period_days', 7);
-        
-        // Cutoff date is (Today - Grace Period). e.g. If today is 15th and grace is 7, 
+
+        // Cutoff date is (Today - Grace Period). e.g. If today is 15th and grace is 7,
         // invoices due on or before the 8th are now actionable.
         $cutoffDate = now()->subDays($graceDays)->startOfDay();
 
-        $this->info("Checking for overdue invoices due on or before: " . $cutoffDate->format('Y-m-d'));
+        $this->info('Checking for overdue invoices due on or before: '.$cutoffDate->format('Y-m-d'));
         Log::info('Overdue invoice check started.', [
             'cutoff_date' => $cutoffDate->toDateString(),
             'dry_run' => $isDryRun,
             'grace_days' => $graceDays,
         ]);
         if ($isDryRun) {
-            $this->warn("!! DRY RUN MODE - No actions will be taken !!");
+            $this->warn('!! DRY RUN MODE - No actions will be taken !!');
         }
 
         // Find unpaid invoices past the cutoff date
@@ -62,7 +62,7 @@ class CheckOverdueInvoices extends Command
             });
 
         $this->newLine();
-        $this->info("Overdue check completed.");
+        $this->info('Overdue check completed.');
         Log::info('Overdue invoice check completed.', [
             'cutoff_date' => $cutoffDate->toDateString(),
             'dry_run' => $isDryRun,
@@ -81,8 +81,9 @@ class CheckOverdueInvoices extends Command
             $this->info("   [DRY RUN] Would isolate customer {$customer->name}");
             $result = $reminders->send($invoice, 'isolation', true);
             if (($result['status'] ?? null) === 'dry-run') {
-                $this->info("   [DRY RUN] Would send isolation WhatsApp notification");
+                $this->info('   [DRY RUN] Would send isolation WhatsApp notification');
             }
+
             return;
         }
 
@@ -95,7 +96,7 @@ class CheckOverdueInvoices extends Command
                 'invoice_id' => $invoice->id,
                 'due_date' => $invoice->due_date->format('Y-m-d'),
                 'days_overdue' => $daysOverdue,
-                'reason' => 'payment_overdue'
+                'reason' => 'payment_overdue',
             ])
             ->log('system_isolation_triggered');
 
@@ -103,6 +104,6 @@ class CheckOverdueInvoices extends Command
         IsolateCustomerJob::dispatch($customer);
 
         $result = $reminders->send($invoice, 'isolation');
-        $this->info("   Isolation notification: " . ($result['status'] ?? 'skipped'));
+        $this->info('   Isolation notification: '.($result['status'] ?? 'skipped'));
     }
 }

@@ -2,15 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Casts\Attribute;
-use Spatie\Activitylog\Traits\LogsActivity;
-use Spatie\Activitylog\LogOptions;
 use Illuminate\Database\Eloquent\SoftDeletes;
-
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Customer extends Model
 {
@@ -24,7 +22,7 @@ class Customer extends Model
             if (empty($customer->join_date)) {
                 $customer->join_date = now();
             }
-            
+
             if (empty($customer->due_day)) {
                 $customer->due_day = $customer->join_date ? $customer->join_date->day : now()->day;
             }
@@ -128,7 +126,7 @@ class Customer extends Model
      */
     public function getKtpPhotoUrlAttribute($value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
@@ -143,7 +141,7 @@ class Customer extends Model
             return $value;
         }
 
-        return asset('storage/' . $value);
+        return asset('storage/'.$value);
     }
 
     private function normalizeKtpPhotoValue(string $value): string
@@ -165,6 +163,6 @@ class Customer extends Model
      */
     public function hasKtpPhoto(): bool
     {
-        return !empty($this->ktp_photo_url);
+        return ! empty($this->ktp_photo_url);
     }
 }

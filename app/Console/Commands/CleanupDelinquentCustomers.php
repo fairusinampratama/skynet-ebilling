@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\Customer;
 use App\Models\Invoice;
-use Illuminate\Console\Command;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,9 +31,9 @@ class CleanupDelinquentCustomers extends Command
 
         $this->info("Minimum unpaid periods: {$minimumUnpaid}");
         $this->info("Enforceable billing window: {$windowMonths} month(s)");
-        $this->info('Stale invoice cutoff: before ' . $cutoffPeriod->toDateString());
-        $this->info('Stale unpaid invoices to void: ' . count($staleInvoiceIds));
-        $this->info('Eligible customers: ' . count($candidateIds));
+        $this->info('Stale invoice cutoff: before '.$cutoffPeriod->toDateString());
+        $this->info('Stale unpaid invoices to void: '.count($staleInvoiceIds));
+        $this->info('Eligible customers: '.count($candidateIds));
 
         if ($candidateIds === [] && $staleInvoiceIds === []) {
             return self::SUCCESS;
@@ -56,8 +56,9 @@ class CleanupDelinquentCustomers extends Command
             );
         }
 
-        if (!$apply) {
+        if (! $apply) {
             $this->warn('Dry run only. Re-run with --apply to void stale invoices and soft-delete eligible customers.');
+
             return self::SUCCESS;
         }
 
@@ -127,7 +128,7 @@ class CleanupDelinquentCustomers extends Command
     }
 
     /**
-     * @param array<int> $candidateIds
+     * @param  array<int>  $candidateIds
      */
     private function previewRows(array $candidateIds): Collection
     {
@@ -155,7 +156,7 @@ class CleanupDelinquentCustomers extends Command
     }
 
     /**
-     * @param array<int> $invoiceIds
+     * @param  array<int>  $invoiceIds
      */
     private function voidStaleInvoices(array $invoiceIds, Carbon $cutoffPeriod): int
     {

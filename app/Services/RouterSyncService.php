@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Router;
 use App\Models\Customer;
+use App\Models\Router;
 use App\Models\RouterStagedCustomer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +25,7 @@ class RouterSyncService
         try {
             // Strict timeout for UI responsiveness: 5 seconds, 1 attempt
             $this->mikrotik->connect($router, ['timeout' => 5, 'attempts' => 1]);
-            
+
             // 1. Fetch System Resources (Fast)
             $resourceQuery = new \RouterOS\Query('/system/resource/print');
             $resource = $this->mikrotik->getClient()->query($resourceQuery)->read();
@@ -42,7 +42,7 @@ class RouterSyncService
             $router->update([
                 'connection_status' => 'online',
                 'current_online_count' => $onlineCount,
-                'cpu_load' => isset($system['cpu-load']) ? (int)$system['cpu-load'] : null,
+                'cpu_load' => isset($system['cpu-load']) ? (int) $system['cpu-load'] : null,
                 'uptime' => $system['uptime'] ?? null,
                 'version' => $system['version'] ?? null,
                 'board_name' => $system['board-name'] ?? null,
@@ -54,21 +54,21 @@ class RouterSyncService
             return [
                 'success' => true,
                 'online_count' => $onlineCount,
-                'message' => "Connected! Synced {$onlineCount} active users."
+                'message' => "Connected! Synced {$onlineCount} active users.",
             ];
 
         } catch (\Exception $e) {
-             // Update health check timestamp and connection status on failure
-             $router->update([
+            // Update health check timestamp and connection status on failure
+            $router->update([
                 'connection_status' => 'offline',
                 'last_health_check_at' => now(),
-           ]);
+            ]);
 
-           return [
-               'success' => false,
-               'error' => $e->getMessage(),
-               'message' => "Connection error: {$e->getMessage()}"
-           ];
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'message' => "Connection error: {$e->getMessage()}",
+            ];
         }
     }
 
@@ -81,12 +81,12 @@ class RouterSyncService
 
         try {
             $this->mikrotik->connect($router); // Standard timeout for heavy scan
-            
+
             $secrets = $this->mikrotik->getPPPSecrets();
             $stats = $this->syncSecretsToEbillingCustomers($router, $secrets, $stats, $dryRun);
-            
+
             // Update scan results
-            if (!$dryRun) {
+            if (! $dryRun) {
                 $router->update([
                     'connection_status' => 'online',
                     'last_scanned_at' => now(),
@@ -97,7 +97,7 @@ class RouterSyncService
             $this->mikrotik->disconnect();
 
         } catch (\Exception $e) {
-            if (!$dryRun) {
+            if (! $dryRun) {
                 $router->update(['connection_status' => 'offline']);
             }
             throw $e; // Re-throw to let caller handle critical failure
@@ -109,7 +109,6 @@ class RouterSyncService
     /**
      * Full Sync: Health + Customers + Status (One Connection)
      */
-
     public function fullSync(Router $router): array
     {
         $connected = false;
@@ -122,7 +121,7 @@ class RouterSyncService
             $result = [
                 'health' => [],
                 'scan' => [],
-                'success' => true
+                'success' => true,
             ];
 
             // 0. Smart Auto-Configuration (Detection)
@@ -152,7 +151,7 @@ class RouterSyncService
             $router->update([
                 'connection_status' => 'online',
                 'current_online_count' => $onlineCount,
-                'cpu_load' => isset($system['cpu-load']) ? (int)$system['cpu-load'] : null,
+                'cpu_load' => isset($system['cpu-load']) ? (int) $system['cpu-load'] : null,
                 'uptime' => $system['uptime'] ?? null,
                 'version' => $system['version'] ?? null,
                 'board_name' => $system['board-name'] ?? null,
@@ -165,9 +164,10 @@ class RouterSyncService
 
         } catch (\Exception $e) {
             $router->update(['connection_status' => 'offline']);
+
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ];
         } finally {
             if ($connected) {
@@ -184,7 +184,7 @@ class RouterSyncService
         try {
             $profiles = $this->mikrotik->getProfiles();
             $commonNames = ['isolirebilling', 'isolir', 'isolated', 'nonpayment', 'block', 'suspend', 'expired'];
-            
+
             foreach ($profiles as $profile) {
                 $profileName = $profile['name'] ?? '';
                 if (in_array(strtolower($profileName), $commonNames)) {
@@ -194,7 +194,7 @@ class RouterSyncService
                 }
             }
         } catch (\Exception $e) {
-            Log::warning("Failed to auto-detect isolation profile for {$router->name}: " . $e->getMessage());
+            Log::warning("Failed to auto-detect isolation profile for {$router->name}: ".$e->getMessage());
         }
     }
 
@@ -205,10 +205,10 @@ class RouterSyncService
     {
         try {
             $profiles = $this->mikrotik->getProfiles();
-            
+
             foreach ($profiles as $profile) {
                 $name = $profile['name'] ?? '';
-                
+
                 // Skip system/isolation profiles
                 if (in_array(strtolower($name), ['default', 'default-encryption'])) {
                     continue;
@@ -237,7 +237,7 @@ class RouterSyncService
 
             Log::info("Synced profiles to database for {$router->name}");
         } catch (\Exception $e) {
-            Log::warning("Failed to sync profiles for {$router->name}: " . $e->getMessage());
+            Log::warning("Failed to sync profiles for {$router->name}: ".$e->getMessage());
         }
     }
 
@@ -246,8 +246,10 @@ class RouterSyncService
      */
     protected function extractBandwidth(?string $rateLimit): ?string
     {
-        if (!$rateLimit) return null;
-        
+        if (! $rateLimit) {
+            return null;
+        }
+
         // Parse: "2560k/15M 5120k/20M ..." → Extract "20M"
         $parts = explode(' ', $rateLimit);
         if (count($parts) >= 2) {
@@ -257,7 +259,7 @@ class RouterSyncService
                 return $segments[1]; // "20M"
             }
         }
-        
+
         return null;
     }
 
@@ -293,22 +295,23 @@ class RouterSyncService
 
         foreach ($secrets as $secret) {
             $pppoeUsername = $secret['name'] ?? null;
-            if (!$pppoeUsername) {
+            if (! $pppoeUsername) {
                 continue;
             }
 
             $customer = $customersByPppoe[$pppoeUsername] ?? null;
 
-            if (!$customer) {
+            if (! $customer) {
                 $stats['unmatched_mikrotik']++;
-                if (!$dryRun) {
+                if (! $dryRun) {
                     $this->stageRouterOnlySecret($router, $secret);
                     $stats['staged_router_only']++;
                 }
+
                 continue;
             }
 
-            if (!$dryRun) {
+            if (! $dryRun) {
                 $isOnline = array_key_exists($pppoeUsername, $activeUsernames) ? true : null;
                 $syncRows[] = $this->customerSyncRow($router, $customer, $secret, $stats, $isOnline);
                 if ($this->markStagedSecretMatched($router, $pppoeUsername, $customer)) {
@@ -318,11 +321,11 @@ class RouterSyncService
             $stats['mapped']++;
         }
 
-        if (!$dryRun && !empty($syncRows)) {
+        if (! $dryRun && ! empty($syncRows)) {
             $this->updateCustomerSyncRows($syncRows);
         }
 
-        if (!$dryRun) {
+        if (! $dryRun) {
             $stats['staged_gone'] = $this->markStagedSecretsGone($router, $secretUsernames);
         }
 
@@ -356,7 +359,7 @@ class RouterSyncService
             'pppoe_user' => $username,
         ]);
 
-        if (!$staged->exists) {
+        if (! $staged->exists) {
             $staged->first_seen_at = $now;
         }
 
@@ -391,7 +394,7 @@ class RouterSyncService
         $query = RouterStagedCustomer::where('router_id', $router->id)
             ->where('status', 'unmatched');
 
-        if (!empty($secretUsernames)) {
+        if (! empty($secretUsernames)) {
             $query->whereNotIn('pppoe_user', $secretUsernames);
         }
 
@@ -425,7 +428,7 @@ class RouterSyncService
             ->whereNotNull('pppoe_user')
             ->where('pppoe_user', '!=', '');
 
-        if (!empty($secretUsernames)) {
+        if (! empty($secretUsernames)) {
             $query->whereNotIn('pppoe_user', $secretUsernames);
         }
 

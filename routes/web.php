@@ -1,13 +1,13 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\InvoiceController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\PackageController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\SettingController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PackageController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,9 +26,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Redirect root to login
-Route::get('/', function () {
-    return redirect()->route('login');
-});
+Route::redirect('/', '/login');
 
 // =====================================================
 // Public Payment Routes
@@ -37,13 +35,13 @@ Route::get('/pay/{uuid}', [\App\Http\Controllers\PublicInvoiceController::class,
 
 // Authenticated Routes
 Route::middleware(['auth', 'verified'])->group(function () {
-    
+
     // =====================================================
     // Dashboard - Enhanced with Accounting Widgets
     // =====================================================
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
-    
+
     // =====================================================
     // Profile Management
     // =====================================================
@@ -57,7 +55,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('superadmin')->group(function () {
         Route::resource('users', UserManagementController::class)->except(['show']);
     });
-    
+
     // =====================================================
     // Customer Management
     // =====================================================
@@ -71,9 +69,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
         Route::post('/customers/{customer}/isolate', [CustomerController::class, 'isolate'])->name('customers.isolate');
         Route::post('/customers/{customer}/reconnect', [CustomerController::class, 'reconnect'])->name('customers.reconnect');
+        Route::get('/api/routers/{router}/packages', [PackageController::class, 'byRouter'])
+            ->name('api.routers.packages');
     });
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->withTrashed()->name('customers.show');
-    
+
     // =====================================================
     // Package Management
     // =====================================================
@@ -98,7 +98,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/routers/{router}/sync-online', [\App\Http\Controllers\RouterController::class, 'syncOnlineStatus'])
             ->name('routers.sync-online');
     });
-    
+
     // =====================================================
     // Invoice Management
     // =====================================================
@@ -122,7 +122,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('invoices.download');
     Route::get('/customers/{customer}/invoices', [InvoiceController::class, 'customerInvoices'])
         ->name('customers.invoices');
-    
+
     // =====================================================
     // Payment Entry
     // =====================================================
@@ -131,11 +131,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('invoices.pay');
         Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])
             ->name('payments.store');
-        Route::post('/payments/bulk-import', [PaymentController::class, 'bulkImport'])
-            ->name('payments.bulk-import');
     });
 
-    
     // =====================================================
     // Analytics & Reports
     // =====================================================

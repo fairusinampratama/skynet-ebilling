@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('remote_address')->nullable();
             $table->string('only_one')->nullable();
             $table->timestamps();
-            
+
             // Unique: Router + Profile Name
             $table->unique(['router_id', 'name']);
         });

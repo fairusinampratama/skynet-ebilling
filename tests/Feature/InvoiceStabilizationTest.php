@@ -193,8 +193,8 @@ class InvoiceStabilizationTest extends TestCase
     private function router(array $overrides = []): Router
     {
         return Router::create(array_merge([
-            'name' => 'Invoice Router ' . uniqid(),
-            'ip_address' => '10.99.0.' . rand(1, 254),
+            'name' => 'Invoice Router '.uniqid(),
+            'ip_address' => '10.99.0.'.rand(1, 254),
             'username' => 'admin',
             'password' => 'secret',
             'port' => 8728,
@@ -212,11 +212,11 @@ class InvoiceStabilizationTest extends TestCase
         ]);
 
         return Customer::create(array_merge([
-            'code' => 'INV-CUST-' . strtoupper(substr(uniqid(), -6)),
+            'code' => 'INV-CUST-'.strtoupper(substr(uniqid(), -6)),
             'name' => 'Invoice Customer',
             'phone' => '081234567890',
             'address' => 'Invoice Address',
-            'pppoe_user' => 'invoice.' . substr(uniqid(), -6),
+            'pppoe_user' => 'invoice.'.substr(uniqid(), -6),
             'package_id' => $package->id,
             'status' => 'active',
             'due_day' => 20,
@@ -240,14 +240,12 @@ class FakeInvoiceWhatspieService extends WhatspieService
 {
     public array $messages = [];
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function sendMessage(string $phone, string $message): ?array
     {
         $this->messages[] = compact('phone', 'message');
 
-        return ['id' => 'fake-message-' . count($this->messages)];
+        return ['id' => 'fake-message-'.count($this->messages)];
     }
 }

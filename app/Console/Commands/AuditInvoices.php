@@ -23,7 +23,7 @@ class AuditInvoices extends Command
     {
         $period = $this->period();
 
-        $this->info('Auditing invoices for ' . $period->format('F Y') . ' (' . $period->toDateString() . ')');
+        $this->info('Auditing invoices for '.$period->format('F Y').' ('.$period->toDateString().')');
 
         $this->reportMissingInvoices($period);
         $this->reportPaidWithoutValidPayments($period);

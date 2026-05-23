@@ -44,7 +44,8 @@ class ValidateLegacyAreaMappingCommandTest extends TestCase
 
     public function test_command_fails_if_resolver_returns_general(): void
     {
-        $this->app->instance(LegacyAreaResolver::class, new class extends LegacyAreaResolver {
+        $this->app->instance(LegacyAreaResolver::class, new class extends LegacyAreaResolver
+        {
             public function resolve(array $customer): array
             {
                 return [
@@ -66,11 +67,11 @@ class ValidateLegacyAreaMappingCommandTest extends TestCase
     }
 
     /**
-     * @param array<int, array<string, mixed>> $customers
+     * @param  array<int, array<string, mixed>>  $customers
      */
     private function customerFile(array $customers): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'legacy-area-customers-') . '.json';
+        $path = tempnam(sys_get_temp_dir(), 'legacy-area-customers-').'.json';
         file_put_contents($path, json_encode($customers, JSON_THROW_ON_ERROR));
 
         return $path;

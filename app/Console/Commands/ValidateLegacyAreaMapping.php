@@ -43,18 +43,21 @@ class ValidateLegacyAreaMapping extends Command
             if (($result['area'] ?? null) === 'SKYNET-GENERAL') {
                 $counts['general']++;
                 $unmapped[] = $row + ['failure' => 'general'];
+
                 continue;
             }
 
             if (! $result['area']) {
                 $counts['unmapped']++;
                 $unmapped[] = $row + ['failure' => 'unmapped'];
+
                 continue;
             }
 
             if (! $resolver->isApprovedArea($result['area'])) {
                 $counts['junk']++;
                 $unmapped[] = $row + ['failure' => 'junk'];
+
                 continue;
             }
 
@@ -62,15 +65,15 @@ class ValidateLegacyAreaMapping extends Command
             $mapped[] = $row;
         }
 
-        $this->line('Total customers: ' . count($customers));
-        $this->line('Mapped by API area: ' . $counts['api_area']);
-        $this->line('Mapped by legacy location: ' . $counts['legacy_location']);
-        $this->line('Mapped by prefix: ' . $counts['prefix']);
-        $this->line('Mapped by package: ' . $counts['package_keyword']);
-        $this->line('Mapped by address: ' . $counts['address_keyword']);
-        $this->line('Unmapped: ' . $counts['unmapped']);
-        $this->line('SKYNET-GENERAL: ' . $counts['general']);
-        $this->line('Junk/invalid area: ' . $counts['junk']);
+        $this->line('Total customers: '.count($customers));
+        $this->line('Mapped by API area: '.$counts['api_area']);
+        $this->line('Mapped by legacy location: '.$counts['legacy_location']);
+        $this->line('Mapped by prefix: '.$counts['prefix']);
+        $this->line('Mapped by package: '.$counts['package_keyword']);
+        $this->line('Mapped by address: '.$counts['address_keyword']);
+        $this->line('Unmapped: '.$counts['unmapped']);
+        $this->line('SKYNET-GENERAL: '.$counts['general']);
+        $this->line('Junk/invalid area: '.$counts['junk']);
 
         if ($this->option('write-report')) {
             $this->writeReports($mapped, $unmapped);
@@ -116,14 +119,13 @@ class ValidateLegacyAreaMapping extends Command
         $response = Http::timeout(60)->get("{$baseUrl}/api/v1/customers");
 
         if (! $response->successful()) {
-            throw new \RuntimeException('Failed to fetch legacy customers: ' . $response->body());
+            throw new \RuntimeException('Failed to fetch legacy customers: '.$response->body());
         }
 
         return $this->customerRows($response->json());
     }
 
     /**
-     * @param mixed $decoded
      * @return array<int, array<string, mixed>>
      */
     private function customerRows(mixed $decoded): array
@@ -144,8 +146,8 @@ class ValidateLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<string, mixed> $customer
-     * @param array{area: ?string, reason: string, source_value: ?string, valid: bool} $result
+     * @param  array<string, mixed>  $customer
+     * @param  array{area: ?string, reason: string, source_value: ?string, valid: bool}  $result
      * @return array<string, string>
      */
     private function reportRow(array $customer, array $result): array
@@ -162,7 +164,7 @@ class ValidateLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<string, mixed> $customer
+     * @param  array<string, mixed>  $customer
      */
     private function packageName(array $customer): string
     {
@@ -174,8 +176,8 @@ class ValidateLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, array<string, string>> $mapped
-     * @param array<int, array<string, string>> $unmapped
+     * @param  array<int, array<string, string>>  $mapped
+     * @param  array<int, array<string, string>>  $unmapped
      */
     private function writeReports(array $mapped, array $unmapped): void
     {
@@ -198,7 +200,7 @@ class ValidateLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, array<string, string>> $rows
+     * @param  array<int, array<string, string>>  $rows
      */
     private function writeCsv(string $path, array $rows): void
     {
@@ -225,7 +227,7 @@ class ValidateLegacyAreaMapping extends Command
     }
 
     /**
-     * @param array<int, array<string, string>> $rows
+     * @param  array<int, array<string, string>>  $rows
      */
     private function writeJson(string $path, array $rows): void
     {

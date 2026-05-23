@@ -444,11 +444,11 @@ class WhatsAppGatewaySettingsTest extends TestCase
         ]);
 
         return Customer::create(array_merge([
-            'code' => 'WA-CUST-' . strtoupper(substr(uniqid(), -6)),
+            'code' => 'WA-CUST-'.strtoupper(substr(uniqid(), -6)),
             'name' => 'WA Customer',
             'phone' => '081234567890',
             'address' => 'WA Address',
-            'pppoe_user' => 'wa.' . substr(uniqid(), -6),
+            'pppoe_user' => 'wa.'.substr(uniqid(), -6),
             'package_id' => $package->id,
             'status' => 'active',
             'due_day' => 20,
@@ -472,14 +472,12 @@ class FakeGatewayWhatspieService extends WhatspieService
 {
     public array $messages = [];
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     public function sendMessage(string $phone, string $message): ?array
     {
         $this->messages[] = compact('phone', 'message');
 
-        return ['ok' => true, 'id' => 'fake-gateway-message-' . count($this->messages)];
+        return ['ok' => true, 'id' => 'fake-gateway-message-'.count($this->messages)];
     }
 }

@@ -23,14 +23,14 @@ class LegacyAreaCoordinateService
         }
 
         if (preg_match('/^(-?\d+),(\d+),(-?\d+(?:\.\d+)?)$/', $value, $matches) === 1) {
-            return $this->validCoordinate((float) ($matches[1] . '.' . $matches[2]), (float) $matches[3]);
+            return $this->validCoordinate((float) ($matches[1].'.'.$matches[2]), (float) $matches[3]);
         }
 
         return null;
     }
 
     /**
-     * @param array<string, array<int, array{lat: float, lng: float}>> $pointsByArea
+     * @param  array<string, array<int, array{lat: float, lng: float}>>  $pointsByArea
      * @return array<string, array{lat: float, lng: float, count: int}>
      */
     public function centroids(array $pointsByArea, int $minimumPoints = 2): array
@@ -52,8 +52,8 @@ class LegacyAreaCoordinateService
     }
 
     /**
-     * @param array{lat: float, lng: float} $point
-     * @param array<string, array{lat: float, lng: float, count: int}> $centroids
+     * @param  array{lat: float, lng: float}  $point
+     * @param  array<string, array{lat: float, lng: float, count: int}>  $centroids
      * @return array{area: string, distance_km: float}|null
      */
     public function nearest(array $point, array $centroids): ?array

@@ -101,8 +101,8 @@ class CustomerMikrotikSyncStatusTest extends TestCase
         return Customer::create([
             'code' => $code,
             'name' => $code,
-            'phone' => '08000000' . substr($code, -1),
-            'address' => $code . ' Address',
+            'phone' => '08000000'.substr($code, -1),
+            'address' => $code.' Address',
             'pppoe_user' => $pppoe,
             'package_id' => $package->id,
             'router_id' => $router?->id,
@@ -117,7 +117,7 @@ class CustomerMikrotikSyncStatusTest extends TestCase
     {
         return Package::create([
             'name' => 'Sync Package',
-            'code' => 'SYNC-PKG-' . uniqid(),
+            'code' => 'SYNC-PKG-'.uniqid(),
             'price' => 100000,
         ]);
     }

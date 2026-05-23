@@ -36,9 +36,7 @@ class InvoiceReminderService
         'isolation' => "*Layanan Diisolir Sementara*\n\nHalo {name}, kami belum menerima pembayaran tagihan internet periode {period} sebesar *Rp {amount}* yang jatuh tempo pada *{due_date}*.\n\nLayanan internet Anda sementara kami isolir. Silakan lakukan pembayaran agar layanan dapat aktif kembali.\n\nTerima kasih.",
     ];
 
-    public function __construct(private WhatspieService $whatspie)
-    {
-    }
+    public function __construct(private WhatspieService $whatspie) {}
 
     public function hasBroadcast(Invoice $invoice, string $type): bool
     {

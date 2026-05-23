@@ -17,4 +17,3 @@ class LegacyDataSeeder extends Seeder
         $this->command->info('✅ Migration completed successfully!');
     }
 }
-

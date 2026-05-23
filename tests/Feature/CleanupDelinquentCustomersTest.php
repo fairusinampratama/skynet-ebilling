@@ -121,7 +121,7 @@ class CleanupDelinquentCustomersTest extends TestCase
     {
         return Package::create([
             'name' => 'Cleanup Package',
-            'code' => 'PKG-CLEANUP-' . uniqid(),
+            'code' => 'PKG-CLEANUP-'.uniqid(),
             'price' => 100000,
         ]);
     }

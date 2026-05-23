@@ -7,8 +7,8 @@ use App\Models\Setting;
 use App\Services\InvoiceReminderService;
 use App\Services\WhatspieService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class SettingController extends Controller
 {
@@ -39,7 +39,7 @@ class SettingController extends Controller
             ->where('key', '!=', 'whatsapp_api_key')
             ->get()
             ->groupBy('group');
-        
+
         return Inertia::render('Settings/Index', [
             'settings' => $settings,
             'grouped_settings' => [
@@ -64,7 +64,7 @@ class SettingController extends Controller
                         'isolation' => $this->templateSetting('whatsapp_template_isolation', 'isolation'),
                     ],
                 ],
-            ]
+            ],
         ]);
     }
 
@@ -158,7 +158,7 @@ class SettingController extends Controller
                 $message = "Configured device not found. Active paired device is {$deviceStatus['actual_device']}. Save this as Device ID, then test again.";
             }
 
-            return back()->with('error', 'WhatsApp test failed: ' . $message);
+            return back()->with('error', 'WhatsApp test failed: '.$message);
         }
 
         $response = $whatspie->sendMessage(
@@ -174,6 +174,6 @@ class SettingController extends Controller
             return back()->with('success', 'WhatsApp test message sent successfully.');
         }
 
-        return back()->with('error', 'WhatsApp test failed: ' . ($response['error'] ?? 'Unknown gateway error.'));
+        return back()->with('error', 'WhatsApp test failed: '.($response['error'] ?? 'Unknown gateway error.'));
     }
 }

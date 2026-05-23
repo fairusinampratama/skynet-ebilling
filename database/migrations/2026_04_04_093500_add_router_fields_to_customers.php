@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            if (!Schema::hasColumn('customers', 'router_id')) {
+            if (! Schema::hasColumn('customers', 'router_id')) {
                 $table->foreignId('router_id')->nullable()->after('area_id')->constrained()->nullOnDelete();
             }
-            if (!Schema::hasColumn('customers', 'mikrotik_profile')) {
+            if (! Schema::hasColumn('customers', 'mikrotik_profile')) {
                 $table->string('mikrotik_profile')->nullable()->after('router_id');
             }
         });

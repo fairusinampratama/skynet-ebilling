@@ -14,7 +14,8 @@ use PDO;
 
 class SyncFromStagingDb extends Command
 {
-    protected $signature   = 'ebilling:sync {--db= : Path to the SQLite staging DB}';
+    protected $signature = 'ebilling:sync {--db= : Path to the SQLite staging DB}';
+
     protected $description = 'Sync customers and invoices from the Python eBilling SQLite staging DB into MySQL.';
 
     private PDO $sqlite;
@@ -31,13 +32,14 @@ class SyncFromStagingDb extends Command
 
         if (! file_exists($dbPath)) {
             $this->error("SQLite DB not found at: {$dbPath}");
+
             return self::FAILURE;
         }
 
         $this->sqlite = new PDO("sqlite:{$dbPath}");
         $this->sqlite->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        $this->info('🔗 Connected to staging DB: ' . $dbPath);
+        $this->info('🔗 Connected to staging DB: '.$dbPath);
 
         DB::disableQueryLog();
 
@@ -45,6 +47,7 @@ class SyncFromStagingDb extends Command
         $this->syncInvoices();
 
         $this->info('✅ Sync complete.');
+
         return self::SUCCESS;
     }
 
@@ -69,11 +72,11 @@ class SyncFromStagingDb extends Command
         $bar->start();
 
         // Pre-load area and package caches to avoid N+1
-        $areaCacheByName    = Area::pluck('id', 'name')->toArray();
+        $areaCacheByName = Area::pluck('id', 'name')->toArray();
         $packageCacheByName = Package::pluck('id', 'name')->toArray();
 
-        $updatedCount  = 0;
-        $deletedCount  = 0;
+        $updatedCount = 0;
+        $deletedCount = 0;
 
         DB::beginTransaction();
 
@@ -81,6 +84,7 @@ class SyncFromStagingDb extends Command
             $code = $row['code'] ?? $row['id'] ?? null;
             if (! $code) {
                 $bar->advance();
+
                 continue;
             }
 
@@ -92,7 +96,7 @@ class SyncFromStagingDb extends Command
                     try {
                         $area = Area::firstOrCreate(
                             ['name' => $areaName],
-                            ['code' => Str::slug($areaName) ?: 'area-' . Str::random(5)]
+                            ['code' => Str::slug($areaName) ?: 'area-'.Str::random(5)]
                         );
                         $areaCacheByName[$areaName] = $area->id;
                     } catch (\Exception $e) {
@@ -100,11 +104,11 @@ class SyncFromStagingDb extends Command
                         try {
                             $area = Area::create([
                                 'name' => $areaName,
-                                'code' => Str::slug($areaName) . '-' . Str::random(3),
+                                'code' => Str::slug($areaName).'-'.Str::random(3),
                             ]);
                             $areaCacheByName[$areaName] = $area->id;
                         } catch (\Exception $e) {
-                            $this->error("\nFailed to create area {$areaName}: " . $e->getMessage());
+                            $this->error("\nFailed to create area {$areaName}: ".$e->getMessage());
                         }
                     }
                 }
@@ -120,56 +124,56 @@ class SyncFromStagingDb extends Command
                     $pkg = Package::firstOrCreate(
                         ['name' => $pkgName],
                         [
-                            'price'           => $row['package_price'] ?? 100000,
-                            'code'            => (Str::slug($pkgName) ?: 'pkg') . '-' . Str::random(3),
-                            'mikrotik_profile'=> $pkgName,
+                            'price' => $row['package_price'] ?? 100000,
+                            'code' => (Str::slug($pkgName) ?: 'pkg').'-'.Str::random(3),
+                            'mikrotik_profile' => $pkgName,
                         ]
                     );
                     $packageCacheByName[$pkgName] = $pkg->id;
                 } catch (\Exception $e) {
-                    $this->error("\nFailed to resolve package {$pkgName}: " . $e->getMessage());
+                    $this->error("\nFailed to resolve package {$pkgName}: ".$e->getMessage());
                 }
             }
             $packageId = $packageCacheByName[$pkgName] ?? null;
 
             // Final fallback for package_id if it's still null (database integrity)
             if (! $packageId) {
-                $packageId = Package::where('name', 'Paket Unknown')->value('id') 
+                $packageId = Package::where('name', 'Paket Unknown')->value('id')
                     ?? Package::first()->id;
             }
 
             // Map status: SQLite "deleted" → Laravel "terminated"
             $status = match ($row['status'] ?? 'active') {
-                'deleted'    => 'terminated',
-                'isolated'   => 'isolated',
-                'active'     => 'active',
-                default      => 'active',
+                'deleted' => 'terminated',
+                'isolated' => 'isolated',
+                'active' => 'active',
+                default => 'active',
             };
 
             $wasDeleted = ($row['status'] ?? '') === 'deleted';
 
             // Ensure pppoe_user is not empty and unique
             $scrapedPppoeUser = $row['pppoe_username'] ?? $row['pppoe_user'] ?? null;
-            $pppoeUser = ! empty($scrapedPppoeUser) ? $scrapedPppoeUser : ($code . '_PPPOE');
+            $pppoeUser = ! empty($scrapedPppoeUser) ? $scrapedPppoeUser : ($code.'_PPPOE');
 
             try {
                 Customer::updateOrCreate(
                     ['code' => $code],
                     [
-                        'name'         => $row['name'] ?? 'Unknown',
-                        'address'      => $row['address'] ?? '-',
-                        'phone'        => $row['phone'] ?? '-',
-                        'nik'          => $row['nik'] ?? null,
-                        'pppoe_user'   => $pppoeUser,
-                        'area_id'      => $areaId,
-                        'package_id'   => $packageId,
-                        'status'       => $status,
-                        'geo_lat'      => $this->safeFloat($row['geo_lat'] ?? null, -90, 90),
-                        'geo_long'     => $this->safeFloat($row['geo_long'] ?? null, -180, 180),
-                        'join_date'    => $row['join_date'] ?? null,
-                        'due_day'      => $row['due_day'] ?? 20,
-                        'ktp_photo_url'=> $row['ktp_photo_url'] ?? null,
-                        'is_online'    => (bool) ($row['is_online'] ?? false),
+                        'name' => $row['name'] ?? 'Unknown',
+                        'address' => $row['address'] ?? '-',
+                        'phone' => $row['phone'] ?? '-',
+                        'nik' => $row['nik'] ?? null,
+                        'pppoe_user' => $pppoeUser,
+                        'area_id' => $areaId,
+                        'package_id' => $packageId,
+                        'status' => $status,
+                        'geo_lat' => $this->safeFloat($row['geo_lat'] ?? null, -90, 90),
+                        'geo_long' => $this->safeFloat($row['geo_long'] ?? null, -180, 180),
+                        'join_date' => $row['join_date'] ?? null,
+                        'due_day' => $row['due_day'] ?? 20,
+                        'ktp_photo_url' => $row['ktp_photo_url'] ?? null,
+                        'is_online' => (bool) ($row['is_online'] ?? false),
                     ]
                 );
 
@@ -179,7 +183,7 @@ class SyncFromStagingDb extends Command
                     $updatedCount++;
                 }
             } catch (\Exception $e) {
-                $this->error("\nFailed to sync customer {$code}: " . $e->getMessage());
+                $this->error("\nFailed to sync customer {$code}: ".$e->getMessage());
             }
 
             $bar->advance();
@@ -208,22 +212,23 @@ class SyncFromStagingDb extends Command
 
         // Pre-load customer_id keyed by legacy code to avoid N+1
         $customerIdByCode = Customer::pluck('id', 'code')->toArray();
-        $customerDueDay   = Customer::pluck('due_day', 'id')->toArray();
+        $customerDueDay = Customer::pluck('due_day', 'id')->toArray();
 
         $upsertCount = 0;
-        $skipCount   = 0;
-        $batchSize   = 500;
-        $processed   = 0;
+        $skipCount = 0;
+        $batchSize = 500;
+        $processed = 0;
 
         DB::beginTransaction();
 
         foreach ($rows as $row) {
             $legacyCode = $row['customer_id'] ?? null; // SQLite stores the legacy id_pelanggan
-            $periodStr  = $row['period'] ?? null;
+            $periodStr = $row['period'] ?? null;
 
             if (! $legacyCode || ! $periodStr) {
                 $skipCount++;
                 $bar->advance();
+
                 continue;
             }
 
@@ -231,13 +236,13 @@ class SyncFromStagingDb extends Command
             if (! isset($customerIdByCode[$legacyCode])) {
                 // Orphan: create stub customer so invoice history is preserved
                 $stub = Customer::create([
-                    'code'    => $legacyCode,
-                    'name'    => 'Unknown (Deleted)',
-                    'status'  => 'terminated',
+                    'code' => $legacyCode,
+                    'name' => 'Unknown (Deleted)',
+                    'status' => 'terminated',
                     'due_day' => 20,
                 ]);
                 $customerIdByCode[$legacyCode] = $stub->id;
-                $customerDueDay[$stub->id]     = 20;
+                $customerDueDay[$stub->id] = 20;
             }
 
             $customerId = $customerIdByCode[$legacyCode];
@@ -247,21 +252,22 @@ class SyncFromStagingDb extends Command
             } catch (\Exception) {
                 $skipCount++;
                 $bar->advance();
+
                 continue;
             }
 
-            $dueDay  = $customerDueDay[$customerId] ?? 20;
+            $dueDay = $customerDueDay[$customerId] ?? 20;
             $dueDate = $period->copy()->day($dueDay <= $period->daysInMonth ? $dueDay : $period->daysInMonth);
-            $status  = str_contains(strtolower($row['status'] ?? ''), 'paid') ? 'paid' : 'unpaid';
+            $status = str_contains(strtolower($row['status'] ?? ''), 'paid') ? 'paid' : 'unpaid';
 
             // Upsert — always update amount and status, not just on first insert
             Invoice::updateOrCreate(
                 ['customer_id' => $customerId, 'period' => $period->toDateString()],
                 [
-                    'code'         => $row['code'] ?? ('INV-' . $period->format('Ym') . '-' . $legacyCode),
-                    'amount'       => $row['amount'] ?? 0,
-                    'status'       => $status,
-                    'due_date'     => $dueDate->toDateString(),
+                    'code' => $row['code'] ?? ('INV-'.$period->format('Ym').'-'.$legacyCode),
+                    'amount' => $row['amount'] ?? 0,
+                    'status' => $status,
+                    'due_date' => $dueDate->toDateString(),
                     'payment_link' => $row['payment_link'] ?? null,
                     'generated_at' => $row['created_at'] ?? now(),
                 ]
@@ -294,6 +300,7 @@ class SyncFromStagingDb extends Command
             return null;
         }
         $f = (float) $value;
+
         return ($f >= $min && $f <= $max) ? $f : null;
     }
 }
