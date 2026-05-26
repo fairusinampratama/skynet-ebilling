@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\Router;
+use App\Support\NetworkProfiles;
 use Illuminate\Support\Facades\Log;
 use RouterOS\Client;
 use RouterOS\Config;
@@ -202,6 +203,22 @@ class MikrotikService
         }
     }
 
+    public function getActiveConnection(string $username): ?array
+    {
+        $this->ensureConnected();
+
+        try {
+            $query = (new Query('/ppp/active/print'))
+                ->where('name', $username);
+            $response = $this->client->query($query)->read();
+
+            return $response[0] ?? null;
+        } catch (\Exception $e) {
+            Log::error("Failed to get active connection for {$username} from {$this->router->name}: {$e->getMessage()}");
+            throw $e;
+        }
+    }
+
     /**
      * Isolate a user (block internet access)
      * Method: Change PPPoE profile to 'isolirebilling' (case-insensitive)
@@ -294,6 +311,11 @@ class MikrotikService
             $targetProfile = $customer
                 ? $this->reconnectProfileName($customer, $profile)
                 : $profile;
+            $targetProfile = trim((string) $targetProfile);
+
+            if ($targetProfile === '' || NetworkProfiles::isIsolationLike($targetProfile)) {
+                throw new \RuntimeException("Cannot reconnect '{$username}' on {$this->router->name}: no safe non-isolation restore profile is available.");
+            }
 
             if ($customer && ! empty($customer->previous_profile)) {
                 Log::info("Restoring {$username} to previous profile: {$targetProfile}");

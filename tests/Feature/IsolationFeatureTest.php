@@ -442,6 +442,39 @@ class IsolationFeatureTest extends TestCase
         }
     }
 
+    public function test_mikrotik_reconnect_fails_when_restore_profile_is_still_isolation(): void
+    {
+        $router = $this->router();
+        $package = Package::create([
+            'code' => 'PKG-NO-ROUTER-PROFILE',
+            'name' => 'No Router Profile',
+            'price' => 100000,
+            'mikrotik_profile' => null,
+        ]);
+        $this->customer([
+            'router_id' => $router->id,
+            'package_id' => $package->id,
+            'pppoe_user' => 'unsafe.restore',
+            'status' => 'isolated',
+            'previous_profile' => null,
+            'mikrotik_profile' => 'ISOLIREBILLING',
+        ]);
+        $service = new FakeIsolationMikrotikService([
+            ['name' => 'default'],
+            ['name' => 'ISOLIREBILLING'],
+        ], [
+            '.id' => '*1',
+            'name' => 'unsafe.restore',
+            'profile' => 'ISOLIREBILLING',
+        ]);
+        $service->connect($router);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('no safe non-isolation restore profile is available');
+
+        $service->reconnectUser('unsafe.restore', 'ISOLIREBILLING');
+    }
+
     public function test_live_isolation_command_preflight_does_not_dispatch_jobs_without_yes(): void
     {
         Bus::fake();
