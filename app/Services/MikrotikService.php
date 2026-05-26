@@ -15,6 +15,8 @@ class MikrotikService
 
     protected ?Router $router = null;
 
+    protected ?array $lastProfileUpdateResult = null;
+
     /**
      * Connect to a MikroTik router
      *
@@ -74,11 +76,11 @@ class MikrotikService
             activity()
                 ->causedBy(auth()->user() ?? null)
                 ->performedOn($customer)
-                ->withProperties([
+                ->withProperties(array_merge([
                     'router' => $customer->router->name,
                     'pppoe_user' => $customer->pppoe_user,
                     'mode' => 'realtime',
-                ])
+                ], $this->lastProfileUpdateResult ?? []))
                 ->log('customer_isolated');
         } finally {
             $this->disconnect();
@@ -114,11 +116,11 @@ class MikrotikService
             activity()
                 ->causedBy(auth()->user() ?? null)
                 ->performedOn($customer)
-                ->withProperties([
+                ->withProperties(array_merge([
                     'router' => $customer->router->name,
                     'pppoe_user' => $customer->pppoe_user,
                     'mode' => 'realtime',
-                ])
+                ], $this->lastProfileUpdateResult ?? []))
                 ->log('customer_reconnected');
         } finally {
             $this->disconnect();
@@ -208,6 +210,7 @@ class MikrotikService
     {
         $this->ensureConnected();
         $isolationProfile = $this->isolationProfileName();
+        $this->lastProfileUpdateResult = null;
 
         try {
             // Get all available profiles to find case-insensitive match
@@ -240,7 +243,24 @@ class MikrotikService
             $this->setPPPSecretProfile($secret, $matchedProfile);
 
             // Kick active session if any
-            $this->kickUser($username);
+            $kickResult = $this->kickUser($username);
+
+            $verifiedSecret = $this->findPPPSecret($username);
+            $verifiedProfile = $verifiedSecret['profile'] ?? null;
+
+            if (! $verifiedSecret || strcasecmp((string) $verifiedProfile, $matchedProfile) !== 0) {
+                throw new \RuntimeException(
+                    "Isolation verification failed for '{$username}' on {$this->router->name}. Expected '{$matchedProfile}', got '".($verifiedProfile ?? 'missing secret')."'."
+                );
+            }
+
+            $this->lastProfileUpdateResult = [
+                'username' => $username,
+                'old_profile' => $currentProfile,
+                'target_profile' => $matchedProfile,
+                'verified_profile' => $verifiedProfile,
+                'kick' => $kickResult,
+            ];
 
             Log::info("Successfully isolated user: {$username} on {$this->router->name} (Profile: {$matchedProfile})");
 
@@ -258,6 +278,7 @@ class MikrotikService
     public function reconnectUser(string $username, string $profile = 'default'): bool
     {
         $this->ensureConnected();
+        $this->lastProfileUpdateResult = null;
 
         try {
             // Find the PPP secret
@@ -281,12 +302,29 @@ class MikrotikService
             // Restore profile
             $this->setPPPSecretProfile($secret, $targetProfile);
 
+            // Kick active session to force new profile
+            $kickResult = $this->kickUser($username);
+
+            $verifiedSecret = $this->findPPPSecret($username);
+            $verifiedProfile = $verifiedSecret['profile'] ?? null;
+
+            if (! $verifiedSecret || strcasecmp((string) $verifiedProfile, $targetProfile) !== 0) {
+                throw new \RuntimeException(
+                    "Reconnection verification failed for '{$username}' on {$this->router->name}. Expected '{$targetProfile}', got '".($verifiedProfile ?? 'missing secret')."'."
+                );
+            }
+
             if ($customer && ! empty($customer->previous_profile)) {
                 $customer->update(['previous_profile' => null]);
             }
 
-            // Kick active session to force new profile
-            $this->kickUser($username);
+            $this->lastProfileUpdateResult = [
+                'username' => $username,
+                'old_profile' => $secret['profile'] ?? null,
+                'target_profile' => $targetProfile,
+                'verified_profile' => $verifiedProfile,
+                'kick' => $kickResult,
+            ];
 
             Log::info("Successfully reconnected user: {$username} on {$this->router->name} to {$targetProfile}");
 
@@ -335,7 +373,7 @@ class MikrotikService
     /**
      * Kick an active PPPoE session
      */
-    public function kickUser(string $username): void
+    public function kickUser(string $username): array
     {
         try {
             $query = (new Query('/ppp/active/print'))
@@ -352,10 +390,27 @@ class MikrotikService
                 $this->client->query($query)->read();
 
                 Log::info("Kicked active session for user: {$username} on {$this->router->name}");
+
+                return [
+                    'status' => 'kicked',
+                    'active_id' => $session['.id'] ?? null,
+                ];
             }
+
+            return ['status' => 'not_active'];
         } catch (\Exception $e) {
             Log::warning("Could not kick user {$username}: {$e->getMessage()}");
+
+            return [
+                'status' => 'failed',
+                'error' => $e->getMessage(),
+            ];
         }
+    }
+
+    public function lastProfileUpdateResult(): ?array
+    {
+        return $this->lastProfileUpdateResult;
     }
 
     protected function ensureConnected(): void

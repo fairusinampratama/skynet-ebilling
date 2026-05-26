@@ -83,10 +83,10 @@ class IsolateCustomerJob implements ShouldQueue
                 activity()
                     ->causedBy(auth()->user() ?? null)
                     ->performedOn($this->customer)
-                    ->withProperties([
+                    ->withProperties(array_merge([
                         'router' => $router->name,
                         'pppoe_user' => $this->customer->pppoe_user,
-                    ])
+                    ], $mikrotik->lastProfileUpdateResult() ?? []))
                     ->log('customer_isolated');
 
                 Log::info("Successfully isolated: {$this->customer->name}");
