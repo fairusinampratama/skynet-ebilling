@@ -194,21 +194,31 @@ class PreviewLegacyPackageMapping extends Command
 
     private function targetProfile(int $routerId, string $suggested): ?RouterProfile
     {
-        if (strcasecmp($suggested, '10MB') === 0) {
-            return RouterProfile::query()
+        foreach ($this->profileCandidates($suggested) as $candidate) {
+            $profile = RouterProfile::query()
                 ->where('router_id', $routerId)
-                ->where('name', '10MB')
-                ->first()
-                ?: RouterProfile::query()
-                    ->where('router_id', $routerId)
-                    ->where('name', '10M')
-                    ->first();
+                ->where('name', $candidate)
+                ->first();
+
+            if ($profile) {
+                return $profile;
+            }
         }
 
-        return RouterProfile::query()
-            ->where('router_id', $routerId)
-            ->where('name', $suggested)
-            ->first();
+        return null;
+    }
+
+    private function profileCandidates(string $suggested): array
+    {
+        return match (strtoupper($suggested)) {
+            '10MB' => ['10MB', '10M', '10M-25M'],
+            '15MB' => ['15MB', '15M'],
+            '20MB' => ['20MB', '20M', '25MB'],
+            '25MB' => ['25MB', '25M'],
+            '30MB' => ['30MB', '30M'],
+            '50MB' => ['50MB', '50M'],
+            default => [$suggested],
+        };
     }
 
     private function targetPackageName(object $row, string $targetProfile): string

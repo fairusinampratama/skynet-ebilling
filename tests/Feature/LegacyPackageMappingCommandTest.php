@@ -103,7 +103,23 @@ class LegacyPackageMappingCommandTest extends TestCase
         );
     }
 
-    public function test_missing_normal_target_profile_is_review_only_and_10mb_r_is_not_selected(): void
+    public function test_10m_uses_10m_25m_before_10mb_r(): void
+    {
+        $router = $this->router('Bumiayu');
+        $legacy = $this->legacyPackage('Paket UpTo 10Mbps Bumiayu', 115000);
+        $this->profile($router, '10MB_R', '5M/10M');
+        $this->profile($router, '10M-25M', '15M/20M');
+        $customer = $this->customer($legacy, $router, [
+            'mikrotik_profile' => '10MB_R',
+        ]);
+
+        $this->artisan('network:preview-legacy-package-mapping --apply --yes')
+            ->assertExitCode(0);
+
+        $this->assertSame('10M-25M', $customer->refresh()->package->mikrotik_profile);
+    }
+
+    public function test_missing_target_profile_is_review_only_and_10mb_r_is_not_selected(): void
     {
         $router = $this->router('Bumiayu');
         $legacy = $this->legacyPackage('Paket UpTo 10Mbps Bumiayu', 115000);
@@ -118,6 +134,32 @@ class LegacyPackageMappingCommandTest extends TestCase
 
         $this->assertSame($legacy->id, $customer->refresh()->package_id);
         $this->assertSame(1, Package::count());
+    }
+
+    public function test_20m_can_use_25mb_when_20mb_is_missing(): void
+    {
+        $router = $this->router('Sentul');
+        $legacy = $this->legacyPackage('Paket UpTo 20Mbps', 200000);
+        $this->profile($router, '25MB', '12M/24M');
+        $customer = $this->customer($legacy, $router);
+
+        $this->artisan('network:preview-legacy-package-mapping --apply --yes')
+            ->assertExitCode(0);
+
+        $this->assertSame('25MB', $customer->refresh()->package->mikrotik_profile);
+    }
+
+    public function test_25m_can_use_25m_when_25mb_is_missing(): void
+    {
+        $router = $this->router('Lawang');
+        $legacy = $this->legacyPackage('Paket up to 25M', 125000);
+        $this->profile($router, '25M', '12M/24M');
+        $customer = $this->customer($legacy, $router);
+
+        $this->artisan('network:preview-legacy-package-mapping --apply --yes')
+            ->assertExitCode(0);
+
+        $this->assertSame('25M', $customer->refresh()->package->mikrotik_profile);
     }
 
     public function test_apply_reuses_existing_matching_target_package(): void
