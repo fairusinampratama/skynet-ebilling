@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Jobs\IsolateCustomerJob;
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Setting;
 use App\Services\InvoiceReminderService;
@@ -47,19 +48,24 @@ class CheckOverdueInvoices extends Command
             $this->warn('!! DRY RUN MODE - No actions will be taken !!');
         }
 
-        // Find unpaid invoices past the cutoff date
-        // Only for active customers (don't re-isolate already isolated ones)
-        Invoice::where('status', 'unpaid')
+        // Only the customer's latest invoice can trigger automated isolation.
+        // Historical unpaid invoices are reportable, but must not isolate a customer
+        // when newer billing already shows a different state.
+        $this->latestInvoiceQuery()
             ->where('due_date', '<=', $cutoffDate)
             ->whereHas('customer', function ($query) {
                 $query->where('status', 'active');
             })
-            ->with('customer')
+            ->with(['customer.router'])
             ->chunk(100, function ($invoices) use ($isDryRun, $cutoffDate, $reminders) {
                 foreach ($invoices as $invoice) {
                     $this->processOverdueInvoice($invoice, $isDryRun, $cutoffDate, $reminders);
                 }
             });
+
+        if ($isDryRun) {
+            $this->reportHistoricalOverdueSkippedByLatestInvoice($cutoffDate);
+        }
 
         $this->newLine();
         $this->info('Overdue check completed.');
@@ -74,11 +80,35 @@ class CheckOverdueInvoices extends Command
         $customer = $invoice->customer;
         $daysOverdue = $invoice->due_date->diffInDays(now());
 
-        $this->line("Found overdue invoice: <comment>{$invoice->code}</comment> for <comment>{$customer->name}</comment>");
+        $this->line("Found overdue latest invoice: <comment>{$invoice->code}</comment> for <comment>{$customer->name}</comment>");
+        $this->line(" - Period: {$invoice->period->format('Y-m-d')}");
+        $this->line(" - Status: {$invoice->status}");
         $this->line(" - Due Date: {$invoice->due_date->format('Y-m-d')} ({$daysOverdue} days overdue)");
+        $this->line(' - Router: '.($customer->router?->name ?? 'NO_ROUTER'));
+        $this->line(' - PPPoE: '.($customer->pppoe_user ?: 'NO_PPPOE'));
+
+        if (! $customer->router_id || ! $customer->router) {
+            $this->warn("   Skipping {$customer->name}: router is required for MikroTik enforcement.");
+            Log::warning('Overdue isolation skipped because customer has no router.', [
+                'customer_id' => $customer->id,
+                'invoice_id' => $invoice->id,
+            ]);
+
+            return;
+        }
+
+        if (! $customer->pppoe_user) {
+            $this->warn("   Skipping {$customer->name}: PPPoE username is required for MikroTik enforcement.");
+            Log::warning('Overdue isolation skipped because customer has no PPPoE username.', [
+                'customer_id' => $customer->id,
+                'invoice_id' => $invoice->id,
+            ]);
+
+            return;
+        }
 
         if ($isDryRun) {
-            $this->info("   [DRY RUN] Would isolate customer {$customer->name}");
+            $this->info("   [DRY RUN] Would isolate customer {$customer->name} because latest invoice is unpaid and overdue.");
             $result = $reminders->send($invoice, 'isolation', true);
             if (($result['status'] ?? null) === 'dry-run') {
                 $this->info('   [DRY RUN] Would send isolation WhatsApp notification');
@@ -105,5 +135,83 @@ class CheckOverdueInvoices extends Command
 
         $result = $reminders->send($invoice, 'isolation');
         $this->info('   Isolation notification: '.($result['status'] ?? 'skipped'));
+    }
+
+    private function latestInvoiceQuery()
+    {
+        return Invoice::query()
+            ->where('status', 'unpaid')
+            ->whereRaw('invoices.id = (
+                SELECT latest_invoices.id
+                FROM invoices latest_invoices
+                WHERE latest_invoices.customer_id = invoices.customer_id
+                ORDER BY latest_invoices.period DESC, latest_invoices.id DESC
+                LIMIT 1
+            )');
+    }
+
+    private function reportHistoricalOverdueSkippedByLatestInvoice($cutoffDate): void
+    {
+        $rows = Customer::ebilling()
+            ->where('customers.status', 'active')
+            ->whereExists(function ($query) use ($cutoffDate) {
+                $query->selectRaw('1')
+                    ->from('invoices as old_invoices')
+                    ->whereColumn('old_invoices.customer_id', 'customers.id')
+                    ->where('old_invoices.status', 'unpaid')
+                    ->where('old_invoices.due_date', '<=', $cutoffDate);
+            })
+            ->join('invoices as latest_invoices', function ($join) {
+                $join->on('latest_invoices.customer_id', '=', 'customers.id')
+                    ->whereRaw('latest_invoices.id = (
+                        SELECT newest.id
+                        FROM invoices newest
+                        WHERE newest.customer_id = customers.id
+                        ORDER BY newest.period DESC, newest.id DESC
+                        LIMIT 1
+                    )');
+            })
+            ->where(function ($query) use ($cutoffDate) {
+                $query->where('latest_invoices.status', '!=', 'unpaid')
+                    ->orWhere('latest_invoices.due_date', '>', $cutoffDate);
+            })
+            ->select([
+                'customers.code as customer_code',
+                'customers.name as customer_name',
+                'latest_invoices.code as invoice_code',
+                'latest_invoices.period',
+                'latest_invoices.status',
+                'latest_invoices.due_date',
+            ])
+            ->orderBy('customers.code')
+            ->limit(25)
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $this->newLine();
+        $this->warn('Skipped customers with historical unpaid overdue invoices because their latest invoice is not overdue unpaid:');
+        $this->table(
+            ['Customer', 'Name', 'Latest Invoice', 'Period', 'Status', 'Due Date'],
+            $rows->map(fn ($row) => [
+                $row->customer_code,
+                $row->customer_name,
+                $row->invoice_code,
+                $this->formatDateValue($row->period),
+                $row->status,
+                $this->formatDateValue($row->due_date),
+            ])->all()
+        );
+    }
+
+    private function formatDateValue($value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        return (string) $value;
     }
 }
