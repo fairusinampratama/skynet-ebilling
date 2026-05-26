@@ -37,6 +37,9 @@ class IsolationFeatureTest extends TestCase
                     'mikrotik_sync_checked_at' => now(),
                 ]);
             });
+        $mikrotik->shouldReceive('lastProfileUpdateResult')
+            ->once()
+            ->andReturn(['kick' => ['status' => 'not_active']]);
         $this->app->instance(MikrotikService::class, $mikrotik);
 
         $this->actingAs($admin)
@@ -76,6 +79,9 @@ class IsolationFeatureTest extends TestCase
                     'mikrotik_sync_checked_at' => now(),
                 ]);
             });
+        $mikrotik->shouldReceive('lastProfileUpdateResult')
+            ->once()
+            ->andReturn(['kick' => ['status' => 'not_active']]);
         $this->app->instance(MikrotikService::class, $mikrotik);
 
         $this->actingAs($admin)
@@ -356,6 +362,86 @@ class IsolationFeatureTest extends TestCase
         $this->assertNull($customer->refresh()->previous_profile);
     }
 
+    public function test_mikrotik_isolation_fails_when_post_write_profile_does_not_verify(): void
+    {
+        $router = $this->router(['isolation_profile' => 'ISOLIR-CUSTOM']);
+        $customer = $this->customer(['router_id' => $router->id, 'pppoe_user' => 'verify.fail']);
+        $service = new FakeIsolationMikrotikService([
+            ['name' => 'default'],
+            ['name' => 'ISOLIR-CUSTOM'],
+        ], [
+            '.id' => '*1',
+            'name' => 'verify.fail',
+            'profile' => '20MB',
+        ]);
+        $service->skipProfileWrite = true;
+        $service->connect($router);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Isolation verification failed');
+
+        try {
+            $service->isolateUser('verify.fail');
+        } finally {
+            $this->assertSame('20MB', $service->secret['profile']);
+            $this->assertNull($service->lastProfileUpdateResult());
+            $this->assertSame('20MB', $customer->refresh()->previous_profile);
+        }
+    }
+
+    public function test_mikrotik_isolation_succeeds_when_kick_fails_but_secret_profile_verifies(): void
+    {
+        $router = $this->router(['isolation_profile' => 'ISOLIR-CUSTOM']);
+        $customer = $this->customer(['router_id' => $router->id, 'pppoe_user' => 'kick.fail']);
+        $service = new FakeIsolationMikrotikService([
+            ['name' => 'default'],
+            ['name' => 'ISOLIR-CUSTOM'],
+        ], [
+            '.id' => '*1',
+            'name' => 'kick.fail',
+            'profile' => '20MB',
+        ]);
+        $service->kickShouldFail = true;
+        $service->connect($router);
+
+        $this->assertTrue($service->isolateUser('kick.fail'));
+        $this->assertSame('ISOLIR-CUSTOM', $service->secret['profile']);
+        $this->assertSame('20MB', $customer->refresh()->previous_profile);
+        $this->assertSame('failed', $service->lastProfileUpdateResult()['kick']['status'] ?? null);
+    }
+
+    public function test_mikrotik_reconnect_fails_when_post_write_profile_does_not_verify(): void
+    {
+        $router = $this->router();
+        $customer = $this->customer([
+            'router_id' => $router->id,
+            'pppoe_user' => 'reconnect.verify.fail',
+            'status' => 'isolated',
+            'previous_profile' => '20MB',
+        ]);
+        $service = new FakeIsolationMikrotikService([
+            ['name' => 'default'],
+            ['name' => '20MB'],
+        ], [
+            '.id' => '*1',
+            'name' => 'reconnect.verify.fail',
+            'profile' => 'ISOLIREBILLING',
+        ]);
+        $service->skipProfileWrite = true;
+        $service->connect($router);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Reconnection verification failed');
+
+        try {
+            $service->reconnectUser('reconnect.verify.fail', 'default');
+        } finally {
+            $this->assertSame('ISOLIREBILLING', $service->secret['profile']);
+            $this->assertSame('20MB', $customer->refresh()->previous_profile);
+            $this->assertNull($service->lastProfileUpdateResult());
+        }
+    }
+
     public function test_live_isolation_command_preflight_does_not_dispatch_jobs_without_yes(): void
     {
         Bus::fake();
@@ -377,6 +463,22 @@ class IsolationFeatureTest extends TestCase
             ->assertExitCode(0);
 
         Bus::assertNothingDispatched();
+    }
+
+    public function test_network_diagnostic_reports_missing_router_without_mutating_customer(): void
+    {
+        $customer = $this->customer([
+            'code' => 'DIAG-NO-ROUTER',
+            'router_id' => null,
+        ]);
+
+        $this->artisan('network:diagnose-customer', ['customer' => $customer->code])
+            ->expectsOutputToContain('Customer: Isolation Customer')
+            ->expectsOutputToContain('Router: NO_ROUTER')
+            ->expectsOutputToContain('Cannot query router because customer is missing router or PPPoE username.')
+            ->assertExitCode(0);
+
+        $this->assertSame('active', $customer->refresh()->status);
     }
 
     private function router(array $overrides = []): Router
@@ -428,6 +530,10 @@ class FakeIsolationMikrotikService extends MikrotikService
 {
     public ?string $lastSetProfile = null;
 
+    public bool $skipProfileWrite = false;
+
+    public bool $kickShouldFail = false;
+
     public function __construct(private array $profiles, public array $secret) {}
 
     public function connect(Router $router, array $options = []): self
@@ -452,8 +558,22 @@ class FakeIsolationMikrotikService extends MikrotikService
     protected function setPPPSecretProfile(array $secret, string $profile): void
     {
         $this->lastSetProfile = $profile;
+        if ($this->skipProfileWrite) {
+            return;
+        }
+
         $this->secret['profile'] = $profile;
     }
 
-    public function kickUser(string $username): void {}
+    public function kickUser(string $username): array
+    {
+        if ($this->kickShouldFail) {
+            return [
+                'status' => 'failed',
+                'error' => 'fake kick failure',
+            ];
+        }
+
+        return ['status' => 'not_active'];
+    }
 }

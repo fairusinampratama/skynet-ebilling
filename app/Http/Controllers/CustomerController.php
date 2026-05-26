@@ -259,8 +259,13 @@ class CustomerController extends Controller
         if ($customer->router_id && $customer->pppoe_user) {
             try {
                 $mikrotik->isolateCustomerNow($customer, 10);
+                $kick = $mikrotik->lastProfileUpdateResult()['kick']['status'] ?? null;
+                $message = "Customer {$customer->name} isolated on router and verified.";
+                if ($kick === 'failed') {
+                    $message .= ' Active session kick failed; customer may need to reconnect before the new profile applies.';
+                }
 
-                return back()->with('success', "Customer {$customer->name} isolated on router.");
+                return back()->with('success', $message);
             } catch (\Throwable $e) {
                 return back()->with('error', "Mikrotik Error: {$e->getMessage()}");
             }
@@ -285,8 +290,13 @@ class CustomerController extends Controller
         if ($customer->router_id && $customer->pppoe_user) {
             try {
                 $mikrotik->reconnectCustomerNow($customer, 10);
+                $kick = $mikrotik->lastProfileUpdateResult()['kick']['status'] ?? null;
+                $message = "Customer {$customer->name} reconnected on router and verified.";
+                if ($kick === 'failed') {
+                    $message .= ' Active session kick failed; customer may need to reconnect before the restored profile applies.';
+                }
 
-                return back()->with('success', "Customer {$customer->name} reconnected on router.");
+                return back()->with('success', $message);
             } catch (\Throwable $e) {
                 return back()->with('error', "Mikrotik Error: {$e->getMessage()}");
             }
