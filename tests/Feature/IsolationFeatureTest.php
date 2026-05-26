@@ -165,6 +165,101 @@ class IsolationFeatureTest extends TestCase
         Bus::assertDispatched(IsolateCustomerJob::class, fn ($job) => $job->customer->is($active));
     }
 
+    public function test_overdue_command_ignores_old_unpaid_invoice_when_newest_invoice_is_paid(): void
+    {
+        Bus::fake();
+        $router = $this->router();
+        $customer = $this->customer(['router_id' => $router->id, 'status' => 'active']);
+
+        $this->invoice($customer, [
+            'period' => now()->subMonths(2)->startOfMonth()->toDateString(),
+            'due_date' => now()->subDays(60)->toDateString(),
+            'status' => 'unpaid',
+        ]);
+        $this->invoice($customer, [
+            'period' => now()->startOfMonth()->toDateString(),
+            'due_date' => now()->subDays(10)->toDateString(),
+            'status' => 'paid',
+        ]);
+
+        $this->artisan('billing:check-overdue')
+            ->expectsOutputToContain('Overdue check completed.')
+            ->assertExitCode(0);
+
+        Bus::assertNotDispatched(IsolateCustomerJob::class);
+    }
+
+    public function test_overdue_command_dispatches_when_newest_invoice_is_unpaid_and_overdue(): void
+    {
+        Bus::fake();
+        $router = $this->router();
+        $customer = $this->customer(['router_id' => $router->id, 'status' => 'active']);
+
+        $this->invoice($customer, [
+            'period' => now()->subMonths(2)->startOfMonth()->toDateString(),
+            'due_date' => now()->subDays(60)->toDateString(),
+            'status' => 'paid',
+        ]);
+        $this->invoice($customer, [
+            'period' => now()->startOfMonth()->toDateString(),
+            'due_date' => now()->subDays(10)->toDateString(),
+            'status' => 'unpaid',
+        ]);
+
+        $this->artisan('billing:check-overdue')->assertExitCode(0);
+
+        Bus::assertDispatched(IsolateCustomerJob::class, 1);
+        Bus::assertDispatched(IsolateCustomerJob::class, fn ($job) => $job->customer->is($customer));
+    }
+
+    public function test_overdue_command_dry_run_does_not_dispatch_isolation(): void
+    {
+        Bus::fake();
+        $router = $this->router();
+        $customer = $this->customer(['router_id' => $router->id, 'status' => 'active']);
+
+        $this->invoice($customer, [
+            'due_date' => now()->subDays(10)->toDateString(),
+            'status' => 'unpaid',
+        ]);
+
+        $this->artisan('billing:check-overdue --dry-run')
+            ->expectsOutputToContain('[DRY RUN] Would isolate customer')
+            ->assertExitCode(0);
+
+        Bus::assertNotDispatched(IsolateCustomerJob::class);
+    }
+
+    public function test_overdue_command_skips_latest_overdue_customer_without_router_or_pppoe(): void
+    {
+        Bus::fake();
+        $withoutRouter = $this->customer([
+            'code' => 'NO-ROUTER',
+            'router_id' => null,
+            'status' => 'active',
+        ]);
+        $withoutPppoe = $this->customer([
+            'code' => 'NO-PPPOE',
+            'router_id' => $this->router()->id,
+            'pppoe_user' => '',
+            'status' => 'active',
+        ]);
+
+        foreach ([$withoutRouter, $withoutPppoe] as $customer) {
+            $this->invoice($customer, [
+                'due_date' => now()->subDays(10)->toDateString(),
+                'status' => 'unpaid',
+            ]);
+        }
+
+        $this->artisan('billing:check-overdue')
+            ->expectsOutputToContain('router is required')
+            ->expectsOutputToContain('PPPoE username is required')
+            ->assertExitCode(0);
+
+        Bus::assertNotDispatched(IsolateCustomerJob::class);
+    }
+
     public function test_manual_payment_dispatches_reconnect_for_isolated_paid_customer(): void
     {
         Bus::fake();
