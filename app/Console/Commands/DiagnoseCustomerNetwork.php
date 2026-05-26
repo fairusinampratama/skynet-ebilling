@@ -46,8 +46,7 @@ class DiagnoseCustomerNetwork extends Command
         try {
             $mikrotik->connect($customer->router, ['timeout' => 10, 'attempts' => 1]);
             $secret = $mikrotik->getPPPSecret($customer->pppoe_user);
-            $activeSession = collect($mikrotik->getActiveConnections())
-                ->first(fn (array $session) => ($session['name'] ?? null) === $customer->pppoe_user);
+            $activeSession = $mikrotik->getActiveConnection($customer->pppoe_user);
         } catch (\Throwable $e) {
             $this->error("Router query failed: {$e->getMessage()}");
 
