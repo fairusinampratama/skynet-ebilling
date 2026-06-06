@@ -14,6 +14,8 @@ interface DataTableToolbarProps {
     onFilterChange: (key: string, value: string) => void;
     onReset: () => void;
     actions?: ReactNode;
+    extra?: ReactNode;
+    hasExtraFilters?: boolean;
 }
 
 export function DataTableToolbar({
@@ -25,8 +27,10 @@ export function DataTableToolbar({
     onFilterChange,
     onReset,
     actions,
+    extra,
+    hasExtraFilters = false,
 }: DataTableToolbarProps) {
-    const isFiltered = search.length > 0 || Object.values(activeFilters).some(v => v !== 'all');
+    const isFiltered = search.length > 0 || hasExtraFilters || Object.values(activeFilters).some(v => v !== 'all');
 
     return (
         <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-border bg-card shadow-sm transition-all items-start sm:items-center">
@@ -63,6 +67,8 @@ export function DataTableToolbar({
                         />
                     );
                 })}
+
+                {extra}
 
                 {isFiltered && (
                     <Button

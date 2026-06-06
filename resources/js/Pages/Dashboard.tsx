@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/Components/ui/table';
 import { Badge } from '@/Components/ui/badge';
 import { Activity, CreditCard, DollarSign, AlertCircle, Wifi, Server, CheckCircle2, FileWarning, BarChart3 } from 'lucide-react';
+import { formatIdr } from '@/Components/Format';
 
 interface Transaction {
     id: number;
@@ -42,14 +43,6 @@ interface Props {
 }
 
 export default function Dashboard({ stats, recent_payments }: Props) {
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
-
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return new Intl.DateTimeFormat('id-ID', {
@@ -95,7 +88,7 @@ export default function Dashboard({ stats, recent_payments }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold tracking-tight text-foreground">
-                                {formatCurrency(stats.projected_revenue)}
+                                {formatIdr(stats.projected_revenue)}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
                                 Sum of all active packages
@@ -115,7 +108,7 @@ export default function Dashboard({ stats, recent_payments }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold tracking-tight text-foreground">
-                                {formatCurrency(stats.actual_revenue)}
+                                {formatIdr(stats.actual_revenue)}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
                                 Collected this month
@@ -135,7 +128,7 @@ export default function Dashboard({ stats, recent_payments }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold tracking-tight text-foreground">
-                                {formatCurrency(stats.outstanding)}
+                                {formatIdr(stats.outstanding)}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
                                 Remaining to collect
@@ -312,7 +305,7 @@ export default function Dashboard({ stats, recent_payments }: Props) {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right font-bold font-mono tracking-tight text-foreground">
-                                                {formatCurrency(payment.amount)}
+                                                {formatIdr(payment.amount)}
                                             </TableCell>
                                         </TableRow>
                                     ))

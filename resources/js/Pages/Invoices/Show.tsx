@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner';
 import { optionalImage, requiredNumber, requiredString, validateForm } from '@/lib/validation';
 import { z } from 'zod';
+import { formatIdr } from '@/Components/Format';
 
 interface Customer {
     id: number;
@@ -75,7 +76,7 @@ import { PageProps } from '@/types';
 const payableTransactionStatuses = new Set(['verified', 'paid']);
 
 export default function Show({ invoice }: Props) {
-    const { settings, auth } = usePage<PageProps>().props;
+    const { settings, auth, flash } = usePage<PageProps>().props;
     const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isVoidOpen, setIsVoidOpen] = useState(false);
@@ -89,9 +90,10 @@ export default function Show({ invoice }: Props) {
         .reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0);
     const balance = Math.max(0, Number(invoice.amount) - totalPaid);
     const hasTransactions = invoice.transactions.length > 0;
+    const shouldShowCashPrint = Number(flash.print_invoice_id) === Number(invoice.id);
     const paymentSchema = z.object({
         amount: requiredNumber('Payment amount', 0)
-            .refine((amount) => amount <= balance, `Payment amount cannot exceed ${formatCurrency(balance)}.`),
+            .refine((amount) => amount <= balance, `Payment amount cannot exceed ${formatIdr(balance)}.`),
         method: z.enum(['cash', 'transfer', 'payment_gateway'], { error: 'Payment method is required.' }),
         paid_at: requiredString('Payment date'),
         proof: optionalImage('Payment proof'),
@@ -126,14 +128,6 @@ export default function Show({ invoice }: Props) {
             onFinish: () => setDeleteProcessing(false),
         });
     };
-
-    function formatCurrency(amount: number) {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    }
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('id-ID', {
@@ -210,6 +204,21 @@ export default function Show({ invoice }: Props) {
 
             <div className="py-8">
                 <div className="mx-auto max-w-5xl space-y-6">
+                    {shouldShowCashPrint && (
+                        <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="font-semibold">Cash payment recorded.</p>
+                                <p className="text-sm opacity-80">Use the invoice PDF for office print.</p>
+                            </div>
+                            <Button variant="outline" size="sm" className="gap-2 bg-background" asChild>
+                                <a href={route('invoices.download', invoice.id)} target="_blank">
+                                    <Download className="h-4 w-4" />
+                                    Print Invoice PDF
+                                </a>
+                            </Button>
+                        </div>
+                    )}
+
                     {/* Status Banner */}
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between p-6 rounded-xl border border-border bg-card shadow-sm">
                         <div className="flex items-center gap-4">
@@ -261,7 +270,7 @@ export default function Show({ invoice }: Props) {
                                                 />
                                                 {errors.amount && <p className="text-sm text-destructive">{errors.amount}</p>}
                                                 <p className="text-xs text-muted-foreground">
-                                                    Max payable: {formatCurrency(balance)}
+                                                    Max payable: {formatIdr(balance)}
                                                 </p>
                                             </div>
 
@@ -480,16 +489,16 @@ export default function Show({ invoice }: Props) {
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-muted-foreground">Subtotal</span>
-                                        <span className="font-medium">{formatCurrency(invoice.amount)}</span>
+                                        <span className="font-medium">{formatIdr(invoice.amount)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-muted-foreground">Total Paid</span>
-                                        <span className="font-medium text-emerald-600">-{formatCurrency(totalPaid)}</span>
+                                        <span className="font-medium text-emerald-600">-{formatIdr(totalPaid)}</span>
                                     </div>
                                     <Separator />
                                     <div className="flex justify-between items-center pt-2">
                                         <span className="font-semibold">Balance Due</span>
-                                        <span className="font-bold text-xl text-foreground">{formatCurrency(balance)}</span>
+                                        <span className="font-bold text-xl text-foreground">{formatIdr(balance)}</span>
                                     </div>
                                 </div>
                             </CardContent>
@@ -559,7 +568,7 @@ export default function Show({ invoice }: Props) {
                                                     </TableCell>
                                                 )}
                                                 <TableCell className="text-right font-medium">
-                                                    {formatCurrency(t.amount)}
+                                                    {formatIdr(t.amount)}
                                                 </TableCell>
                                             </TableRow>
                                         ))

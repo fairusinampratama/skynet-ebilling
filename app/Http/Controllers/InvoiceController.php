@@ -10,6 +10,7 @@ use App\Models\Transaction;
 use App\Support\AreaScope;
 use App\Support\SimpleXlsxWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -35,6 +36,7 @@ class InvoiceController extends Controller
                 'search' => $request->search,
                 'status' => $request->status ?? 'all',
                 'period_filter' => $request->period_filter ?? 'all',
+                'period' => $request->period,
                 'limit' => $limit,
             ],
         ]);
@@ -299,8 +301,8 @@ class InvoiceController extends Controller
                     $q->where('status', $status);
                 }
             })
-            ->when($request->input('period_filter', 'all') !== 'history', function ($q) {
-                $q->whereDate('period', now()->startOfMonth()->toDateString());
+            ->when($this->requestedPeriod($request), function ($q, Carbon $period) {
+                $q->whereDate('period', $period->toDateString());
             })
             // Default sort: Unpaid first, then newest
             ->orderByRaw("FIELD(status, 'unpaid', 'paid', 'void')")
@@ -308,5 +310,23 @@ class InvoiceController extends Controller
         AreaScope::applyToInvoices($query, $request->user());
 
         return $query;
+    }
+
+    private function requestedPeriod(Request $request): ?Carbon
+    {
+        $period = trim((string) $request->input('period', ''));
+        if (preg_match('/^\d{4}-\d{2}$/', $period) === 1) {
+            try {
+                return Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+            } catch (\Throwable) {
+                return now()->startOfMonth();
+            }
+        }
+
+        return match ($request->input('period_filter', 'all')) {
+            'history' => null,
+            'previous' => now()->subMonthNoOverflow()->startOfMonth(),
+            default => now()->startOfMonth(),
+        };
     }
 }

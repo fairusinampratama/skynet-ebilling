@@ -21,6 +21,7 @@ import {
     DialogTrigger,
 } from "@/Components/ui/dialog";
 import { PageProps } from '@/types';
+import { formatIdr } from '@/Components/Format';
 
 // Types
 interface Transaction {
@@ -135,10 +136,6 @@ export default function Show({ customer }: Props) {
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
     };
 
     const getStatusBadge = (status: string) => {
@@ -316,7 +313,7 @@ export default function Show({ customer }: Props) {
                                         <span className="block truncate">{customer.package.name}</span>
                                     </DetailRow>
                                     <DetailRow label="Price">
-                                        {formatCurrency(customer.package.price)} / mo
+                                        {formatIdr(customer.package.price)} / mo
                                     </DetailRow>
                                     <DetailRow label="Package Profile">
                                         <ProfileValue value={customer.package.mikrotik_profile} />
@@ -515,7 +512,7 @@ export default function Show({ customer }: Props) {
                                                 <TableRow key={inv.id} className="border-border hover:bg-muted/50">
                                                     <TableCell className="font-mono">#{String(inv.id).padStart(6, '0')}</TableCell>
                                                     <TableCell>{periodDate(inv.period)}</TableCell>
-                                                    <TableCell>{formatCurrency(inv.amount)}</TableCell>
+                                                    <TableCell>{formatIdr(inv.amount)}</TableCell>
                                                     <TableCell className={new Date(inv.due_date) < new Date() && inv.status === 'unpaid' ? 'text-destructive font-bold' : ''}>
                                                         {formatDate(inv.due_date)}
                                                     </TableCell>
@@ -578,7 +575,7 @@ export default function Show({ customer }: Props) {
                                                         <TableCell className="font-mono">INV-{String(txn.invoice_id).padStart(6, '0')}</TableCell>
                                                         <TableCell className="capitalize">{txn.method.replace('_', ' ')}</TableCell>
                                                         <TableCell className="font-medium text-emerald-500">
-                                                            + {formatCurrency(txn.amount)}
+                                                            + {formatIdr(txn.amount)}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))

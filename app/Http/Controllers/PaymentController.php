@@ -96,7 +96,13 @@ class PaymentController extends Controller
             }
         });
 
-        return redirect()->route('invoices.show', $invoice)
+        $redirect = redirect()->route('invoices.show', $invoice)
             ->with('success', 'Payment recorded successfully.');
+
+        if ($validated['method'] === 'cash') {
+            $redirect->with('print_invoice_id', $invoice->id);
+        }
+
+        return $redirect;
     }
 }

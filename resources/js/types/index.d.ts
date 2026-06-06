@@ -17,6 +17,7 @@ export type PageProps<
     flash: {
         success?: string;
         error?: string;
+        print_invoice_id?: number;
     };
     settings: {
         payment_channels: Array<{

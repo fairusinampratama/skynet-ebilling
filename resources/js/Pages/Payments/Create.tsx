@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/Components/ui/alert';
 import { FormEventHandler } from 'react';
 import { optionalImage, requiredNumber, validateForm } from '@/lib/validation';
 import { z } from 'zod';
+import { formatIdr } from '@/Components/Format';
 
 interface Customer {
     id: number;
@@ -47,14 +48,6 @@ export default function Create({ invoice }: Props) {
         e.preventDefault();
         if (!validateForm(paymentCreateSchema, data, form)) return;
         post(`/invoices/${invoice.id}/payments`);
-    };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
     };
 
     const formatDate = (dateString: string) => {
@@ -102,7 +95,7 @@ export default function Create({ invoice }: Props) {
                                         </div>
                                         <div>
                                             <span className="font-semibold">Invoice Amount:</span>{' '}
-                                            <span className="text-lg font-bold">{formatCurrency(invoice.amount)}</span>
+                                            <span className="text-lg font-bold">{formatIdr(invoice.amount)}</span>
                                         </div>
                                         <div>
                                             <span className="font-semibold">Due Date:</span> {formatDate(invoice.due_date)}
