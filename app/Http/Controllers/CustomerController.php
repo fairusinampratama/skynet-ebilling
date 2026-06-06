@@ -11,6 +11,8 @@ use App\Models\Router;
 use App\Services\MikrotikService;
 use App\Support\AreaScope;
 use App\Support\SimpleXlsxWriter;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -68,7 +70,12 @@ class CustomerController extends Controller
                 'invoices as unpaid_periods_count' => function ($query) {
                     $query->where('status', 'unpaid');
                 },
-            ]);
+            ])
+            ->withMax([
+                'invoices as last_paid_period' => function ($query) {
+                    $query->where('status', 'paid');
+                },
+            ], 'period');
 
         $rowNumber = 1;
         $rows = $query->lazy(1000)->map(function (Customer $customer) use (&$rowNumber) {
@@ -79,15 +86,17 @@ class CustomerController extends Controller
                 $customer->name,
                 $customer->address,
                 $customer->phone,
+                $customer->pppoe_user ?? '',
                 $customer->area?->name ?? '',
                 $customer->package?->name ?? '',
                 $customer->package?->rate_limit ?? '',
                 $customer->package?->price ?? '',
-                $customer->status,
+                $this->exportStatusLabel($customer),
                 $customer->router?->name ?? '',
                 $customer->mikrotik_sync_status ?? 'unknown',
                 $customer->mikrotik_synced_at?->toDateTimeString() ?? '',
                 $customer->mikrotik_sync_checked_at?->toDateTimeString() ?? '',
+                $this->formatExportPeriod($customer->last_paid_period),
                 $customer->join_date?->toDateString() ?? '',
                 $customer->due_day,
                 $customer->unpaid_periods_count,
@@ -102,6 +111,7 @@ class CustomerController extends Controller
             'Nama Pelanggan',
             'Alamat',
             'Tlp',
+            'Username PPPoE',
             'Area',
             'Nama Langganan',
             'Keterangan Langganan',
@@ -111,6 +121,7 @@ class CustomerController extends Controller
             'MikroTik Sync',
             'MikroTik Synced At',
             'MikroTik Checked At',
+            'Periode Pembayaran Terakhir',
             'Tanggal Bergabung',
             'Jatuh Tempo',
             'Periode Belum Bayar',
@@ -404,6 +415,55 @@ class CustomerController extends Controller
             ->with('router:id,name')
             ->orderBy('name')
             ->get();
+    }
+
+    private function exportStatusLabel(Customer $customer): string
+    {
+        if ((float) ($customer->package?->price ?? 0) === 0.0) {
+            return 'fasum';
+        }
+
+        if ($this->isLastPaidPeriodPastDismantleCutoff($customer->last_paid_period)) {
+            return 'dismantle';
+        }
+
+        if ($customer->trashed() || $customer->status === 'terminated') {
+            return 'dismantle';
+        }
+
+        if ($customer->status === 'isolated') {
+            return 'suspend';
+        }
+
+        if ($customer->status === 'active') {
+            return 'active';
+        }
+
+        return $customer->status;
+    }
+
+    private function isLastPaidPeriodPastDismantleCutoff(CarbonInterface|string|null $period): bool
+    {
+        if (! $period) {
+            return false;
+        }
+
+        $lastPaidPeriod = $period instanceof CarbonInterface
+            ? $period->copy()->startOfMonth()
+            : Carbon::parse($period)->startOfMonth();
+
+        return $lastPaidPeriod->lt(now()->startOfMonth()->subMonths(3));
+    }
+
+    private function formatExportPeriod(CarbonInterface|string|null $period): string
+    {
+        if (! $period) {
+            return '';
+        }
+
+        return $period instanceof CarbonInterface
+            ? $period->format('F Y')
+            : \Carbon\Carbon::parse($period)->format('F Y');
     }
 
     private function uniqueCustomerCode(string $name): string

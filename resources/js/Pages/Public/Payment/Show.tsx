@@ -8,6 +8,7 @@ import { Badge } from '@/Components/ui/badge';
 import { Separator } from '@/Components/ui/separator';
 import { AlertCircle, CheckCircle2, Clock, CreditCard, Building2, Smartphone, Mail } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/Components/ui/alert';
+import { formatIdr } from '@/Components/Format';
 
 interface Invoice {
     id: number;
@@ -59,15 +60,6 @@ export default function Show({ invoice, channels, company, manual_accounts }: Pr
         if (!selectedChannel) return;
         setData('method', selectedChannel);
         post(route('public.invoice.pay', invoice.uuid));
-    };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount);
     };
 
     const formatDate = (dateString: string) => {
@@ -171,7 +163,7 @@ export default function Show({ invoice, channels, company, manual_accounts }: Pr
                                             {new Date(invoice.period).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
                                         </p>
                                     </div>
-                                    <p className="text-lg font-bold">{formatCurrency(invoice.amount)}</p>
+                                    <p className="text-lg font-bold">{formatIdr(invoice.amount)}</p>
                                 </div>
 
                                 <Separator />
@@ -179,7 +171,7 @@ export default function Show({ invoice, channels, company, manual_accounts }: Pr
                                 {/* Total */}
                                 <div className="flex justify-between items-center py-4 bg-muted/50 -mx-6 px-6 rounded-lg">
                                     <p className="text-lg font-bold">Total Amount</p>
-                                    <p className="text-2xl font-bold text-primary">{formatCurrency(invoice.amount)}</p>
+                                    <p className="text-2xl font-bold text-primary">{formatIdr(invoice.amount)}</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -261,7 +253,7 @@ export default function Show({ invoice, channels, company, manual_accounts }: Pr
                                                         onClick={handlePay}
                                                         disabled={!selectedChannel || processing}
                                                     >
-                                                        {processing ? 'Processing...' : `Pay ${formatCurrency(invoice.amount)}`}
+                                                        {processing ? 'Processing...' : `Pay ${formatIdr(invoice.amount)}`}
                                                     </Button>
                                                 </>
                                             ) : (

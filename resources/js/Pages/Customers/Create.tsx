@@ -11,6 +11,7 @@ import MapPicker from '@/Components/MapPicker';
 import { FormEventHandler } from 'react';
 import { nullableId, optionalImage, optionalNumberInRange, requiredId, requiredString, validateForm } from '@/lib/validation';
 import { z } from 'zod';
+import { formatIdr } from '@/Components/Format';
 
 // Interfaces
 interface Package {
@@ -336,7 +337,7 @@ export default function Create({ packages, areas, routers }: Props) {
                                                 <SelectItem key={pkg.id} value={String(pkg.id)}>
                                                     <span className="font-medium">{pkg.name}</span>
                                                     <span className="text-muted-foreground ml-2">
-                                                        ({pkg.mikrotik_profile || 'No profile'} / Rp {pkg.price.toLocaleString('id-ID')})
+                                                        ({pkg.mikrotik_profile || 'No profile'} / {formatIdr(pkg.price)})
                                                     </span>
                                                 </SelectItem>
                                             ))}

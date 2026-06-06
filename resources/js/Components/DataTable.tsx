@@ -68,6 +68,10 @@ interface DataTableProps<T> {
     searchPlaceholder?: string;
     filterConfigs?: FilterConfig[]; // Dropdown filters configuration
     actions?: ReactNode; // Slot for "Add Button" etc.
+    toolbarExtra?: ReactNode;
+    extraFilters?: Record<string, string | undefined>;
+    onResetExtraFilters?: () => void;
+    onFilterChanged?: (key: string, value: string) => void;
     loading?: boolean;
     onRowClick?: (item: T) => void;
     mobileCard?: (item: T) => ReactNode;
@@ -84,6 +88,10 @@ export default function DataTable<T extends { id: number | string }>({
     searchPlaceholder = "Search...",
     filterConfigs = [],
     actions,
+    toolbarExtra,
+    extraFilters = {},
+    onResetExtraFilters,
+    onFilterChanged,
     onRowClick,
     mobileCard,
     routeName,
@@ -111,6 +119,8 @@ export default function DataTable<T extends { id: number | string }>({
     const [isLoading, setIsLoading] = useState(false);
 
     const debouncedSearch = useDebounce(search, 350);
+    const extraFiltersKey = JSON.stringify(extraFilters);
+    const hasExtraFilters = Object.values(extraFilters).some(Boolean);
 
     // Effect to trigger search/filter
     useEffect(() => {
@@ -127,6 +137,11 @@ export default function DataTable<T extends { id: number | string }>({
                 params[key] = activeFilters[key];
             }
         });
+        Object.entries(extraFilters).forEach(([key, value]) => {
+            if (value) {
+                params[key] = value;
+            }
+        });
 
         setIsLoading(true);
         router.get(
@@ -139,7 +154,7 @@ export default function DataTable<T extends { id: number | string }>({
                 onFinish: () => setIsLoading(false)
             }
         );
-    }, [debouncedSearch, activeFilters, sortField, sortDirection, limit, routeName, routeParams]);
+    }, [debouncedSearch, activeFilters, sortField, sortDirection, limit, routeName, routeParams, extraFiltersKey]);
 
     // Handlers
     const handleSort = (field: string) => {
@@ -153,6 +168,7 @@ export default function DataTable<T extends { id: number | string }>({
 
     const handleFilterChange = (key: string, value: string) => {
         setActiveFilters(prev => ({ ...prev, [key]: value }));
+        onFilterChanged?.(key, value);
     };
 
     const handleReset = () => {
@@ -164,6 +180,7 @@ export default function DataTable<T extends { id: number | string }>({
         setActiveFilters(resetFilters);
         setSortField('created_at');
         setSortDirection('desc');
+        onResetExtraFilters?.();
     };
 
     const SortIcon = ({ field }: { field: string }) => {
@@ -185,6 +202,8 @@ export default function DataTable<T extends { id: number | string }>({
                 onReset={handleReset}
                 searchPlaceholder={searchPlaceholder}
                 actions={actions}
+                extra={toolbarExtra}
+                hasExtraFilters={hasExtraFilters}
             />
 
             {/* Table Card */}

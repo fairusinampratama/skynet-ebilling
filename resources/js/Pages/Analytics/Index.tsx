@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Users, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
+import { formatIdr } from '@/Components/Format';
 
 interface MetricCardProps {
     title: string;
@@ -85,15 +86,6 @@ export default function Index() {
         fetchAnalytics();
     }, []);
 
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(value);
-    };
-
     if (loading) {
         return (
             <AuthenticatedLayout>
@@ -122,7 +114,7 @@ export default function Index() {
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
                         <MetricCard
                             title="Current MRR"
-                            value={formatCurrency(mrrData?.current_mrr || 0)}
+                            value={formatIdr(mrrData?.current_mrr || 0)}
                             trend={`${mrrData?.growth_percentage >= 0 ? '+' : ''}${mrrData?.growth_percentage}% from last month`}
                             trendDirection={mrrData?.growth_percentage >= 0 ? 'up' : 'down'}
                             icon={<DollarSign />}
@@ -135,7 +127,7 @@ export default function Index() {
                         />
                         <MetricCard
                             title="Outstanding Amount"
-                            value={formatCurrency(collectionData?.by_status?.unpaid?.total_amount || 0)}
+                            value={formatIdr(collectionData?.by_status?.unpaid?.total_amount || 0)}
                             trend={`${collectionData?.by_status?.unpaid?.count || 0} unpaid invoices`}
                             icon={<AlertCircle />}
                         />
@@ -171,7 +163,7 @@ export default function Index() {
                                             <Tooltip
                                                 contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
                                                 itemStyle={{ color: 'var(--color-foreground)' }}
-                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                                formatter={(value: any) => formatIdr(Number(value || 0))}
                                             />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Line type="monotone" dataKey="total_invoiced" stroke="var(--color-chart-1)" name="Invoiced" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
@@ -197,7 +189,7 @@ export default function Index() {
                                             <Tooltip
                                                 cursor={{ fill: 'var(--color-muted)', opacity: 0.1 }}
                                                 contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
-                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                                formatter={(value: any) => formatIdr(Number(value || 0))}
                                             />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="total_amount" fill="var(--color-chart-5)" radius={[4, 4, 0, 0]} name="Amount" />
@@ -222,7 +214,7 @@ export default function Index() {
                                             <Tooltip
                                                 cursor={{ fill: 'var(--color-muted)', opacity: 0.1 }}
                                                 contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
-                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                                formatter={(value: any) => formatIdr(Number(value || 0))}
                                             />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="total_collected" fill="var(--color-chart-2)" stackId="a" radius={[0, 4, 4, 0]} name="Collected" />
@@ -248,7 +240,7 @@ export default function Index() {
                                             <Tooltip
                                                 cursor={{ fill: 'var(--color-muted)', opacity: 0.1 }}
                                                 contentStyle={{ backgroundColor: 'var(--color-card)', borderColor: 'var(--color-border)', color: 'var(--color-foreground)', borderRadius: 'var(--radius)' }}
-                                                formatter={(value: any) => formatCurrency(Number(value || 0))}
+                                                formatter={(value: any) => formatIdr(Number(value || 0))}
                                             />
                                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                             <Bar dataKey="total_revenue" fill="var(--color-chart-4)" radius={[0, 4, 4, 0]} name="Revenue (3mo)" />

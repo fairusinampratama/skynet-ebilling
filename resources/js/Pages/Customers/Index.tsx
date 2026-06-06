@@ -6,6 +6,7 @@ import { Badge } from '@/Components/ui/badge';
 import { Download } from "lucide-react";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 import { PageProps } from '@/types';
+import { formatIdr } from '@/Components/Format';
 
 
 const getStatusBadge = (status: string) => {
@@ -171,7 +172,7 @@ export default function Index({ customers, packages = [], areas = [], filters = 
                         </span>
                     </div>
                     <span className="text-xs font-mono text-muted-foreground">
-                        Rp {customer.package.price.toLocaleString('id-ID')}
+                        {formatIdr(customer.package.price)}
                     </span>
                 </div>
             )

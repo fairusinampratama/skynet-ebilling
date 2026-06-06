@@ -15,6 +15,7 @@ import {
     DialogTrigger,
 } from "@/Components/ui/dialog";
 import { useState } from 'react';
+import { formatIdr } from '@/Components/Format';
 
 interface Customer {
     id: number;
@@ -47,14 +48,6 @@ export default function Show({ package: pkg }: Props) {
     const handleDelete = () => {
         router.delete(route('packages.destroy', pkg.id));
         setDeleteDialogOpen(false);
-    };
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
     };
 
     const getStatusColor = (status: string) => {
@@ -145,7 +138,7 @@ export default function Show({ package: pkg }: Props) {
                                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{formatCurrency(pkg.price)}</div>
+                                <div className="text-2xl font-bold">{formatIdr(pkg.price)}</div>
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Per customer per month
                                 </p>
@@ -176,7 +169,7 @@ export default function Show({ package: pkg }: Props) {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
-                                    {formatCurrency(pkg.price * pkg.customers_count)}
+                                    {formatIdr(pkg.price * pkg.customers_count)}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
                                     Monthly potential
@@ -202,7 +195,7 @@ export default function Show({ package: pkg }: Props) {
 
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Price</p>
-                                    <p className="text-base font-semibold mt-1">{formatCurrency(pkg.price)}</p>
+                                    <p className="text-base font-semibold mt-1">{formatIdr(pkg.price)}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Router</p>

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { FormEventHandler } from 'react';
 import { requiredId, requiredNumber, requiredString, validateForm } from '@/lib/validation';
 import { z } from 'zod';
+import { formatIdr } from '@/Components/Format';
 
 interface Package {
     id: number;
@@ -284,7 +285,7 @@ export default function Create({ customers, areas }: Props) {
                                     {errors.amount && <p className="text-sm text-destructive">{errors.amount}</p>}
                                     {selectedCustomer && (
                                         <p className="text-xs text-muted-foreground">
-                                            Package: {selectedCustomer.package?.name} — Rp {selectedCustomer.package?.price?.toLocaleString('id-ID')}
+                                            Package: {selectedCustomer.package?.name} — {formatIdr(selectedCustomer.package?.price ?? 0)}
                                         </p>
                                     )}
                                 </div>

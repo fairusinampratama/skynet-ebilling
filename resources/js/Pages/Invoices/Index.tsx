@@ -3,10 +3,12 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
+import { Input } from '@/Components/ui/input';
 import { Eye, CreditCard, Calendar, AlertCircle, MoreHorizontal, Plus, Download } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/Components/ui/dropdown-menu";
 import DataTable, { Column, FilterConfig, PaginatedData } from '@/Components/DataTable';
 import { PageProps } from '@/types';
+import { formatIdr } from '@/Components/Format';
 
 interface Customer {
     id: number;
@@ -33,20 +35,14 @@ interface Props {
         direction?: 'asc' | 'desc';
         limit?: string;
         period_filter?: string;
+        period?: string;
     };
 }
 
 export default function Index({ invoices, filters = {} }: Props) {
     const { auth } = usePage<PageProps>().props;
     const isAdmin = auth.user.role === 'admin' || auth.user.role === 'superadmin';
-
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
+    const [customPeriod, setCustomPeriod] = useState(filters.period || '');
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('id-ID', {
@@ -133,7 +129,7 @@ export default function Index({ invoices, filters = {} }: Props) {
             accessorKey: "amount",
             cell: (invoice) => (
                 <span className="font-mono">
-                    {formatCurrency(invoice.amount)}
+                    {formatIdr(invoice.amount)}
                 </span>
             )
         },
@@ -202,6 +198,8 @@ export default function Index({ invoices, filters = {} }: Props) {
             key: 'period_filter',
             placeholder: 'Current Period',
             options: [
+                { label: 'Current Period', value: 'all' },
+                { label: 'Previous Month', value: 'previous' },
                 { label: 'All History', value: 'history' },
             ]
         },
@@ -223,10 +221,26 @@ export default function Index({ invoices, filters = {} }: Props) {
                 params.set(key, String(value));
             }
         });
+        if (customPeriod) {
+            params.set('period', customPeriod);
+            params.delete('period_filter');
+        }
 
         const query = params.toString();
         return query ? `${route('invoices.export')}?${query}` : route('invoices.export');
     };
+
+    const monthPicker = (
+        <div className="flex items-center gap-2">
+            <Input
+                type="month"
+                value={customPeriod}
+                onChange={(event) => setCustomPeriod(event.target.value)}
+                className="h-8 w-[160px]"
+                aria-label="Custom invoice month"
+            />
+        </div>
+    );
 
     return (
         <AuthenticatedLayout
@@ -266,6 +280,14 @@ export default function Index({ invoices, filters = {} }: Props) {
                     searchPlaceholder="Search Customer, Code..."
                     filterConfigs={filterConfigs}
                     routeName="invoices.index"
+                    toolbarExtra={monthPicker}
+                    extraFilters={customPeriod ? { period: customPeriod } : {}}
+                    onResetExtraFilters={() => setCustomPeriod('')}
+                    onFilterChanged={(key) => {
+                        if (key === 'period_filter') {
+                            setCustomPeriod('');
+                        }
+                    }}
                     onRowClick={(item: Invoice) => router.visit(route('invoices.show', item.id))}
                 />
             </div>
