@@ -1,0 +1,20 @@
+[Unit]
+Description=Skynet eBilling — Ticket Report WA (scheduled summary)
+Documentation=https://github.com/tiarh/skynet-ebilling
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=skynet
+WorkingDirectory=/opt/skynet-ebilling
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Host 106 has autossh tunnel 0.0.0.0:8085 -> 103.156.128.102:8085 (Evo API)
+# When run from HOST (not container), host.docker.internal is invalid → use localhost
+Environment="EVOLUTION_API_BASE_URL=http://localhost:8085"
+ExecStart=/opt/skynet-ebilling/ticket-report-wa.sh
+StandardOutput=append:/var/log/skynet-ticket-report.log
+StandardError=append:/var/log/skynet-ticket-report.log
+
+[Install]
+WantedBy=multi-user.target

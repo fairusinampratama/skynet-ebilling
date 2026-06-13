@@ -1,0 +1,15 @@
+[Unit]
+Description=Skynet eBilling — Ticket Report WA every 2 hours (12, 14, 16 WIB)
+Documentation=https://github.com/tiarh/skynet-ebilling
+
+[Timer]
+# 05,07,09 UTC = 12:00, 14:00, 16:00 WIB (Asia/Jakarta = UTC+7)
+OnCalendar=*-*-* 05,07,09:00:00
+# 30s random jitter to avoid thundering herd
+RandomizedDelaySec=30s
+# If we missed a run (e.g. server was down), fire ASAP once on boot
+Persistent=true
+Unit=skynet-ticket-report.service
+
+[Install]
+WantedBy=timers.target
