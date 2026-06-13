@@ -9,11 +9,19 @@
 set -euo pipefail
 # Try to source .env from script dir so $EVOLUTION_API_BASE_URL is set
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Preserve overrides from caller (e.g. systemd Environment=)
+__EVO_PRESET="${EVOLUTION_API_BASE_URL:-${EVO_URL:-}}"
 if [ -f "$SCRIPT_DIR/.env" ]; then
   set -a
   # shellcheck disable=SC1091
   . "$SCRIPT_DIR/.env"
   set +a
+fi
+# Restore caller overrides — .env is shared with Laravel containers and may
+# contain host.docker.internal URLs that don't work from the host itself.
+if [ -n "$__EVO_PRESET" ]; then
+  EVOLUTION_API_BASE_URL="$__EVO_PRESET"
+  EVO_URL="$__EVO_PRESET"
 fi
 
 EVO_URL="${EVOLUTION_API_BASE_URL:-${EVO_URL:-http://localhost:8085}}"
