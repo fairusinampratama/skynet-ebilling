@@ -36,7 +36,7 @@ return [
     ],
 
     'legacy_scraper' => [
-        'url' => env('LEGACY_SCRAPER_URL', 'http://scraping-ebilling.103.156.128.102.sslip.io'),
+        'url' => env('LEGACY_SCRAPER_URL'),
     ],
 
 ];

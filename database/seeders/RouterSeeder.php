@@ -15,23 +15,9 @@ class RouterSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $routers = [
-            ['name' => 'PPoE RANDUAGUNG', 'ip_address' => '10.181.40.2', 'port' => 8728],
-            ['name' => 'Antena', 'ip_address' => '10.77.77.3', 'port' => 8728],
-            ['name' => 'Metro', 'ip_address' => '10.20.40.2', 'port' => 8728],
-            ['name' => 'Martopuro', 'ip_address' => '10.182.53.2', 'port' => 8728],
-            ['name' => 'Srigading', 'ip_address' => '10.181.88.2', 'port' => 8728],
-            ['name' => 'Lawang', 'ip_address' => '10.181.9.2', 'port' => 8728],
-            ['name' => 'Bantaran', 'ip_address' => '10.182.45.2', 'port' => 8728],
-            ['name' => 'Karangploso', 'ip_address' => '10.181.30.2', 'port' => 8728],
-            ['name' => 'Arjosari', 'ip_address' => '10.150.5.3', 'port' => 8728],
-            ['name' => 'Bumiayu', 'ip_address' => '10.150.6.5', 'port' => 8728],
-            ['name' => 'Kasin', 'ip_address' => '10.150.5.4', 'port' => 8728],
-            ['name' => 'Ngadipuro', 'ip_address' => '10.150.6.3', 'port' => 8728],
-            ['name' => 'Sentul', 'ip_address' => '10.183.10.27', 'port' => 8728],
-            ['name' => 'Tutur', 'ip_address' => '10.183.10.20', 'port' => 8728],
-            ['name' => 'Krian', 'ip_address' => '10.150.6.2', 'port' => 8728],
-            ['name' => 'Kendit', 'ip_address' => '10.183.10.11', 'port' => 8728],
-            ['name' => 'Blitar', 'ip_address' => '10.183.10.9', 'port' => 8728],
+            ['name' => 'Demo Core Router', 'ip_address' => '192.0.2.10', 'port' => 8728],
+            ['name' => 'Demo Distribution Router', 'ip_address' => '192.0.2.11', 'port' => 8728],
+            ['name' => 'Demo Access Router', 'ip_address' => '192.0.2.12', 'port' => 8728],
         ];
 
         foreach ($routers as $router) {
@@ -39,8 +25,8 @@ class RouterSeeder extends Seeder
             Router::create([
                 'name' => $router['name'],
                 'ip_address' => $router['ip_address'],
-                'username' => 'userskynet',
-                'password' => 'skynet',
+                'username' => 'demo-router-user',
+                'password' => 'replace-with-private-secret',
                 'port' => $router['port'],
                 'is_active' => true,
             ]);

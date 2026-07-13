@@ -1,4 +1,10 @@
 *.log
+*.csv
+*.xls
+*.xlsx
+*.sql
+*.sqlite
+*.db
 .DS_Store
 .env
 .env.backup
@@ -20,6 +26,7 @@
 /storage/framework/vite
 /storage/pail
 /vendor
+/migration_data/
 Homestead.json
 Homestead.yaml
 Thumbs.db

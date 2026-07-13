@@ -102,4 +102,6 @@ Use the MySQL-backed Docker test command in `RUNNING_THE_APP.md` for the full fe
 
 If you discover any security-related issues, please avoid using the public issue tracker and instead communicate directly with the development team.
 
+Real customer exports, migration datasets, router credentials, payment evidence, generated spreadsheets, logs, and production environment files are intentionally excluded from this repository. Use anonymized fixtures for public examples and keep operational data in approved private storage only.
+
 <!-- Last updated: 2026-05-22 -->

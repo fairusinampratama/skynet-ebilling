@@ -10,33 +10,31 @@ class SeedAbdulRoshidSeeder extends Seeder
 {
     public function run()
     {
-        // 1. Ensure Package Exists
         $package = Package::firstOrCreate(
-            ['name' => 'Paket 5M Krian'],
+            ['name' => 'Demo 5 Mbps Package'],
             [
-                'code' => 'PKG-5M-KRIAN',
+                'code' => 'PKG-DEMO-5M',
                 'price' => 125000,
                 'rate_limit' => '5Mbps',
             ]
         );
 
-        // 2. Create Customer
         $customer = Customer::firstOrCreate(
-            ['pppoe_user' => 'ABDULROSHIDRT16@SKY-KRI-31'],
+            ['pppoe_user' => 'demo-customer@example'],
             [
-                'code' => 'KRN119',
-                'name' => 'ABDUL ROSID',
-                'address' => 'RT.16/RW.06 BADAS',
-                'phone' => '0',
-                'nik' => '3515115006770000',
+                'code' => 'DEMO001',
+                'name' => 'Demo Customer',
+                'address' => 'Example service area',
+                'phone' => '080000000000',
+                'nik' => null,
                 'package_id' => $package->id,
-                'status' => 'active', // Lowercase as per new enum
-                'join_date' => '2021-11-30', // "30 November 2021" converted
-                'geo_lat' => -7.372358,
-                'geo_long' => 112.607408,
+                'status' => 'active',
+                'join_date' => '2026-01-01',
+                'geo_lat' => null,
+                'geo_long' => null,
             ]
         );
 
-        $this->command->info('Customer ABDUL ROSID seeded successfully.');
+        $this->command->info('Demo customer seeded successfully.');
     }
 }

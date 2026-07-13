@@ -4,8 +4,7 @@
 # Evo API URL priority:
 #   1. $EVOLUTION_API_BASE_URL (set in .env via Laravel or sourced by crontab)
 #   2. $EVO_URL (explicit override)
-#   3. localhost:8085 (works on 106 via autossh tunnel 0.0.0.0:8085->102:8085)
-#   4. http://103.156.128.102:8085 (public, works from 216)
+#   3. localhost:8085 for a private tunnel or local service
 set -euo pipefail
 # Try to source .env from script dir so $EVOLUTION_API_BASE_URL is set
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -26,13 +25,13 @@ fi
 
 EVO_URL="${EVOLUTION_API_BASE_URL:-${EVO_URL:-http://localhost:8085}}"
 EVO_KEY="${EVOLUTION_API_API_KEY:-${EVO_API_KEY:-}}"  # from .env, NEVER hardcode!
-EVO_INSTANCE="skynet-ebilling"
-GROUP_JID="120363406951510568@g.us"
-MYSQL_CONTAINER="skynet-ebilling-mysql-1"
-MYSQL_USER="skynet"
+EVO_INSTANCE="${EVO_INSTANCE:-skynet-ebilling}"
+GROUP_JID="${EVO_GROUP_JID:-}"
+MYSQL_CONTAINER="${MYSQL_CONTAINER:-skynet-ebilling-mysql-1}"
+MYSQL_USER="${DB_USERNAME:-skynet}"
 MYSQL_PASS="${DB_PASSWORD:-}"  # from .env, NEVER hardcode!
-MYSQL_DB="skynet_ebilling"
-APP_URL="https://ebilling.sky.net.id"
+MYSQL_DB="${DB_DATABASE:-skynet_ebilling}"
+APP_URL="${APP_URL:-https://example.test}"
 # Legacy: tinyurl cache path kept for backward compat (no longer used — links are now direct ebilling.sky.net.id URLs)
 TINYURL_CACHE="/opt/skynet-ebilling/src/.tinyurl-cache"
 
